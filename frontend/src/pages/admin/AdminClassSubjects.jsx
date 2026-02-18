@@ -1,0 +1,131 @@
+import { useEffect, useState } from "react";
+import axios from "axios";
+
+export default function AdminClassSubjects() {
+  const [classes, setClasses] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+
+  const [selectedClass, setSelectedClass] = useState("");
+  const [assignments, setAssignments] = useState([]);
+
+  const API = "http://localhost:5000/api/admin";
+
+  useEffect(() => {
+    loadClasses();
+    loadSubjects();
+  }, []);
+
+  useEffect(() => {
+    if (selectedClass) {
+      loadAssignments(selectedClass);
+    }
+  }, [selectedClass]);
+
+  async function loadClasses() {
+    const res = await axios.get(`${API}/classes`, { withCredentials: true });
+    setClasses(res.data);
+  }
+
+  async function loadSubjects() {
+    const res = await axios.get(`${API}/subjects`, { withCredentials: true });
+    setSubjects(res.data);
+  }
+
+  async function loadAssignments(classId) {
+    const res = await axios.get(
+      `${API}/class-subjects/${classId}`,
+      { withCredentials: true }
+    );
+    setAssignments(res.data);
+  }
+
+  async function assign(subjectId) {
+    try {
+      await axios.post(
+        `${API}/class-subjects`,
+        { classId: selectedClass, subjectId },
+        { withCredentials: true }
+      );
+
+      loadAssignments(selectedClass);
+    } catch (err) {
+      alert(err.response?.data?.message || "Could not assign");
+    }
+  }
+
+  async function remove(id) {
+    await axios.delete(`${API}/class-subjects/${id}`, {
+      withCredentials: true,
+    });
+
+    loadAssignments(selectedClass);
+  }
+
+  const assignedIds = assignments.map((a) => a.subjectId);
+
+  return (
+    <div className="p-4">
+      <h2 className="text-xl font-bold mb-4">
+        Assign Subjects to Classes
+      </h2>
+
+      <select
+        className="border p-2 mb-4 w-full"
+        value={selectedClass}
+        onChange={(e) => setSelectedClass(e.target.value)}
+      >
+        <option value="">-- Select Class --</option>
+        {classes.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+
+      {selectedClass && (
+        <>
+          <h3 className="font-semibold mb-2">Available Subjects</h3>
+
+          <div className="grid grid-cols-2 gap-2">
+            {subjects.map((s) => {
+              const isAssigned = assignedIds.includes(s.id);
+
+              return (
+                <div
+                  key={s.id}
+                  className="border p-2 flex justify-between items-center"
+                >
+                  <span>
+                    {s.name} {s.code ? `(${s.code})` : ""}
+                  </span>
+
+                  {!isAssigned ? (
+                    <button
+                      className="bg-green-600 text-white px-2 py-1"
+                      onClick={() => assign(s.id)}
+                    >
+                      Add
+                    </button>
+                  ) : (
+                    <button
+                      className="bg-red-600 text-white px-2 py-1"
+                      onClick={() =>
+                        remove(
+                          assignments.find(
+                            (a) => a.subjectId === s.id
+                          ).id
+                        )
+                      }
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

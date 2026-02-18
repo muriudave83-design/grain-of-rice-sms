@@ -1,0 +1,419 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+//
+// USER SYSTEM
+//
+enum Role {
+  ADMIN
+  TEACHER
+  PARENT
+  SPONSOR
+  ACCOUNTANT
+  STUDENT
+}
+
+model User {
+  id                 Int      @id @default(autoincrement())
+  name               String
+  email              String   @unique
+  password           String
+  role               Role
+  mustChangePassword Boolean  @default(true)
+  createdAt          DateTime @default(now())
+
+  guardians          Guardian[]          @relation("UserToGuardian")
+  sponsorships       Sponsorship[]
+  subjects           Subject[]           @relation("TeacherSubjects")
+  invoices           Invoice[]           @relation("AccountantInvoices")
+  studentProfile     Student?
+  disciplineRecords  Discipline[]        @relation("UserDisciplineRecords")
+  attendanceSessions AttendanceSession[]
+
+  parentStudents ParentStudent[] @relation("ParentLinks")
+}
+
+//
+// STUDENT
+//
+model Student {
+  id          Int       @id @default(autoincrement())
+  firstName   String
+  lastName    String
+  dob         DateTime?
+  admissionNo String    @unique
+  createdAt   DateTime  @default(now())
+
+  classId Int
+  class   Class @relation(fields: [classId], references: [id])
+
+  guardians         Guardian[]
+  sponsorships      Sponsorship[]
+  enrollments       Enrollment[]
+  disciplines       Discipline[]
+  invoices          Invoice[]
+  grades            Grade[]
+  assessmentScores  AssessmentScore[]
+  attendanceEntries AttendanceEntry[]
+  reportCards       ReportCard[]
+
+  userId Int?  @unique
+  user   User? @relation(fields: [userId], references: [id])
+
+  parentLinks ParentStudent[]
+}
+
+//
+// CLASS
+//
+model Class {
+  id        Int      @id @default(autoincrement())
+  name      String
+  level     String?
+  createdAt DateTime @default(now())
+
+  students           Student[]
+  reportCards        ReportCard[]
+  attendanceSessions AttendanceSession[]
+  classSubjects      ClassSubject[]
+  assessments        Assessment[]
+}
+
+//
+// GUARDIAN
+//
+model Guardian {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  studentId Int
+  relation  String?
+  createdAt DateTime @default(now())
+
+  user    User    @relation("UserToGuardian", fields: [userId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@unique([userId, studentId])
+}
+
+//
+// PARENT ↔ STUDENT
+//
+model ParentStudent {
+  id        Int @id @default(autoincrement())
+  parentId  Int
+  studentId Int
+
+  parent  User    @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([parentId, studentId])
+}
+
+//
+// SPONSORSHIP
+//
+model Sponsorship {
+  id        Int      @id @default(autoincrement())
+  sponsorId Int
+  studentId Int
+  notes     String?
+  createdAt DateTime @default(now())
+
+  sponsor User    @relation(fields: [sponsorId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@unique([sponsorId, studentId])
+}
+
+//
+// SUBJECT
+//
+model Subject {
+  id        Int      @id @default(autoincrement())
+  name      String
+  code      String?  @unique
+  teacherId Int?
+  createdAt DateTime @default(now())
+
+  teacher User? @relation("TeacherSubjects", fields: [teacherId], references: [id])
+
+  enrollments   Enrollment[]
+  grades        Grade[]
+  assessments   Assessment[]
+  classSubjects ClassSubject[]
+  reportEntries ReportCardSubjectEntry[]
+}
+
+//
+// CLASS ↔ SUBJECT
+//
+model ClassSubject {
+  id Int @id @default(autoincrement())
+
+  classId   Int
+  subjectId Int
+
+  class   Class   @relation(fields: [classId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([classId, subjectId])
+}
+
+//
+// ENROLLMENT
+//
+model Enrollment {
+  id        Int      @id @default(autoincrement())
+  studentId Int
+  subjectId Int
+  createdAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([studentId, subjectId])
+}
+
+//
+// ASSESSMENTS
+//
+enum AssessmentStatus {
+  DRAFT
+  SUBMITTED
+}
+
+model Assessment {
+  id        Int      @id @default(autoincrement())
+  title     String
+  subjectId Int
+  classId   Int
+  termId    Int
+  date      DateTime
+  type      String
+  weight    Float
+  maxScore  Float
+
+  status      AssessmentStatus @default(DRAFT)
+  isPublished Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  // ✅ NEW CATEGORY RELATION
+  categoryId Int?
+  category   AssignmentCategory? @relation(fields: [categoryId], references: [id])
+
+  subject Subject           @relation(fields: [subjectId], references: [id])
+  class   Class             @relation(fields: [classId], references: [id])
+
+  term    Term    @relation(fields: [termId], references: [id])
+
+  scores  AssessmentScore[]
+}
+
+model AssessmentScore {
+  id           Int      @id @default(autoincrement())
+  assessmentId Int
+  studentId    Int
+  score        Float
+  createdAt    DateTime @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id])
+  student    Student    @relation(fields: [studentId], references: [id])
+
+  @@unique([assessmentId, studentId])
+}
+
+//
+// GRADE (DERIVED)
+//
+model Grade {
+  id        Int @id @default(autoincrement())
+  studentId Int
+  subjectId Int
+  termId    Int
+
+  total   Float
+  average Float
+
+  student Student @relation(fields: [studentId], references: [id])
+  subject Subject @relation(fields: [subjectId], references: [id])
+  term    Term    @relation(fields: [termId], references: [id])
+
+  @@unique([studentId, subjectId, termId])
+}
+
+//
+// DISCIPLINE
+//
+model Discipline {
+  id           Int      @id @default(autoincrement())
+  studentId    Int
+  type         String
+  notes        String?
+  recordedById Int?
+  date         DateTime @default(now())
+
+  student    Student @relation(fields: [studentId], references: [id])
+  recordedBy User?   @relation("UserDisciplineRecords", fields: [recordedById], references: [id])
+}
+
+//
+// INVOICE
+//
+model Invoice {
+  id        Int       @id @default(autoincrement())
+  studentId Int
+  amount    Float
+  status    String
+  issuedAt  DateTime  @default(now())
+  dueDate   DateTime?
+  notes     String?
+
+  createdById Int?
+  createdBy   User? @relation("AccountantInvoices", fields: [createdById], references: [id])
+
+  student Student @relation(fields: [studentId], references: [id])
+}
+
+//
+// TERM
+//
+model Term {
+  id           Int      @id @default(autoincrement())
+  name         String
+  startDate    DateTime
+  endDate      DateTime
+  academicYear String
+  isActive     Boolean  @default(true)
+
+  grades      Grade[]
+  reportCards ReportCard[]
+  assessments Assessment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//
+// REPORT CARDS
+//
+enum ReportCardStatus {
+  GENERATED
+  PUBLISHED
+}
+
+model ReportCard {
+  id Int @id @default(autoincrement())
+
+  studentId Int
+  classId   Int
+  termId    Int
+
+  total   Float
+  average Float
+  status  ReportCardStatus
+
+  generatedAt DateTime  @default(now())
+  publishedAt DateTime?
+
+  student Student @relation(fields: [studentId], references: [id])
+  class   Class   @relation(fields: [classId], references: [id])
+  term    Term    @relation(fields: [termId], references: [id])
+
+  subjects ReportCardSubjectEntry[]
+
+  @@unique([studentId, termId])
+}
+
+model ReportCardSubjectEntry {
+  id Int @id @default(autoincrement())
+
+  reportCardId Int
+  subjectId    Int
+
+  total   Float
+  average Float
+
+  reportCard ReportCard @relation(fields: [reportCardId], references: [id])
+  subject    Subject    @relation(fields: [subjectId], references: [id])
+
+  @@unique([reportCardId, subjectId])
+}
+
+//
+// ATTENDANCE
+//
+enum AttendanceSessionStatus {
+  DRAFT
+  SUBMITTED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+model AttendanceSession {
+  id        Int                     @id @default(autoincrement())
+  classId   Int
+  teacherId Int
+  date      DateTime
+  status    AttendanceSessionStatus @default(DRAFT)
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+
+  class   Class             @relation(fields: [classId], references: [id])
+  teacher User              @relation(fields: [teacherId], references: [id])
+  entries AttendanceEntry[]
+
+  @@unique([classId, date])
+}
+
+model AttendanceEntry {
+  id                  Int              @id @default(autoincrement())
+  attendanceSessionId Int
+  studentId           Int
+  status              AttendanceStatus
+  note                String?
+  createdAt           DateTime         @default(now())
+
+  session AttendanceSession @relation(fields: [attendanceSessionId], references: [id])
+  student Student           @relation(fields: [studentId], references: [id])
+
+  @@unique([attendanceSessionId, studentId])
+}
+
+//
+// AUDIT LOGS
+//
+model AuditLog {
+  id String @id @default(uuid())
+
+  actorUserId String
+  actorRole   String
+
+  action     String
+  entityType String
+  entityId   String?
+
+  metadata  Json?
+  createdAt DateTime @default(now())
+}
+
+//
+// ✅ NEW — ASSIGNMENT CATEGORIES
+//
+model AssignmentCategory {
+  id     Int    @id @default(autoincrement())
+  name   String @unique
+  weight Float  @default(1)
+
+  assessments Assessment[]
+}

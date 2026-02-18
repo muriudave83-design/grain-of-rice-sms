@@ -1,0 +1,148 @@
+import { useEffect, useState } from "react";
+import apiClient from "../../services/apiClient";
+
+export default function AdminTeacherSubjectAssignments() {
+  const [teachers, setTeachers] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const [form, setForm] = useState({
+    teacherId: "",
+    subjectId: "",
+  });
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  async function fetchData() {
+    setLoading(true);
+    try {
+      const [teachersRes, subjectsRes, assignmentsRes] = await Promise.all([
+        apiClient.get("/admin/users?role=TEACHER"),
+        apiClient.get("/admin/subjects"),
+        apiClient.get("/admin/teacher-subjects"),
+      ]);
+
+      setTeachers(teachersRes.data);
+      setSubjects(subjectsRes.data);
+      setAssignments(assignmentsRes.data);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitAssignment(e) {
+    e.preventDefault();
+
+    await apiClient.post("/admin/teacher-subjects", form);
+
+    setForm({ teacherId: "", subjectId: "" });
+    fetchData();
+  }
+
+  async function removeAssignment(id) {
+    if (!confirm("Remove this assignment?")) return;
+    await apiClient.delete(`/admin/teacher-subjects/${id}`);
+    fetchData();
+  }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-xl font-semibold">Teacher Subject Assignments</h1>
+
+      <form
+        onSubmit={submitAssignment}
+        className="bg-white border rounded p-4 space-y-4"
+      >
+        <div className="grid grid-cols-2 gap-4">
+          <select
+            required
+            className="p-2 border rounded"
+            value={form.teacherId}
+            onChange={(e) =>
+              setForm({ ...form, teacherId: e.target.value })
+            }
+          >
+            <option value="">Select teacher</option>
+            {teachers.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            required
+            className="p-2 border rounded"
+            value={form.subjectId}
+            onChange={(e) =>
+              setForm({ ...form, subjectId: e.target.value })
+            }
+          >
+            <option value="">Select subject</option>
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} ({s.class?.name})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm"
+          >
+            Assign
+          </button>
+        </div>
+      </form>
+
+      <div className="bg-white border rounded overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="p-3 text-left">Teacher</th>
+              <th className="p-3 text-left">Subject</th>
+              <th className="p-3 text-left">Class</th>
+              <th className="p-3 w-24"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan="4" className="p-4 text-center">
+                  Loading…
+                </td>
+              </tr>
+            ) : assignments.length === 0 ? (
+              <tr>
+                <td colSpan="4" className="p-4 text-center text-gray-500">
+                  No assignments yet
+                </td>
+              </tr>
+            ) : (
+              assignments.map((a) => (
+                <tr key={a.id} className="border-t">
+                  <td className="p-3">{a.teacher.name}</td>
+                  <td className="p-3">{a.subject.name}</td>
+                  <td className="p-3">{a.subject.class?.name}</td>
+                  <td className="p-3 text-right">
+                    <button
+                      onClick={() => removeAssignment(a.id)}
+                      className="text-red-600 text-xs"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

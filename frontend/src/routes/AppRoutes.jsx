@@ -1,0 +1,167 @@
+import React from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
+import ProtectedRoute from "../components/ProtectedRoute";
+import AdminLayout from "../layouts/AdminLayout";
+import TeacherLayout from "../layouts/TeacherLayout"; // ✅ ADDED
+
+// =======================
+// ADMIN PAGES
+// =======================
+import Dashboard from "../pages/admin/AdminDashboardPage";
+import Teachers from "../pages/admin/Teachers";
+import Classes from "../pages/admin/Classes";
+import Grades from "../pages/admin/Grades";
+import Exams from "../pages/admin/Exams";
+import Fees from "../pages/admin/Fees";
+import Payments from "../pages/admin/Payments";
+import UsersPage from "../pages/admin/UsersPage";
+import AdminStudents from "../pages/admin/AdminStudents";
+import AdminClassStudents from "../pages/admin/AdminClassStudents";
+import AdminTeachers from "../pages/admin/AdminTeachers";
+
+import AdminSubjects from "../pages/admin/AdminSubjects";
+import AdminTeacherSubjectAssignments from "../pages/admin/AdminTeacherSubjectAssignments";
+import AdminClassSubjects from "../pages/admin/AdminClassSubjects";
+import AdminAttendanceOverview from "../pages/admin/attendance/AdminAttendanceOverview";
+import AdminAttendanceClass from "../pages/admin/attendance/AdminAttendanceClass";
+import AdminAuditLogs from "../pages/admin/audit/AdminAuditLogs";
+
+// =======================
+// TEACHER PAGES
+// =======================
+import TeacherAssessments from "../pages/teacher/assessments";
+import CreateAssessment from "../pages/teacher/assessments/CreateAssessment";
+import ScoresEntry from "../pages/teacher/assessments/ScoresEntry";
+import AssessmentReview from "../pages/teacher/assessments/AssessmentReview";
+import EditAssessmentRedirect from "../pages/teacher/assessments/Edit";
+import TeacherGradebook from "../pages/teacher/TeacherGradebook";
+
+// =======================
+// PARENT PAGES
+// =======================
+import ParentDashboard from "../pages/parent/ParentDashboard";
+import ParentReportCards from "../pages/parent/report-cards/ParentReportCards";
+import ParentReportCardView from "../pages/parent/report-cards/ParentReportCardView";
+import ParentAttendanceSummary from "../pages/parent/attendance/ParentAttendanceSummary";
+
+// =======================
+// STUDENT PAGES
+// =======================
+import StudentReportCardsList from "../pages/student/StudentReportCardsList";
+import StudentReportCardView from "../pages/student/StudentReportCardView";
+
+// =======================
+// SHARED
+// =======================
+import Notifications from "../pages/notifications/Notifications";
+
+// =======================
+// AUTH
+// =======================
+import LoginPage from "../pages/Login";
+
+export default function AppRoutes() {
+  return (
+    <BrowserRouter>
+      <Routes>
+
+        {/* ROOT */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
+
+        {/* AUTH */}
+        <Route path="/login" element={<LoginPage />} />
+
+        {/* ======================= */}
+        {/* ADMIN */}
+        {/* ======================= */}
+        <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />
+            <Route path="/dashboard/admin" element={<Dashboard />} />
+            <Route path="/dashboard/admin/students" element={<AdminStudents />} />
+            <Route path="/dashboard/admin/teachers" element={<AdminTeachers />} />
+            <Route path="/dashboard/admin/classes" element={<Classes />} />
+            
+            <Route
+              path="/dashboard/admin/classes/:classId/students"
+              element={<AdminClassStudents />}
+            />
+
+            <Route path="/dashboard/admin/grades" element={<Grades />} />
+            <Route path="/dashboard/admin/exams" element={<Exams />} />
+            <Route path="/dashboard/admin/fees" element={<Fees />} />
+            <Route path="/dashboard/admin/payments" element={<Payments />} />
+            <Route path="/dashboard/admin/users" element={<UsersPage />} />
+            <Route path="/dashboard/admin/subjects" element={<AdminSubjects />} />
+            <Route
+              path="/dashboard/admin/teacher-subjects"
+              element={<AdminTeacherSubjectAssignments />}
+            />
+            <Route
+              path="/dashboard/admin/class-subjects"
+              element={<AdminClassSubjects />}
+            />
+            <Route
+              path="/dashboard/admin/attendance"
+              element={<AdminAttendanceOverview />}
+            />
+            <Route
+              path="/dashboard/admin/attendance/:classId"
+              element={<AdminAttendanceClass />}
+            />
+            <Route
+              path="/dashboard/admin/audit-logs"
+              element={<AdminAuditLogs />}
+            />
+          </Route>
+        </Route>
+
+        {/* ======================= */}
+        {/* TEACHER */}
+        {/* ======================= */}
+        <Route element={<ProtectedRoute allowedRoles={["TEACHER"]} />}>
+          <Route element={<TeacherLayout />}>
+            <Route path="/teacher" element={<Navigate to="/teacher/assessments" replace />} />
+            <Route path="/teacher/assessments" element={<TeacherAssessments />} />
+            <Route path="/teacher/assessments/create" element={<CreateAssessment />} />
+            <Route path="/teacher/assessments/:id/edit" element={<EditAssessmentRedirect />} />
+            <Route path="/teacher/assessments/:id/scores" element={<ScoresEntry />} />
+            <Route path="/teacher/assessments/:id/review" element={<AssessmentReview />} />
+            <Route path="/teacher/gradebook" element={<TeacherGradebook />} />
+          </Route>
+        </Route>
+
+        {/* ======================= */}
+        {/* PARENT */}
+        {/* ======================= */}
+        <Route element={<ProtectedRoute allowedRoles={["PARENT"]} />}>
+          <Route path="/parent" element={<ParentDashboard />} />
+          <Route path="/parent/report-cards" element={<ParentReportCards />} />
+          <Route path="/parent/report-cards/:id" element={<ParentReportCardView />} />
+          <Route path="/parent/attendance" element={<ParentAttendanceSummary />} />
+        </Route>
+
+        {/* ======================= */}
+        {/* STUDENT */}
+        {/* ======================= */}
+        <Route element={<ProtectedRoute allowedRoles={["STUDENT"]} />}>
+          <Route path="/student" element={<Navigate to="/student/report-cards" replace />} />
+          <Route path="/student/report-cards" element={<StudentReportCardsList />} />
+          <Route path="/student/report-cards/:termId" element={<StudentReportCardView />} />
+        </Route>
+
+        {/* ======================= */}
+        {/* SHARED */}
+        {/* ======================= */}
+        <Route element={<ProtectedRoute allowedRoles={["ADMIN", "TEACHER", "PARENT"]} />}>
+          <Route path="/notifications" element={<Notifications />} />
+        </Route>
+
+        {/* FALLBACK */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+
+      </Routes>
+    </BrowserRouter>
+  );
+}
