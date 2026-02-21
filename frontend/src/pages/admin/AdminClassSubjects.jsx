@@ -1,14 +1,11 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import apiClient from "../../services/apiClient";
 
 export default function AdminClassSubjects() {
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
-
   const [selectedClass, setSelectedClass] = useState("");
   const [assignments, setAssignments] = useState([]);
-
-  const API = "http://localhost:5000/api/admin";
 
   useEffect(() => {
     loadClasses();
@@ -22,30 +19,26 @@ export default function AdminClassSubjects() {
   }, [selectedClass]);
 
   async function loadClasses() {
-    const res = await axios.get(`${API}/classes`, { withCredentials: true });
+    const res = await apiClient.get("/admin/classes");
     setClasses(res.data);
   }
 
   async function loadSubjects() {
-    const res = await axios.get(`${API}/subjects`, { withCredentials: true });
+    const res = await apiClient.get("/admin/subjects");
     setSubjects(res.data);
   }
 
   async function loadAssignments(classId) {
-    const res = await axios.get(
-      `${API}/class-subjects/${classId}`,
-      { withCredentials: true }
-    );
+    const res = await apiClient.get(`/admin/class-subjects/${classId}`);
     setAssignments(res.data);
   }
 
   async function assign(subjectId) {
     try {
-      await axios.post(
-        `${API}/class-subjects`,
-        { classId: selectedClass, subjectId },
-        { withCredentials: true }
-      );
+      await apiClient.post("/admin/class-subjects", {
+        classId: selectedClass,
+        subjectId,
+      });
 
       loadAssignments(selectedClass);
     } catch (err) {
@@ -54,10 +47,7 @@ export default function AdminClassSubjects() {
   }
 
   async function remove(id) {
-    await axios.delete(`${API}/class-subjects/${id}`, {
-      withCredentials: true,
-    });
-
+    await apiClient.delete(`/admin/class-subjects/${id}`);
     loadAssignments(selectedClass);
   }
 
@@ -113,7 +103,7 @@ export default function AdminClassSubjects() {
                         remove(
                           assignments.find(
                             (a) => a.subjectId === s.id
-                          ).id
+                          )?.id
                         )
                       }
                     >

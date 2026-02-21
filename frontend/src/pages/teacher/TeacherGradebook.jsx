@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import apiClient from "../../services/apiClient";
 
 function EditableRow({ student, assessments, onSaved }) {
   const [scores, setScores] = useState({ ...student.scores });
@@ -19,17 +20,10 @@ function EditableRow({ student, assessments, onSaved }) {
 
         if (value === "" || value === undefined) continue;
 
-        await fetch("http://localhost:5000/api/gradebook/score", {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            assessmentId: assessment.id,
-            studentId: student.id,
-            score: Number(value),
-          }),
+        await apiClient.post("/gradebook/score", {
+          assessmentId: assessment.id,
+          studentId: student.id,
+          score: Number(value),
         });
       }
 
@@ -93,33 +87,35 @@ export default function TeacherGradebook() {
   const [gradebook, setGradebook] = useState(null);
 
   const fetchClasses = async () => {
-    const res = await fetch("http://localhost:5000/api/classes/mine", {
-      credentials: "include",
-    });
-    const data = await res.json();
-    setClasses(data);
+    try {
+      const res = await apiClient.get("/classes/mine");
+      setClasses(res.data);
+    } catch (err) {
+      console.error("Failed to load classes", err);
+    }
   };
 
   const fetchSubjects = async (cid) => {
     if (!cid) return;
-    const res = await fetch(
-      `http://localhost:5000/api/classes/${cid}/subjects`,
-      { credentials: "include" }
-    );
-    const data = await res.json();
-    setSubjects(data);
+    try {
+      const res = await apiClient.get(`/classes/${cid}/subjects`);
+      setSubjects(res.data);
+    } catch (err) {
+      console.error("Failed to load subjects", err);
+    }
   };
 
   const fetchGradebook = async () => {
     if (!classId || !subjectId) return;
 
-    const res = await fetch(
-      `http://localhost:5000/api/gradebook?classId=${classId}&subjectId=${subjectId}`,
-      { credentials: "include" }
-    );
-
-    const data = await res.json();
-    setGradebook(data);
+    try {
+      const res = await apiClient.get(
+        `/gradebook?classId=${classId}&subjectId=${subjectId}`
+      );
+      setGradebook(res.data);
+    } catch (err) {
+      console.error("Failed to load gradebook", err);
+    }
   };
 
   useEffect(() => {
