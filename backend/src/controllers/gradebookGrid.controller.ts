@@ -12,30 +12,19 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
       });
     }
 
-    // 1️⃣ Get assessments with category + weight
+    // 1️⃣ Assessments for class + subject
     const assessments = await prisma.assessment.findMany({
       where: { classId, subjectId },
       orderBy: { id: "asc" },
-      include: {
-        category: {
-          select: {
-            id: true,
-            weight: true,
-          },
-        },
+      select: {
+        id: true,
+        title: true,
+        maxScore: true,
+        status: true,
       },
     });
 
-    // Normalize assessment data
-        const normalizedAssessments = assessments.map((a) => ({
-        id: a.id,
-        title: a.title,
-        maxScore: a.maxScore,
-        categoryId: a.category?.id ?? 0,
-        categoryWeight: a.category?.weight ?? 1, // default weight
-        }));
-
-    // 2️⃣ Get students in this class
+    // 2️⃣ Students in class
     const students = await prisma.student.findMany({
       where: { classId },
       orderBy: { firstName: "asc" },
@@ -46,21 +35,23 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
       },
     });
 
-    // 3️⃣ Get all scores for these assessments
-    const assessmentIds = normalizedAssessments.map((a) => a.id);
+    // 3️⃣ Scores
+    const assessmentIds = assessments.map(a => a.id);
 
-    const scores = await prisma.assessmentScore.findMany({
-      where: {
-        assessmentId: { in: assessmentIds },
-      },
-      select: {
-        assessmentId: true,
-        studentId: true,
-        score: true,
-      },
-    });
+    const scores = assessmentIds.length > 0
+      ? await prisma.assessmentScore.findMany({
+          where: {
+            assessmentId: { in: assessmentIds },
+          },
+          select: {
+            assessmentId: true,
+            studentId: true,
+            score: true,
+          },
+        })
+      : [];
 
-    // 4️⃣ Build score map: { studentId: { assessmentId: score } }
+    // 4️⃣ Build score map
     const scoreMap: Record<number, Record<number, number>> = {};
 
     for (const s of scores) {
@@ -70,69 +61,41 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
       scoreMap[s.studentId][s.assessmentId] = s.score;
     }
 
-    // 5️⃣ Build student rows with weighted averages
-    const studentRows = students.map((student) => {
+    // 5️⃣ Build rows
+    const studentRows = students.map(student => {
       const studentScores = scoreMap[student.id] || {};
 
-      // Build category-based averages
-      const categoryMap: Record<
-        number,
-        { total: number; count: number; weight: number }
-      > = {};
-
-      // Loop through each assessment
-      for (const assessment of normalizedAssessments) {
-        const score = studentScores[assessment.id];
-        if (score === undefined) continue;
-
-        const categoryId = assessment.categoryId;
-        const weight = assessment.categoryWeight;
-
-        if (!categoryMap[categoryId]) {
-          categoryMap[categoryId] = {
-            total: 0,
-            count: 0,
-            weight,
-          };
-        }
-
-        categoryMap[categoryId].total += score;
-        categoryMap[categoryId].count += 1;
-      }
-
-      // Compute weighted average
-      let weightedTotal = 0;
-      let totalWeight = 0;
-
-      for (const cat of Object.values(categoryMap)) {
-        if (cat.count === 0) continue;
-
-        const avg = cat.total / cat.count;
-        weightedTotal += avg * cat.weight;
-        totalWeight += cat.weight;
-      }
-
+      const values = Object.values(studentScores);
       const average =
-        totalWeight > 0
-          ? (weightedTotal / totalWeight).toFixed(1)
+        values.length > 0
+          ? Number(
+              (
+                values.reduce((a, b) => a + b, 0) /
+                values.length
+              ).toFixed(2)
+            )
           : null;
+
+      const missingCount =
+        assessments.length - values.length;
 
       return {
         id: student.id,
         name: `${student.firstName} ${student.lastName}`,
         scores: studentScores,
         average,
+        missingCount,
       };
     });
 
-    // 6️⃣ Return grid data
-    return res.json({
-      assessments: normalizedAssessments,
+    res.json({
+      assessments,
       students: studentRows,
     });
+
   } catch (err) {
     console.error("Failed to build gradebook grid:", err);
-    return res.status(500).json({
+    res.status(500).json({
       message: "Failed to load gradebook",
     });
   }

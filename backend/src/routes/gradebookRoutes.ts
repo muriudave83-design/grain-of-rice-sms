@@ -13,7 +13,10 @@ import { Role } from "@prisma/client";
 
 const router = Router();
 
+// ======================================================
 // 🟢 Gradebook Grid (Teacher)
+// GET /api/gradebook?classId=&subjectId=
+// ======================================================
 router.get(
   "/",
   authenticate,
@@ -21,7 +24,10 @@ router.get(
   getGradebookGrid
 );
 
-// 🟢 Save or update a score
+// ======================================================
+// 🟢 Save or Update Score (Teacher)
+// POST /api/gradebook/score
+// ======================================================
 router.post(
   "/score",
   authenticate,
@@ -58,17 +64,20 @@ router.post(
         },
       });
 
-      res.json(saved);
+      return res.json(saved);
     } catch (err) {
       console.error("Failed to save score:", err);
-      res.status(500).json({
+      return res.status(500).json({
         message: "Failed to save score",
       });
     }
   }
 );
 
-// Teacher summary view
+// ======================================================
+// 🟢 Teacher Summary View
+// GET /api/gradebook/teacher/subject/:subjectId
+// ======================================================
 router.get(
   "/teacher/subject/:subjectId",
   authenticate,
@@ -76,7 +85,10 @@ router.get(
   getTeacherGradebook
 );
 
-// Parent view for a student
+// ======================================================
+// 🟢 Parent View (Single Student)
+// GET /api/gradebook/parent/student/:studentId
+// ======================================================
 router.get(
   "/parent/student/:studentId",
   authenticate,
@@ -84,7 +96,10 @@ router.get(
   getParentGradebook
 );
 
-// Admin overview
+// ======================================================
+// 🟢 Admin Overview
+// GET /api/gradebook/admin/overview
+// ======================================================
 router.get(
   "/admin/overview",
   authenticate,
