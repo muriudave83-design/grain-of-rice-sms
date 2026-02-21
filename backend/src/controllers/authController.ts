@@ -13,11 +13,12 @@ const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
 export const registerUser = async (req: Request, res: Response) => {
   try {
     const { name, email, password, role } = req.body;
-      if (role === "ADMIN") {
-        return res.status(403).json({
-          message: "Admin accounts cannot be created via public registration",
-        });
-      }
+
+    if (role === "ADMIN") {
+      return res.status(403).json({
+        message: "Admin accounts cannot be created via public registration",
+      });
+    }
 
     console.log("📥 Register request:", req.body);
 
@@ -27,7 +28,6 @@ export const registerUser = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Email already registered" });
     }
 
-    // ✅ USE CENTRAL PASSWORD HELPER
     const hashed = await hashPassword(password);
 
     const user = await prisma.user.create({
@@ -87,8 +87,6 @@ export const loginUser = async (req: Request, res: Response) => {
     console.log("👤 USER ROLE FROM DB:", user.role);
     console.log("👤 USER ID:", user.id);
 
-    // ✅ USE CENTRAL PASSWORD HELPER
-    console.log("🔐 Comparing password hash...");
     const valid = await verifyPassword(password, user.password);
     console.log("🔐 Password valid:", valid);
 
@@ -106,10 +104,13 @@ export const loginUser = async (req: Request, res: Response) => {
       { expiresIn: "1h" }
     );
 
+    // ✅ FIXED COOKIE FOR LOCAL + PRODUCTION
+    const isProduction = process.env.NODE_ENV === "production";
+
     res.cookie("access_token", token, {
       httpOnly: true,
-      sameSite: "lax",
-      secure: false,
+      sameSite: isProduction ? "none" : "lax",
+      secure: isProduction,
       path: "/",
       maxAge: 60 * 60 * 1000,
     });
@@ -161,7 +162,6 @@ export const changePassword = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // ✅ USE CENTRAL PASSWORD HELPER
     const passwordMatches = await verifyPassword(
       currentPassword,
       user.password
