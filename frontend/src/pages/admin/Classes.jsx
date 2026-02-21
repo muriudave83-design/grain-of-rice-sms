@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import apiClient from "../../services/apiClient";
 
 export default function Classes() {
   const [classes, setClasses] = useState([]);
@@ -14,18 +15,14 @@ export default function Classes() {
   async function fetchClasses() {
     try {
       setLoading(true);
-      const res = await fetch("/api/admin/classes", {
-        credentials: "include",
-      });
+      setError(null);
 
-      if (!res.ok) {
-        throw new Error("Failed to fetch classes");
-      }
-
-      const data = await res.json();
-      setClasses(data);
+      const res = await apiClient.get("/admin/classes");
+      setClasses(res.data);
     } catch (err) {
-      setError(err.message || "Error loading classes");
+      setError(
+        err?.response?.data?.message || "Error loading classes"
+      );
     } finally {
       setLoading(false);
     }
@@ -40,24 +37,14 @@ export default function Classes() {
     setError(null);
 
     try {
-      const res = await fetch("/api/admin/classes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-        body: JSON.stringify({ name }),
-      });
-
-      if (!res.ok) {
-        const msg = await res.text();
-        throw new Error(msg || "Failed to create class");
-      }
+      await apiClient.post("/admin/classes", { name });
 
       setName("");
       await fetchClasses();
     } catch (err) {
-      setError(err.message || "Error creating class");
+      setError(
+        err?.response?.data?.message || "Error creating class"
+      );
     } finally {
       setSubmitting(false);
     }
