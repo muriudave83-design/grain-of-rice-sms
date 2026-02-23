@@ -9,7 +9,7 @@ export default function AdminSubjects() {
   const fetchSubjects = async () => {
     try {
       const res = await apiClient.get("/admin/subjects");
-      setSubjects(res.data);
+      setSubjects(res.data || []);
     } catch (err) {
       console.error("Failed to fetch subjects", err);
     }
@@ -28,6 +28,22 @@ export default function AdminSubjects() {
       fetchSubjects();
     } catch (err) {
       console.error("Failed to create subject", err);
+    }
+  };
+
+  const handleAssignTeacher = async (subjectId) => {
+    const teacherId = prompt("Enter Teacher ID to assign:");
+    if (!teacherId) return;
+
+    try {
+      await apiClient.put(
+        `/admin/subjects/${subjectId}/assign-teacher`,
+        { teacherId: Number(teacherId) }
+      );
+      alert("Teacher assigned successfully");
+    } catch (err) {
+      console.error("Failed to assign teacher", err);
+      alert("Failed to assign teacher");
     }
   };
 
@@ -63,10 +79,21 @@ export default function AdminSubjects() {
       {subjects.length === 0 ? (
         <p>No subjects yet</p>
       ) : (
-        <ul className="space-y-1">
+        <ul className="space-y-2">
           {subjects.map((s) => (
-            <li key={s.id}>
-              {s.name} ({s.code})
+            <li
+              key={s.id}
+              className="flex items-center justify-between border p-2 rounded"
+            >
+              <span>
+                {s.name} ({s.code})
+              </span>
+              <button
+                onClick={() => handleAssignTeacher(s.id)}
+                className="bg-gray-800 text-white px-3 py-1 text-sm rounded"
+              >
+                Assign Teacher
+              </button>
             </li>
           ))}
         </ul>
