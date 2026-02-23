@@ -35,13 +35,15 @@ function EditableRow({ student, assessments, onSaved }) {
     }
   };
 
+  const numericScores = Object.values(scores)
+    .filter((v) => v !== "" && v !== undefined)
+    .map((v) => Number(v));
+
   const average =
-    Object.values(scores).length > 0
+    numericScores.length > 0
       ? (
-          Object.values(scores).reduce(
-            (a, b) => a + Number(b),
-            0
-          ) / Object.values(scores).length
+          numericScores.reduce((a, b) => a + b, 0) /
+          numericScores.length
         ).toFixed(1)
       : "—";
 
@@ -53,16 +55,43 @@ function EditableRow({ student, assessments, onSaved }) {
         <td key={a.id} className="p-3">
           <input
             type="number"
-            className="w-16 border p-1"
+            min={0}
+            max={a.maxScore}
+            disabled={a.status === "SUBMITTED"}
             value={scores[a.id] ?? ""}
-            onChange={(e) =>
-              handleChange(a.id, e.target.value)
-            }
+            className={`
+              w-16 p-1 text-center border
+              ${a.status === "SUBMITTED" ? "bg-gray-100 cursor-not-allowed" : ""}
+              ${scores[a.id] == null ? "bg-gray-50 border-dashed" : "bg-white"}
+            `}
+            onChange={(e) => {
+              const value = e.target.value;
+
+              if (value === "") {
+                handleChange(a.id, "");
+                return;
+              }
+
+              if (Number(value) > a.maxScore) {
+                alert(`Max score is ${a.maxScore}`);
+                return;
+              }
+
+              handleChange(a.id, value);
+            }}
           />
         </td>
       ))}
 
-      <td className="p-3 font-semibold">{average}</td>
+      <td
+        className={`p-3 font-semibold text-center ${
+          average !== "—" && Number(average) < 40
+            ? "text-red-600"
+            : ""
+        }`}
+      >
+        {average}
+      </td>
 
       <td className="p-3">
         <button
@@ -130,6 +159,21 @@ export default function TeacherGradebook() {
     fetchGradebook();
   }, [classId, subjectId]);
 
+  // ✅ Compute class average per assessment
+  const computeClassAverageForAssessment = (assessmentId) => {
+    if (!gradebook) return null;
+
+    const values = gradebook.students
+      .map((s) => s.scores[assessmentId])
+      .filter((v) => typeof v === "number");
+
+    if (values.length === 0) return null;
+
+    return (
+      values.reduce((a, b) => a + b, 0) / values.length
+    ).toFixed(1);
+  };
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-semibold mb-6">Gradebook</h1>
@@ -179,10 +223,11 @@ export default function TeacherGradebook() {
                     {a.title}
                   </th>
                 ))}
-                <th className="p-3">Average</th>
+                <th className="p-3 text-center">Average</th>
                 <th className="p-3">Actions</th>
               </tr>
             </thead>
+
             <tbody>
               {gradebook.students.map((s) => (
                 <EditableRow
@@ -193,6 +238,49 @@ export default function TeacherGradebook() {
                 />
               ))}
             </tbody>
+
+            {/* ✅ Class Average Footer Row */}
+            <tfoot>
+              <tr className="border-t bg-gray-50 font-semibold">
+                <td className="p-3">Class Avg</td>
+
+                {gradebook.assessments.map((a) => (
+                  <td key={a.id} className="text-center">
+                    {computeClassAverageForAssessment(a.id) ?? "—"}
+                  </td>
+                ))}
+
+                <td className="text-center">
+                  {(() => {
+                    const values = gradebook.students
+                      .map((s) => {
+                        const scores = Object.values(s.scores)
+                          .filter(
+                            (v) => v !== "" && v !== undefined
+                          )
+                          .map((v) => Number(v));
+
+                        if (scores.length === 0) return null;
+
+                        return (
+                          scores.reduce((a, b) => a + b, 0) /
+                          scores.length
+                        );
+                      })
+                      .filter((v) => typeof v === "number");
+
+                    if (values.length === 0) return "—";
+
+                    return (
+                      values.reduce((a, b) => a + b, 0) /
+                      values.length
+                    ).toFixed(1);
+                  })()}
+                </td>
+
+                <td></td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}
