@@ -16,3 +16,25 @@ export const listAssignmentCategories = async (
     res.status(500).json({ message: "Failed to fetch categories" });
   }
 };
+
+export const createAssignmentCategory = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { name } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ message: "Name is required" });
+    }
+
+    const category = await prisma.assignmentCategory.create({
+      data: { name },
+    });
+
+    res.status(201).json(category);
+  } catch (err) {
+    console.error("Failed to create assignment category:", err);
+    res.status(500).json({ message: "Failed to create category" });
+  }
+};
