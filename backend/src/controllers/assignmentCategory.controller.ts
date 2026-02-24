@@ -38,3 +38,26 @@ export const createAssignmentCategory = async (
     res.status(500).json({ message: "Failed to create category" });
   }
 };
+
+export const updateAssignmentCategory = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const id = Number(req.params.id);
+    const { name, weight } = req.body;
+
+    const updated = await prisma.assignmentCategory.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(weight !== undefined && { weight: Number(weight) }),
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Failed to update category:", err);
+    res.status(500).json({ message: "Failed to update category" });
+  }
+};

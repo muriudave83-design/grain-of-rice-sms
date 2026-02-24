@@ -3,6 +3,7 @@ import { authenticate } from "../middlewares/authMiddleware";
 import {
   listAssignmentCategories,
   createAssignmentCategory,
+  updateAssignmentCategory,
 } from "../controllers/assignmentCategory.controller";
 import { requireRole } from "../middlewares/rolesMiddleware";
 import { Role } from "@prisma/client";
@@ -16,6 +17,13 @@ router.post(
   authenticate,
   requireRole([Role.ADMIN]),
   createAssignmentCategory
+);
+
+router.put(
+  "/:id",
+  authenticate,
+  requireRole([Role.ADMIN]),
+  updateAssignmentCategory
 );
 
 export default router;
