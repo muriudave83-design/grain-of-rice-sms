@@ -85,15 +85,51 @@ export default function AdminSubjects() {
               key={s.id}
               className="flex items-center justify-between border p-2 rounded"
             >
-              <span>
-                {s.name} ({s.code})
-              </span>
-              <button
-                onClick={() => handleAssignTeacher(s.id)}
-                className="bg-gray-800 text-white px-3 py-1 text-sm rounded"
-              >
-                Assign Teacher
-              </button>
+              <div>
+                <div className="font-medium">{s.name}</div>
+                <div className="text-sm text-gray-500">
+                  Code: {s.code ?? "-"}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={s.weight ?? 0}
+                  className="w-20 border p-1 text-center"
+                  onChange={(e) => {
+                    const newWeight = e.target.value;
+
+                    setSubjects((prev) =>
+                      prev.map((cat) =>
+                        cat.id === s.id
+                          ? { ...cat, weight: newWeight }
+                          : cat
+                      )
+                    );
+                  }}
+                  onBlur={async () => {
+                    try {
+                      await apiClient.put(
+                        `/assignment-categories/${s.id}`,
+                        { weight: Number(s.weight) }
+                      );
+                    } catch (err) {
+                      console.error("Failed to update weight", err);
+                    }
+                  }}
+                />
+                <span className="text-sm text-gray-500">Weight</span>
+
+                <button
+                  onClick={() => handleAssignTeacher(s.id)}
+                  className="bg-gray-800 text-white px-3 py-1 text-sm rounded"
+                >
+                  Assign Teacher
+                </button>
+              </div>
             </li>
           ))}
         </ul>

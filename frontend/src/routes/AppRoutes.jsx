@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import ProtectedRoute from "../components/ProtectedRoute";
 import AdminLayout from "../layouts/AdminLayout";
-import TeacherLayout from "../layouts/TeacherLayout"; // ✅ ADDED
+import TeacherLayout from "../layouts/TeacherLayout";
 
 // =======================
 // ADMIN PAGES
@@ -21,6 +21,7 @@ import AdminClassStudents from "../pages/admin/AdminClassStudents";
 import AdminTeachers from "../pages/admin/AdminTeachers";
 
 import AdminSubjects from "../pages/admin/AdminSubjects";
+import AdminCategories from "../pages/admin/AdminCategories"; // ✅ ADDED
 import AdminTeacherSubjectAssignments from "../pages/admin/AdminTeacherSubjectAssignments";
 import AdminClassSubjects from "../pages/admin/AdminClassSubjects";
 import AdminAttendanceOverview from "../pages/admin/attendance/AdminAttendanceOverview";
@@ -94,6 +95,13 @@ export default function AppRoutes() {
             <Route path="/dashboard/admin/payments" element={<Payments />} />
             <Route path="/dashboard/admin/users" element={<UsersPage />} />
             <Route path="/dashboard/admin/subjects" element={<AdminSubjects />} />
+
+            {/* ✅ NEW ROUTE ADDED HERE */}
+            <Route
+              path="/dashboard/admin/categories"
+              element={<AdminCategories />}
+            />
+
             <Route
               path="/dashboard/admin/teacher-subjects"
               element={<AdminTeacherSubjectAssignments />}

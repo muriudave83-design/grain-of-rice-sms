@@ -11,13 +11,16 @@ const links = [
   { to: "classes", label: "Classes" },
   { to: "students", label: "Students" },
 
-  // ✅ CLEAN FIX — Dedicated Teachers Page
+  // Dedicated Teachers Page
   { to: "teachers", label: "Teachers" },
 
   // ===============================
-  // ✅ ACADEMIC CORE
+  // ACADEMIC CORE
   // ===============================
   { to: "subjects", label: "Subjects" },
+
+  // ✅ NEW — Assignment Categories
+  { to: "categories", label: "Categories" },
 
   // Teacher → Subject
   { to: "teacher-subjects", label: "Teacher Assignments" },
