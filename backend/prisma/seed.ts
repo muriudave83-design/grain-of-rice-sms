@@ -42,7 +42,20 @@ async function main() {
     },
   });
 
-  console.log("✅ Seeded users with real passwords");
+  // TERM
+  await prisma.term.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      name: "Term 1",
+      academicYear: "2026",
+      startDate: new Date("2026-01-10"),
+      endDate: new Date("2026-04-10"),
+    },
+  });
+
+  console.log("✅ Seeded users and term successfully");
 }
 
 main()
