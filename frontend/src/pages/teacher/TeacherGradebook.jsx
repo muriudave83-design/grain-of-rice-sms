@@ -35,18 +35,6 @@ function EditableRow({ student, assessments, onSaved }) {
     }
   };
 
-  const numericScores = Object.values(scores)
-    .filter((v) => v !== "" && v !== undefined)
-    .map((v) => Number(v));
-
-  const average =
-    numericScores.length > 0
-      ? (
-          numericScores.reduce((a, b) => a + b, 0) /
-          numericScores.length
-        ).toFixed(1)
-      : "—";
-
   return (
     <tr className="border-t">
       <td className="p-3">{student.name}</td>
@@ -83,14 +71,17 @@ function EditableRow({ student, assessments, onSaved }) {
         </td>
       ))}
 
+      {/* ✅ Use backend weighted average */}
       <td
         className={`p-3 font-semibold text-center ${
-          average !== "—" && Number(average) < 40
+          student.average != null && Number(student.average) < 40
             ? "text-red-600"
             : ""
         }`}
       >
-        {average}
+        {student.average != null
+          ? Number(student.average).toFixed(2)
+          : "—"}
       </td>
 
       <td className="p-3">
@@ -159,7 +150,7 @@ export default function TeacherGradebook() {
     fetchGradebook();
   }, [classId, subjectId]);
 
-  // ✅ Compute class average per assessment
+  // ✅ Compute class average per assessment (unchanged)
   const computeClassAverageForAssessment = (assessmentId) => {
     if (!gradebook) return null;
 
@@ -172,6 +163,21 @@ export default function TeacherGradebook() {
     return (
       values.reduce((a, b) => a + b, 0) / values.length
     ).toFixed(1);
+  };
+
+  // ✅ Compute class overall average from backend weighted averages
+  const computeClassOverallAverage = () => {
+    if (!gradebook) return "—";
+
+    const values = gradebook.students
+      .map((s) => s.average)
+      .filter((v) => typeof v === "number");
+
+    if (values.length === 0) return "—";
+
+    return (
+      values.reduce((a, b) => a + b, 0) / values.length
+    ).toFixed(2);
   };
 
   return (
@@ -251,31 +257,7 @@ export default function TeacherGradebook() {
                 ))}
 
                 <td className="text-center">
-                  {(() => {
-                    const values = gradebook.students
-                      .map((s) => {
-                        const scores = Object.values(s.scores)
-                          .filter(
-                            (v) => v !== "" && v !== undefined
-                          )
-                          .map((v) => Number(v));
-
-                        if (scores.length === 0) return null;
-
-                        return (
-                          scores.reduce((a, b) => a + b, 0) /
-                          scores.length
-                        );
-                      })
-                      .filter((v) => typeof v === "number");
-
-                    if (values.length === 0) return "—";
-
-                    return (
-                      values.reduce((a, b) => a + b, 0) /
-                      values.length
-                    ).toFixed(1);
-                  })()}
+                  {computeClassOverallAverage()}
                 </td>
 
                 <td></td>
