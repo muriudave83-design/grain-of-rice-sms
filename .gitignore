@@ -6,7 +6,6 @@ node_modules
 .env.*
 
 # build output
-dist
 build
 
 # logs
