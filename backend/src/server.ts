@@ -115,7 +115,7 @@ app.use("/api/gradebook", gradebookRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/assignment-categories", assignmentCategoryRoutes);
 
-// ✅ FIX: Mount terms route
+// ✅ TERMS ROUTE (THIS FIXES "Cannot GET /api/terms")
 app.use("/api/terms", termRoutes);
 
 app.use("/api/attendance", attendanceRoutes);
@@ -140,8 +140,6 @@ app.use("/api/admin", adminStudentsRoutes);
 app.use("/api/admin", adminClassesRoutes);
 app.use("/api/admin", adminSubjectsRoutes);
 app.use("/api/admin", adminClassStudentsRoutes);
-
-// ✅ Correct mount for class-subjects
 app.use("/api/admin", adminClassSubjectsRoutes);
 
 // ----------------------------------
