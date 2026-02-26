@@ -52,25 +52,25 @@ export default function StudentsPanel({ students = [] }) {
         Object.entries(groupedStudents).map(([grade, gradeStudents]) => (
           <div
             key={grade}
-            className="mb-6 border border-gray-800 rounded-lg overflow-hidden"
+            className="mb-6 border border-gray-200 rounded overflow-hidden"
           >
             {/* Grade Header */}
             <button
               onClick={() => toggleGrade(grade)}
-              className="w-full flex justify-between items-center px-4 py-3 bg-gray-800 text-left text-white font-medium"
+              className="w-full flex justify-between items-center px-4 py-3 bg-gray-100 text-left font-medium text-gray-800"
             >
               <span>
                 {grade} ({gradeStudents.length})
               </span>
-              <span className="text-yellow-400">
+              <span className="text-gray-600">
                 {openGrades[grade] ? "−" : "+"}
               </span>
             </button>
 
             {openGrades[grade] && (
-              <div className="bg-gray-900 overflow-x-auto">
+              <div className="bg-white overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="bg-gray-800 text-gray-300 text-sm uppercase">
+                  <thead className="bg-gray-100 text-gray-600 text-xs uppercase">
                     <tr>
                       <th className="px-4 py-3">Name</th>
                       <th className="px-4 py-3">Admission No</th>
@@ -82,16 +82,18 @@ export default function StudentsPanel({ students = [] }) {
                     {gradeStudents.map((student) => (
                       <tr
                         key={student.id}
-                        className="border-t border-gray-800 hover:bg-gray-800 transition"
+                        className="border-t border-gray-200 hover:bg-gray-50 transition"
                       >
-                        <td className="px-4 py-3">{student.name}</td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-gray-800">
+                          {student.name}
+                        </td>
+                        <td className="px-4 py-3 text-gray-800">
                           {student.admissionNumber}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-gray-800">
                           {student.class?.name || "-"}
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 text-gray-800">
                           {student.parent?.name || "-"}
                         </td>
                       </tr>

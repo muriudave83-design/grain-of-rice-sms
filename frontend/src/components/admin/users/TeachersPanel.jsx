@@ -26,9 +26,9 @@ export default function TeachersPanel({ teachers = [] }) {
         placeholder="Search teachers by name or email..."
       />
 
-      <div className="overflow-x-auto bg-gray-900 rounded-lg border border-gray-800">
+      <div className="overflow-x-auto bg-white rounded border border-gray-200">
         <table className="w-full text-left">
-          <thead className="bg-gray-800 text-gray-300 text-sm uppercase">
+          <thead className="bg-gray-100 text-gray-600 text-xs uppercase">
             <tr>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Email</th>
@@ -50,12 +50,16 @@ export default function TeachersPanel({ teachers = [] }) {
               filteredTeachers.map((teacher) => (
                 <tr
                   key={teacher.id}
-                  className="border-t border-gray-800 hover:bg-gray-800 transition"
+                  className="border-t border-gray-200 hover:bg-gray-50 transition"
                 >
-                  <td className="px-4 py-3">{teacher.name}</td>
-                  <td className="px-4 py-3">{teacher.email}</td>
+                  <td className="px-4 py-3 text-gray-800">
+                    {teacher.name}
+                  </td>
+                  <td className="px-4 py-3 text-gray-800">
+                    {teacher.email}
+                  </td>
                   <td className="px-4 py-3">
-                    <span className="text-sm text-yellow-400">
+                    <span className="text-sm text-gray-600">
                       {teacher.status || "Inactive"}
                     </span>
                   </td>

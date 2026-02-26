@@ -26,9 +26,9 @@ export default function ParentsPanel({ parents = [] }) {
         placeholder="Search parents by name or email..."
       />
 
-      <div className="overflow-x-auto bg-gray-900 rounded-lg border border-gray-800">
+      <div className="overflow-x-auto bg-white rounded border border-gray-200">
         <table className="w-full text-left">
-          <thead className="bg-gray-800 text-gray-300 text-sm uppercase">
+          <thead className="bg-gray-100 text-gray-600 text-xs uppercase">
             <tr>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Email</th>
@@ -50,12 +50,16 @@ export default function ParentsPanel({ parents = [] }) {
               filteredParents.map((parent) => (
                 <tr
                   key={parent.id}
-                  className="border-t border-gray-800 hover:bg-gray-800 transition"
+                  className="border-t border-gray-200 hover:bg-gray-50 transition"
                 >
-                  <td className="px-4 py-3">{parent.name}</td>
-                  <td className="px-4 py-3">{parent.email}</td>
+                  <td className="px-4 py-3 text-gray-800">
+                    {parent.name}
+                  </td>
+                  <td className="px-4 py-3 text-gray-800">
+                    {parent.email}
+                  </td>
                   <td className="px-4 py-3">
-                    <span className="text-sm text-yellow-400">
+                    <span className="text-sm text-gray-600">
                       {parent.status || "Inactive"}
                     </span>
                   </td>
