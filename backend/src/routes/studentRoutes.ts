@@ -38,7 +38,7 @@ router.post(
   }
 );
 
-// ✅ Get all students (Admin + Teacher)
+// ✅ Get ALL students (Admin + Teacher)
 // MUST be above router.get("/:id")
 router.get(
   "/",
