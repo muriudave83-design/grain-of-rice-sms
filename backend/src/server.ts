@@ -20,7 +20,7 @@ import dashboardRoutes from "./routes/dashboardRoutes";
 // ✅ Assignment Categories
 import assignmentCategoryRoutes from "./routes/assignmentCategory.routes";
 
-// ✅ Terms route (FIX)
+// ✅ Terms route (STANDARDIZED)
 import termRoutes from "./routes/termRoutes";
 
 // ✅ Admin routes
@@ -30,8 +30,6 @@ import adminClassesRoutes from "./routes/admin/admin.classes.routes";
 import adminSubjectsRoutes from "./routes/admin/admin.subjects.routes";
 import adminStudentsRoutes from "./routes/admin/admin.students.routes";
 import adminClassStudentsRoutes from "./routes/admin/admin.class.students.routes";
-
-// ✅ THIS is the correct ClassSubject route file
 import adminClassSubjectsRoutes from "./routes/admin/admin.classSubjects.routes";
 
 // ✅ Phase-7: Report Cards
@@ -115,7 +113,7 @@ app.use("/api/gradebook", gradebookRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/assignment-categories", assignmentCategoryRoutes);
 
-// ✅ TERMS ROUTE (THIS FIXES "Cannot GET /api/terms")
+// ✅ STANDARDIZED TERMS ROUTE
 app.use("/api/terms", termRoutes);
 
 app.use("/api/attendance", attendanceRoutes);
@@ -153,6 +151,7 @@ app.get("/", (_req: Request, res: Response) => {
 // SERVER
 // ----------------------------------
 const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
