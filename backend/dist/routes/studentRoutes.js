@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
-import { authenticate } from "../middlewares/authMiddleware";
-import { requireRole } from "../middlewares/rolesMiddleware";
-import { authorizeStudentAccess } from "../middlewares/ownershipMiddleware";
+
+import { authenticate } from "../middlewares/authMiddleware.js";
+import { requireRole } from "../middlewares/rolesMiddleware.js";
+import { authorizeStudentAccess } from "../middlewares/ownershipMiddleware.js";
 
 const prisma = new PrismaClient();
 const router = Router();
