@@ -38,6 +38,26 @@ router.post(
   }
 );
 
+// ✅ Get all students (Admin + Teacher)
+// MUST be above router.get("/:id")
+router.get(
+  "/",
+  authenticate,
+  requireRole(["ADMIN", "TEACHER"]),
+  async (req, res) => {
+    try {
+      const students = await prisma.student.findMany({
+        orderBy: { id: "asc" },
+      });
+
+      res.json(students);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+
 // Get student (RBAC ownership check)
 router.get(
   "/:id",
