@@ -20,6 +20,9 @@ import dashboardRoutes from "./routes/dashboardRoutes";
 // ✅ Assignment Categories
 import assignmentCategoryRoutes from "./routes/assignmentCategory.routes";
 
+// ✅ Terms route (FIX)
+import termRoutes from "./routes/termRoutes";
+
 // ✅ Admin routes
 import adminAuditLogRoutes from "./routes/admin.auditLogs.routes";
 import adminUsersRoutes from "./routes/admin.users.routes";
@@ -111,6 +114,10 @@ app.use("/api/classes", classesRoutes);
 app.use("/api/gradebook", gradebookRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/assignment-categories", assignmentCategoryRoutes);
+
+// ✅ FIX: Mount terms route
+app.use("/api/terms", termRoutes);
+
 app.use("/api/attendance", attendanceRoutes);
 
 // ----------------------------------
