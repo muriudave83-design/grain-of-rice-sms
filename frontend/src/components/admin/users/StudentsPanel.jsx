@@ -1,110 +1,71 @@
 import React, { useState, useMemo } from "react";
 import UserSearch from "./UserSearch";
 
-export default function StudentsPanel({ students = [] }) {
+export default function StudentsPanel({ students = [], onEdit, onToggle }) {
   const [search, setSearch] = useState("");
-  const [openGrades, setOpenGrades] = useState({});
 
-  const filteredStudents = useMemo(() => {
-    return students.filter((student) => {
-      const fullName = `${student.firstName} ${student.lastName}`;
-      return (
-        fullName.toLowerCase().includes(search.toLowerCase()) ||
-        student.admissionNo
-          ?.toLowerCase()
-          .includes(search.toLowerCase())
-      );
-    });
+  const filtered = useMemo(() => {
+    return students.filter((user) =>
+      user.name.toLowerCase().includes(search.toLowerCase()) ||
+      user.email.toLowerCase().includes(search.toLowerCase())
+    );
   }, [students, search]);
-
-  const groupedStudents = useMemo(() => {
-    return filteredStudents.reduce((acc, student) => {
-      const grade = student.class?.name || "Unassigned";
-
-      if (!acc[grade]) acc[grade] = [];
-      acc[grade].push(student);
-
-      return acc;
-    }, {});
-  }, [filteredStudents]);
-
-  const toggleGrade = (grade) => {
-    setOpenGrades((prev) => ({
-      ...prev,
-      [grade]: !prev[grade],
-    }));
-  };
 
   return (
     <div>
       <UserSearch
         value={search}
         onChange={setSearch}
-        placeholder="Search students by name or admission number..."
+        placeholder="Search students by name or email..."
       />
 
-      {Object.keys(groupedStudents).length === 0 ? (
+      {filtered.length === 0 ? (
         <div className="text-center text-gray-500 py-6">
           No students found
         </div>
       ) : (
-        Object.entries(groupedStudents).map(([grade, gradeStudents]) => (
-          <div
-            key={grade}
-            className="mb-6 border border-gray-200 rounded overflow-hidden"
-          >
-            <button
-              onClick={() => toggleGrade(grade)}
-              className="w-full flex justify-between items-center px-4 py-3 bg-gray-100 text-left font-medium text-gray-800"
-            >
-              <span>
-                {grade} ({gradeStudents.length})
-              </span>
-              <span>
-                {openGrades[grade] ? "−" : "+"}
-              </span>
-            </button>
+        <div className="bg-white border rounded overflow-x-auto mt-4">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-left">
+              <tr>
+                <th className="p-3">Name</th>
+                <th className="p-3">Email</th>
+                <th className="p-3">Status</th>
+                <th className="p-3 w-40">Actions</th>
+              </tr>
+            </thead>
 
-            {openGrades[grade] && (
-              <div className="bg-white overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead className="bg-gray-50 text-gray-600 text-xs uppercase">
-                    <tr>
-                      <th className="px-4 py-3">Name</th>
-                      <th className="px-4 py-3">Admission No</th>
-                      <th className="px-4 py-3">Class</th>
-                      <th className="px-4 py-3">Parent</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {gradeStudents.map((student) => {
-                      const fullName = `${student.firstName} ${student.lastName}`;
-
-                      const parentName =
-                        student.parentLinks?.[0]?.parent?.name || "-";
-
-                      return (
-                        <tr
-                          key={student.id}
-                          className="border-t border-gray-200 hover:bg-gray-50 transition"
-                        >
-                          <td className="px-4 py-3">{fullName}</td>
-                          <td className="px-4 py-3">
-                            {student.admissionNo}
-                          </td>
-                          <td className="px-4 py-3">
-                            {student.class?.name || "-"}
-                          </td>
-                          <td className="px-4 py-3">{parentName}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        ))
+            <tbody>
+              {filtered.map((user) => (
+                <tr key={user.id} className="border-t">
+                  <td className="p-3">{user.name}</td>
+                  <td className="p-3">{user.email}</td>
+                  <td className="p-3">
+                    {user.isActive ? (
+                      <span className="text-green-600 text-xs">Active</span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">Inactive</span>
+                    )}
+                  </td>
+                  <td className="p-3 space-x-2">
+                    <button
+                      onClick={() => onEdit(user)}
+                      className="text-blue-600 text-xs"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => onToggle(user)}
+                      className="text-red-600 text-xs"
+                    >
+                      {user.isActive ? "Deactivate" : "Activate"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
