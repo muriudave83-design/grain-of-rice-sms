@@ -15,7 +15,7 @@ export default function UsersPage() {
   // ✅ STUDENTS STATE
   const [students, setStudents] = useState([]);
 
-  // ✅ DEBUG — GUARANTEED PLACEMENT DIRECTLY UNDER STUDENTS STATE
+  // ✅ DEBUG LOG
   useEffect(() => {
     console.log("Students data:", students);
   }, [students]);
@@ -139,15 +139,27 @@ export default function UsersPage() {
       />
 
       {activeTab === "teachers" && (
-        <TeachersPanel teachers={teachers} />
+        <TeachersPanel
+          teachers={teachers}
+          onEdit={openEdit}
+          onToggle={toggleActive}
+        />
       )}
 
       {activeTab === "students" && (
-        <StudentsPanel students={students} />
+        <StudentsPanel
+          students={students}
+          onEdit={openEdit}
+          onToggle={toggleActive}
+        />
       )}
 
       {activeTab === "parents" && (
-        <ParentsPanel parents={parents} />
+        <ParentsPanel
+          parents={parents}
+          onEdit={openEdit}
+          onToggle={toggleActive}
+        />
       )}
 
       {showForm && (

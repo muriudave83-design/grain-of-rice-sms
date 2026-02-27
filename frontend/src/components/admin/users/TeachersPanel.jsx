@@ -1,7 +1,11 @@
 import React, { useState, useMemo } from "react";
 import UserSearch from "./UserSearch";
 
-export default function TeachersPanel({ teachers = [] }) {
+export default function TeachersPanel({
+  teachers = [],
+  onEdit,
+  onToggle,
+}) {
   const [search, setSearch] = useState("");
 
   const filteredTeachers = useMemo(() => {
@@ -33,6 +37,7 @@ export default function TeachersPanel({ teachers = [] }) {
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Actions</th> {/* NEW */}
             </tr>
           </thead>
 
@@ -40,7 +45,7 @@ export default function TeachersPanel({ teachers = [] }) {
             {filteredTeachers.length === 0 ? (
               <tr>
                 <td
-                  colSpan="3"
+                  colSpan="4"
                   className="px-4 py-6 text-center text-gray-500"
                 >
                   No teachers found
@@ -55,14 +60,34 @@ export default function TeachersPanel({ teachers = [] }) {
                   <td className="px-4 py-3 text-gray-800">
                     {teacher.name}
                   </td>
+
                   <td className="px-4 py-3 text-gray-800">
                     {teacher.email}
                   </td>
+
                   <td className="px-4 py-3">
                     <span className="text-sm text-gray-600">
                       {teacher.status || "Inactive"}
                     </span>
                   </td>
+
+                  {/* NEW ACTIONS */}
+                  <td className="px-4 py-3 flex gap-2">
+                    <button
+                      onClick={() => onEdit?.(teacher)}
+                      className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      onClick={() => onToggle?.(teacher)}
+                      className="px-3 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                    >
+                      Toggle
+                    </button>
+                  </td>
+
                 </tr>
               ))
             )}

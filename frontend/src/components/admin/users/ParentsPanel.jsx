@@ -1,7 +1,11 @@
 import React, { useState, useMemo } from "react";
 import UserSearch from "./UserSearch";
 
-export default function ParentsPanel({ parents = [] }) {
+export default function ParentsPanel({
+  parents = [],
+  onEdit,
+  onToggle,
+}) {
   const [search, setSearch] = useState("");
 
   const filteredParents = useMemo(() => {
@@ -33,6 +37,7 @@ export default function ParentsPanel({ parents = [] }) {
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
 
@@ -40,7 +45,7 @@ export default function ParentsPanel({ parents = [] }) {
             {filteredParents.length === 0 ? (
               <tr>
                 <td
-                  colSpan="3"
+                  colSpan="4"
                   className="px-4 py-6 text-center text-gray-500"
                 >
                   No parents found
@@ -55,14 +60,33 @@ export default function ParentsPanel({ parents = [] }) {
                   <td className="px-4 py-3 text-gray-800">
                     {parent.name}
                   </td>
+
                   <td className="px-4 py-3 text-gray-800">
                     {parent.email}
                   </td>
+
                   <td className="px-4 py-3">
                     <span className="text-sm text-gray-600">
                       {parent.status || "Inactive"}
                     </span>
                   </td>
+
+                  <td className="px-4 py-3 flex gap-2">
+                    <button
+                      onClick={() => onEdit?.(parent)}
+                      className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      onClick={() => onToggle?.(parent)}
+                      className="px-3 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                    >
+                      Toggle
+                    </button>
+                  </td>
+
                 </tr>
               ))
             )}
