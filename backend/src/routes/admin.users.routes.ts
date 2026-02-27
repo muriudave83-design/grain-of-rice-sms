@@ -140,8 +140,8 @@ router.post(
 );
 
 /**
- * ✅ FIXED: POST /api/admin/users/student
- * Atomic creation of User + Student with transaction
+ * ✅ ATOMIC FIXED: POST /api/admin/users/student
+ * Strict validation + class existence check + atomic transaction
  */
 router.post(
   "/users/student",
@@ -149,9 +149,6 @@ router.post(
   requireRole(["ADMIN"]),
   async (req, res) => {
     try {
-
-      console.log("Incoming student payload:", req.body);
-
       const {
         firstName,
         lastName,
@@ -159,53 +156,61 @@ router.post(
         email,
         password,
         classId,
+        dob,
       } = req.body;
 
-      if (!firstName || !lastName || !admissionNo || !email || !password || !classId) {
-        console.log("Validation failed:", {
-          firstName,
-          lastName,
-          admissionNo,
-          email,
-          password,
-          classId,
-        });
-
+      // ✅ Strict validation (type-safe)
+      if (
+        typeof firstName !== "string" ||
+        typeof lastName !== "string" ||
+        typeof admissionNo !== "string" ||
+        typeof email !== "string" ||
+        typeof password !== "string" ||
+        typeof classId !== "number"
+      ) {
         return res.status(400).json({
-          message: "Missing required fields",
-          received: {
-            firstName,
-            lastName,
-            admissionNo,
-            email,
-            password,
-            classId,
-          },
+          message: "Invalid or missing fields",
+          received: req.body,
         });
       }
 
-      const { dob } = req.body;
+      // ✅ Verify class exists
+      const classExists = await prisma.class.findUnique({
+        where: { id: classId },
+      });
 
+      if (!classExists) {
+        return res.status(400).json({
+          message: "Class does not exist",
+          classId,
+        });
+      }
+
+      // ✅ Verify email uniqueness
       const existingUser = await prisma.user.findUnique({
         where: { email },
       });
 
       if (existingUser) {
-        return res.status(409).json({ message: "Email already in use" });
+        return res.status(409).json({
+          message: "Email already in use",
+        });
       }
 
+      // ✅ Verify admission number uniqueness
       const existingStudent = await prisma.student.findUnique({
         where: { admissionNo },
       });
 
       if (existingStudent) {
-        return res
-          .status(409)
-          .json({ message: "Admission number already exists" });
+        return res.status(409).json({
+          message: "Admission number already exists",
+        });
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
+      // 🔥 Atomic transaction
       const result = await prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
@@ -222,9 +227,13 @@ router.post(
             firstName,
             lastName,
             admissionNo,
-            dob: dob ? new Date(dob) : undefined,
-            classId,
-            userId: user.id,
+            dob: dob ? new Date(dob) : null,
+            class: {
+              connect: { id: classId },
+            },
+            user: {
+              connect: { id: user.id },
+            },
           },
         });
 
@@ -234,8 +243,12 @@ router.post(
       return res.status(201).json(result);
 
     } catch (error: any) {
-      console.error("Failed to create student:", error);
-      return res.status(400).json({ message: error.message });
+      console.error("Student creation error:", error);
+
+      return res.status(500).json({
+        message: "Server error during student creation",
+        error: error.message,
+      });
     }
   }
 );
