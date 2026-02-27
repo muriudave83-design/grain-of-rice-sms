@@ -12,12 +12,12 @@ export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ STUDENTS STATE
+  // Academic students (NOT used in Users tab identity management)
   const [students, setStudents] = useState([]);
 
-  // ✅ DEBUG LOG
+  // Debug only (optional)
   useEffect(() => {
-    console.log("Students data:", students);
+    console.log("Academic students data:", students);
   }, [students]);
 
   const [activeTab, setActiveTab] = useState("teachers");
@@ -32,21 +32,22 @@ export default function UsersPage() {
     isActive: true,
   });
 
-  // ✅ ROLE SEPARATION
+  // ✅ Identity role separation (CORRECT SOURCE)
   const teachers = users.filter((u) => u.role === "TEACHER");
   const parents = users.filter((u) => u.role === "PARENT");
+  const studentUsers = users.filter((u) => u.role === "STUDENT");
 
-  // ✅ TAB COUNTS
+  // ✅ Tab counts must use identity users
   const counts = {
     teachers: teachers.length,
-    students: students.length,
+    students: studentUsers.length,
     parents: parents.length,
   };
 
-  // ✅ INITIAL LOAD
+  // Initial load
   useEffect(() => {
     fetchUsers();
-    fetchStudents();
+    fetchStudents(); // optional, can be removed later
   }, []);
 
   async function fetchUsers() {
@@ -61,6 +62,7 @@ export default function UsersPage() {
     }
   }
 
+  // Academic students (NOT used in Users identity tab)
   async function fetchStudents() {
     try {
       const res = await apiClient.get("/students");
@@ -84,10 +86,10 @@ export default function UsersPage() {
   function openEdit(user) {
     setEditingUser(user);
     setForm({
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      isActive: user.isActive,
+      name: user.name || "",
+      email: user.email || "",
+      role: user.role || "STUDENT",
+      isActive: user.isActive ?? true,
     });
     setShowForm(true);
   }
@@ -148,7 +150,7 @@ export default function UsersPage() {
 
       {activeTab === "students" && (
         <StudentsPanel
-          students={students}
+          students={studentUsers} // ✅ FIXED: identity users, not academic students
           onEdit={openEdit}
           onToggle={toggleActive}
         />
