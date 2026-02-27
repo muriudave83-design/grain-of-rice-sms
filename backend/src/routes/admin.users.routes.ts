@@ -83,8 +83,7 @@ async function createUser({
       email,
       password: hashedPassword,
       role,
-      mustChangePassword: true,
-      isActive: true,
+      mustChangePassword: true
     },
     select: {
       id: true,
@@ -142,7 +141,6 @@ router.post(
 
 /**
  * ✅ FINAL ATOMIC VERSION MARKER — POST /api/admin/users/student
- * If you see any other validation message, Render is running old code.
  */
 router.post(
   "/users/student",
@@ -163,9 +161,6 @@ router.post(
         dob,
       } = req.body;
 
-      /**
-       * STRICT VALIDATION (TYPE SAFE)
-       */
       if (
         typeof firstName !== "string" ||
         typeof lastName !== "string" ||
@@ -181,9 +176,6 @@ router.post(
         });
       }
 
-      /**
-       * VERIFY CLASS EXISTS
-       */
       const classExists = await prisma.class.findUnique({
         where: { id: classId },
       });
@@ -195,9 +187,6 @@ router.post(
         });
       }
 
-      /**
-       * VERIFY EMAIL UNIQUE
-       */
       const existingUser = await prisma.user.findUnique({
         where: { email },
       });
@@ -208,9 +197,6 @@ router.post(
         });
       }
 
-      /**
-       * VERIFY ADMISSION NUMBER UNIQUE
-       */
       const existingStudent = await prisma.student.findUnique({
         where: { admissionNo },
       });
@@ -223,9 +209,6 @@ router.post(
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      /**
-       * ATOMIC TRANSACTION
-       */
       const result = await prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
@@ -233,8 +216,7 @@ router.post(
             email,
             password: hashedPassword,
             role: "STUDENT",
-            mustChangePassword: true,
-            isActive: true,
+            mustChangePassword: true
           },
         });
 
