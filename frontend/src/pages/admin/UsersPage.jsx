@@ -12,14 +12,15 @@ export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ STEP 8.2 — NEW STATE
+  // ✅ STUDENTS STATE
   const [students, setStudents] = useState([]);
-  const [activeTab, setActiveTab] = useState("teachers");
 
-  // ✅ DEBUG — LOG STUDENTS DATA
+  // ✅ DEBUG — GUARANTEED PLACEMENT DIRECTLY UNDER STUDENTS STATE
   useEffect(() => {
     console.log("Students data:", students);
   }, [students]);
+
+  const [activeTab, setActiveTab] = useState("teachers");
 
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
@@ -31,18 +32,18 @@ export default function UsersPage() {
     isActive: true,
   });
 
-  // ✅ STEP 8.3 — ROLE SEPARATION
+  // ✅ ROLE SEPARATION
   const teachers = users.filter((u) => u.role === "TEACHER");
   const parents = users.filter((u) => u.role === "PARENT");
 
-  // ✅ STEP 8.3 — TAB COUNTS
+  // ✅ TAB COUNTS
   const counts = {
     teachers: teachers.length,
     students: students.length,
     parents: parents.length,
   };
 
-  // ✅ STEP 8.2 — UPDATED useEffect
+  // ✅ INITIAL LOAD
   useEffect(() => {
     fetchUsers();
     fetchStudents();
@@ -60,7 +61,6 @@ export default function UsersPage() {
     }
   }
 
-  // ✅ STEP 8.2 — NEW FUNCTION
   async function fetchStudents() {
     try {
       const res = await apiClient.get("/students");
@@ -132,7 +132,6 @@ export default function UsersPage() {
         </button>
       </div>
 
-      {/* ✅ STEP 8.4 — NEW TAB SYSTEM */}
       <UsersTabs
         activeTab={activeTab}
         setActiveTab={setActiveTab}
