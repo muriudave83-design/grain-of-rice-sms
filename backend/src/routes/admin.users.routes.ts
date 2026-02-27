@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
-import { listUsers } from "../controllers/admin.users.controller"; // ✅ added
+import { listUsers } from "../controllers/admin.users.controller";
 
 const router = Router();
 
@@ -44,18 +44,16 @@ router.get(
 
 /**
  * ✅ GET /api/admin/users
- * Uses controller (supports ?role= filter)
  */
 router.get(
   "/users",
   authenticate,
   requireRole(["ADMIN"]),
-  listUsers // ✅ fixed — now using controller
+  listUsers
 );
 
 /**
  * Shared admin user creation helper
- * (TEACHER / PARENT)
  */
 async function createUser({
   name,
@@ -142,7 +140,8 @@ router.post(
 );
 
 /**
- * POST /api/admin/users/student
+ * ✅ FIXED: POST /api/admin/users/student
+ * Atomic creation of User + Student with transaction
  */
 router.post(
   "/users/student",
@@ -150,37 +149,73 @@ router.post(
   requireRole(["ADMIN"]),
   async (req, res) => {
     try {
-      const { name, email, password } = req.body;
+      const {
+        firstName,
+        lastName,
+        admissionNo,
+        classId,
+        email,
+        password,
+        dob,
+      } = req.body;
 
-      if (!name || !email || !password) {
+      if (
+        !firstName ||
+        !lastName ||
+        !admissionNo ||
+        !email ||
+        !password ||
+        !classId
+      ) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      const existing = await prisma.user.findUnique({ where: { email } });
-      if (existing) {
+      const existingUser = await prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (existingUser) {
         return res.status(409).json({ message: "Email already in use" });
+      }
+
+      const existingStudent = await prisma.student.findUnique({
+        where: { admissionNo },
+      });
+
+      if (existingStudent) {
+        return res
+          .status(409)
+          .json({ message: "Admission number already exists" });
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      const user = await prisma.user.create({
-        data: {
-          name,
-          email,
-          password: hashedPassword,
-          role: "STUDENT",
-          mustChangePassword: true,
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          createdAt: true,
-        },
+      const result = await prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            name: `${firstName} ${lastName}`,
+            email,
+            password: hashedPassword,
+            role: "STUDENT",
+            mustChangePassword: true,
+          },
+        });
+
+        const student = await tx.student.create({
+          data: {
+            firstName,
+            lastName,
+            admissionNo,
+            dob: dob ? new Date(dob) : undefined,
+            classId,
+            userId: user.id,
+          },
+        });
+
+        return { user, student };
       });
 
-      return res.status(201).json(user);
+      return res.status(201).json(result);
     } catch (error: any) {
       console.error("Failed to create student:", error);
       return res.status(400).json({ message: error.message });
@@ -216,15 +251,15 @@ router.post(
     });
 
     if (!user || user.role !== "STUDENT") {
-      return res
-        .status(400)
-        .json({ message: "User must exist and have STUDENT role" });
+      return res.status(400).json({
+        message: "User must exist and have STUDENT role",
+      });
     }
 
     if (student.userId) {
-      return res
-        .status(409)
-        .json({ message: "Student already linked to a user" });
+      return res.status(409).json({
+        message: "Student already linked to a user",
+      });
     }
 
     const userAlreadyLinked = await prisma.student.findFirst({
@@ -242,7 +277,9 @@ router.post(
       data: { userId: user.id },
     });
 
-    return res.json({ message: "Student successfully linked to user" });
+    return res.json({
+      message: "Student successfully linked to user",
+    });
   }
 );
 
