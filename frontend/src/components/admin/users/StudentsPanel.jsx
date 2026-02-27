@@ -1,14 +1,25 @@
 import React, { useState, useMemo } from "react";
 import UserSearch from "./UserSearch";
 
-export default function StudentsPanel({ students = [], onEdit, onToggle }) {
+export default function StudentsPanel({
+  students = [],
+  onEdit = () => {},
+  onToggle = () => {},
+}) {
   const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
-    return students.filter((user) =>
-      user.name.toLowerCase().includes(search.toLowerCase()) ||
-      user.email.toLowerCase().includes(search.toLowerCase())
-    );
+    const searchLower = search.toLowerCase();
+
+    return students.filter((user) => {
+      const name = user?.name || "";
+      const email = user?.email || "";
+
+      return (
+        name.toLowerCase().includes(searchLower) ||
+        email.toLowerCase().includes(searchLower)
+      );
+    });
   }, [students, search]);
 
   return (
@@ -36,33 +47,46 @@ export default function StudentsPanel({ students = [], onEdit, onToggle }) {
             </thead>
 
             <tbody>
-              {filtered.map((user) => (
-                <tr key={user.id} className="border-t">
-                  <td className="p-3">{user.name}</td>
-                  <td className="p-3">{user.email}</td>
-                  <td className="p-3">
-                    {user.isActive ? (
-                      <span className="text-green-600 text-xs">Active</span>
-                    ) : (
-                      <span className="text-gray-400 text-xs">Inactive</span>
-                    )}
-                  </td>
-                  <td className="p-3 space-x-2">
-                    <button
-                      onClick={() => onEdit(user)}
-                      className="text-blue-600 text-xs"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => onToggle(user)}
-                      className="text-red-600 text-xs"
-                    >
-                      {user.isActive ? "Deactivate" : "Activate"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filtered.map((user) => {
+                const name = user?.name || "—";
+                const email = user?.email || "—";
+                const isActive = !!user?.isActive;
+
+                return (
+                  <tr key={user.id} className="border-t">
+                    <td className="p-3">{name}</td>
+                    <td className="p-3">{email}</td>
+
+                    <td className="p-3">
+                      {isActive ? (
+                        <span className="text-green-600 text-xs">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">
+                          Inactive
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="p-3 space-x-2">
+                      <button
+                        onClick={() => onEdit(user)}
+                        className="text-blue-600 text-xs"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => onToggle(user)}
+                        className="text-red-600 text-xs"
+                      >
+                        {isActive ? "Deactivate" : "Activate"}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
