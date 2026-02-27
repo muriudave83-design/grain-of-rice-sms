@@ -48,6 +48,14 @@ router.get(
     try {
       const students = await prisma.student.findMany({
         orderBy: { id: "asc" },
+        include: {
+          class: true,
+          parentLinks: {
+            include: {
+              parent: true,
+            },
+          },
+        },
       });
 
       res.json(students);
@@ -64,25 +72,36 @@ router.get(
   authenticate,
   authorizeStudentAccess,
   async (req, res) => {
-    const id = Number(req.params.id);
+    try {
+      const id = Number(req.params.id);
 
-    const student = await prisma.student.findUnique({
-      where: { id },
-      include: {
-        guardians: { include: { user: true } },
-        sponsorships: { include: { sponsor: true } },
-        enrollments: { include: { subject: true } },
-        grades: true,
-        invoices: true,
-        disciplines: true,
-      },
-    });
+      const student = await prisma.student.findUnique({
+        where: { id },
+        include: {
+          class: true,
+          parentLinks: {
+            include: {
+              parent: true,
+            },
+          },
+          guardians: { include: { user: true } },
+          sponsorships: { include: { sponsor: true } },
+          enrollments: { include: { subject: true } },
+          grades: true,
+          invoices: true,
+          disciplines: true,
+        },
+      });
 
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      res.json(student);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Server error" });
     }
-
-    res.json(student);
   }
 );
 
