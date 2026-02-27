@@ -55,7 +55,7 @@ export default function UsersPage() {
   // Initial load
   useEffect(() => {
     fetchUsers();
-    fetchStudents(); // optional, can be removed later
+    fetchStudents(); // optional
   }, []);
 
   async function fetchUsers() {
@@ -70,7 +70,6 @@ export default function UsersPage() {
     }
   }
 
-  // Academic students (NOT used in Users identity tab)
   async function fetchStudents() {
     try {
       const res = await apiClient.get("/students");
@@ -80,6 +79,7 @@ export default function UsersPage() {
     }
   }
 
+  // ✅ Reset form cleanly
   function openCreate() {
     setEditingUser(null);
     setForm({
@@ -87,8 +87,6 @@ export default function UsersPage() {
       email: "",
       role: "STUDENT",
       isActive: true,
-
-      // Student-specific
       firstName: "",
       lastName: "",
       admissionNo: "",
@@ -107,7 +105,6 @@ export default function UsersPage() {
       role: user.role || "STUDENT",
       isActive: user.isActive ?? true,
 
-      // Student-specific (left empty for edit unless implemented)
       firstName: "",
       lastName: "",
       admissionNo: "",
@@ -213,15 +210,18 @@ export default function UsersPage() {
               {editingUser ? "Edit User" : "Create User"}
             </h2>
 
-            <input
-              required
-              placeholder="Full name"
-              className="w-full mb-3 p-2 border rounded"
-              value={form.name}
-              onChange={(e) =>
-                setForm({ ...form, name: e.target.value })
-              }
-            />
+            {/* ✅ Full Name ONLY for non-student roles */}
+            {form.role !== "STUDENT" && (
+              <input
+                required
+                placeholder="Full name"
+                className="w-full mb-3 p-2 border rounded"
+                value={form.name}
+                onChange={(e) =>
+                  setForm({ ...form, name: e.target.value })
+                }
+              />
+            )}
 
             <input
               required
@@ -281,6 +281,7 @@ export default function UsersPage() {
                   }
                 />
 
+                {/* ✅ classId required */}
                 <input
                   required
                   type="number"
@@ -301,6 +302,7 @@ export default function UsersPage() {
                   }
                 />
 
+                {/* ✅ Password field */}
                 <input
                   required
                   type="password"
