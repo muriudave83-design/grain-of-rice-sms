@@ -9,7 +9,6 @@ const router = Router();
 
 /**
  * ✅ GET /api/admin/stats
- * Real dashboard numbers
  */
 router.get(
   "/stats",
@@ -83,7 +82,7 @@ async function createUser({
       email,
       password: hashedPassword,
       role,
-      mustChangePassword: true
+      mustChangePassword: true,
     },
     select: {
       id: true,
@@ -140,114 +139,17 @@ router.post(
 );
 
 /**
- * ✅ FINAL ATOMIC VERSION MARKER — POST /api/admin/users/student
+ * 🚨 TEMPORARY TEST ROUTE
+ * POST /api/admin/users/student
  */
 router.post(
   "/users/student",
   authenticate,
   requireRole(["ADMIN"]),
-  async (req, res) => {
-    try {
-      console.log("🔥 NEW BACKEND VERSION ACTIVE");
-      console.log("Incoming student payload:", req.body);
-
-      const {
-        firstName,
-        lastName,
-        admissionNo,
-        email,
-        password,
-        classId,
-        dob,
-      } = req.body;
-
-      if (
-        typeof firstName !== "string" ||
-        typeof lastName !== "string" ||
-        typeof admissionNo !== "string" ||
-        typeof email !== "string" ||
-        typeof password !== "string" ||
-        typeof classId !== "number"
-      ) {
-        return res.status(400).json({
-          message: "THIS IS THE NEW BACKEND VERSION",
-          reason: "Invalid or missing fields",
-          received: req.body,
-        });
-      }
-
-      const classExists = await prisma.class.findUnique({
-        where: { id: classId },
-      });
-
-      if (!classExists) {
-        return res.status(400).json({
-          message: "Class does not exist",
-          classId,
-        });
-      }
-
-      const existingUser = await prisma.user.findUnique({
-        where: { email },
-      });
-
-      if (existingUser) {
-        return res.status(409).json({
-          message: "Email already in use",
-        });
-      }
-
-      const existingStudent = await prisma.student.findUnique({
-        where: { admissionNo },
-      });
-
-      if (existingStudent) {
-        return res.status(409).json({
-          message: "Admission number already exists",
-        });
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      const result = await prisma.$transaction(async (tx) => {
-        const user = await tx.user.create({
-          data: {
-            name: `${firstName} ${lastName}`,
-            email,
-            password: hashedPassword,
-            role: "STUDENT",
-            mustChangePassword: true
-          },
-        });
-
-        const student = await tx.student.create({
-          data: {
-            firstName,
-            lastName,
-            admissionNo,
-            dob: dob ? new Date(dob) : null,
-            class: {
-              connect: { id: classId },
-            },
-            user: {
-              connect: { id: user.id },
-            },
-          },
-        });
-
-        return { user, student };
-      });
-
-      return res.status(201).json(result);
-
-    } catch (error: any) {
-      console.error("Student creation error:", error);
-
-      return res.status(500).json({
-        message: "Server error during student creation",
-        error: error.message,
-      });
-    }
+  async (_req, res) => {
+    return res.status(400).json({
+      message: "BACKEND VERSION TEST 123",
+    });
   }
 );
 

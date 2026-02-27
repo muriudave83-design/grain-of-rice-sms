@@ -30,23 +30,57 @@ router.post("/", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRol
         res.status(500).json({ message: "Server error" });
     }
 });
+// ✅ Get ALL students (Admin + Teacher)
+// MUST be above router.get("/:id")
+router.get("/", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN", "TEACHER"]), async (req, res) => {
+    try {
+        const students = await prisma.student.findMany({
+            orderBy: { id: "asc" },
+            include: {
+                class: true,
+                parentLinks: {
+                    include: {
+                        parent: true,
+                    },
+                },
+            },
+        });
+        res.json(students);
+    }
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
 // Get student (RBAC ownership check)
 router.get("/:id", authMiddleware_1.authenticate, ownershipMiddleware_1.authorizeStudentAccess, async (req, res) => {
-    const id = Number(req.params.id);
-    const student = await prisma.student.findUnique({
-        where: { id },
-        include: {
-            guardians: { include: { user: true } },
-            sponsorships: { include: { sponsor: true } },
-            enrollments: { include: { subject: true } },
-            grades: true,
-            invoices: true,
-            disciplines: true,
-        },
-    });
-    if (!student) {
-        return res.status(404).json({ message: "Student not found" });
+    try {
+        const id = Number(req.params.id);
+        const student = await prisma.student.findUnique({
+            where: { id },
+            include: {
+                class: true,
+                parentLinks: {
+                    include: {
+                        parent: true,
+                    },
+                },
+                guardians: { include: { user: true } },
+                sponsorships: { include: { sponsor: true } },
+                enrollments: { include: { subject: true } },
+                grades: true,
+                invoices: true,
+                disciplines: true,
+            },
+        });
+        if (!student) {
+            return res.status(404).json({ message: "Student not found" });
+        }
+        res.json(student);
     }
-    res.json(student);
+    catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Server error" });
+    }
 });
 exports.default = router;

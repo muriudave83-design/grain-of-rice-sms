@@ -19,6 +19,8 @@ const gradebookRoutes_1 = __importDefault(require("./routes/gradebookRoutes"));
 const dashboardRoutes_1 = __importDefault(require("./routes/dashboardRoutes"));
 // ✅ Assignment Categories
 const assignmentCategory_routes_1 = __importDefault(require("./routes/assignmentCategory.routes"));
+// ✅ Terms route (STANDARDIZED)
+const termRoutes_1 = __importDefault(require("./routes/termRoutes"));
 // ✅ Admin routes
 const admin_auditLogs_routes_1 = __importDefault(require("./routes/admin.auditLogs.routes"));
 const admin_users_routes_1 = __importDefault(require("./routes/admin.users.routes"));
@@ -26,7 +28,6 @@ const admin_classes_routes_1 = __importDefault(require("./routes/admin/admin.cla
 const admin_subjects_routes_1 = __importDefault(require("./routes/admin/admin.subjects.routes"));
 const admin_students_routes_1 = __importDefault(require("./routes/admin/admin.students.routes"));
 const admin_class_students_routes_1 = __importDefault(require("./routes/admin/admin.class.students.routes"));
-// ✅ THIS is the correct ClassSubject route file
 const admin_classSubjects_routes_1 = __importDefault(require("./routes/admin/admin.classSubjects.routes"));
 // ✅ Phase-7: Report Cards
 const reportCardReadRoutes_1 = require("./routes/reportCardReadRoutes");
@@ -95,6 +96,8 @@ app.use("/api/classes", classes_1.default);
 app.use("/api/gradebook", gradebookRoutes_1.default);
 app.use("/api/dashboard", dashboardRoutes_1.default);
 app.use("/api/assignment-categories", assignmentCategory_routes_1.default);
+// ✅ STANDARDIZED TERMS ROUTE
+app.use("/api/terms", termRoutes_1.default);
 app.use("/api/attendance", attendanceRoutes_1.default);
 // ----------------------------------
 // REPORT CARDS
@@ -114,7 +117,6 @@ app.use("/api/admin", admin_students_routes_1.default);
 app.use("/api/admin", admin_classes_routes_1.default);
 app.use("/api/admin", admin_subjects_routes_1.default);
 app.use("/api/admin", admin_class_students_routes_1.default);
-// ✅ Correct mount for class-subjects
 app.use("/api/admin", admin_classSubjects_routes_1.default);
 // ----------------------------------
 // FALLBACK
