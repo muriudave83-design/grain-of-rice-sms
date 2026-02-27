@@ -37,6 +37,7 @@ router.get("/students", async (req, res) => {
  * Create a new student
  */
 router.post("/students", async (req, res) => {
+    console.log("🔥 ADMIN STUDENTS ROUTE HIT");
     try {
         let { firstName, lastName, admissionNo, classId, parentId } = req.body;
         // Normalize values
