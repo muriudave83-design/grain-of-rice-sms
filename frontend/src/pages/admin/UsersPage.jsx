@@ -12,13 +12,11 @@ export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Academic students (NOT used in Users tab identity management)
+  // Academic students (optional debug)
   const [students, setStudents] = useState([]);
 
-  // Debug only (optional)
-  useEffect(() => {
-    console.log("Academic students data:", students);
-  }, [students]);
+  // ✅ Classes for dropdown
+  const [classes, setClasses] = useState([]);
 
   const [activeTab, setActiveTab] = useState("teachers");
 
@@ -40,22 +38,21 @@ export default function UsersPage() {
     password: "",
   });
 
-  // ✅ Identity role separation (CORRECT SOURCE)
+  // Identity role separation
   const teachers = users.filter((u) => u.role === "TEACHER");
   const parents = users.filter((u) => u.role === "PARENT");
   const studentUsers = users.filter((u) => u.role === "STUDENT");
 
-  // ✅ Tab counts must use identity users
   const counts = {
     teachers: teachers.length,
     students: studentUsers.length,
     parents: parents.length,
   };
 
-  // Initial load
   useEffect(() => {
     fetchUsers();
-    fetchStudents(); // optional
+    fetchStudents(); // optional debug
+    fetchClasses();  // ✅ fetch classes for dropdown
   }, []);
 
   async function fetchUsers() {
@@ -79,7 +76,17 @@ export default function UsersPage() {
     }
   }
 
-  // ✅ Reset form cleanly
+  // ✅ Fetch classes
+  async function fetchClasses() {
+    try {
+      const res = await apiClient.get("/admin/classes");
+      setClasses(res.data);
+    } catch (err) {
+      console.error("Failed to load classes", err);
+    }
+  }
+
+  // Reset form cleanly
   function openCreate() {
     setEditingUser(null);
     setForm({
@@ -133,9 +140,17 @@ export default function UsersPage() {
             password: form.password,
           });
         } else if (form.role === "TEACHER") {
-          await apiClient.post("/admin/users/teacher", form);
+          await apiClient.post("/admin/users/teacher", {
+            name: form.name,
+            email: form.email,
+            password: form.password,
+          });
         } else if (form.role === "PARENT") {
-          await apiClient.post("/admin/users/parent", form);
+          await apiClient.post("/admin/users/parent", {
+            name: form.name,
+            email: form.email,
+            password: form.password,
+          });
         }
       }
 
@@ -210,7 +225,7 @@ export default function UsersPage() {
               {editingUser ? "Edit User" : "Create User"}
             </h2>
 
-            {/* ✅ Full Name ONLY for non-student roles */}
+            {/* Full Name ONLY for non-students */}
             {form.role !== "STUDENT" && (
               <input
                 required
@@ -236,7 +251,7 @@ export default function UsersPage() {
             />
 
             <select
-              className="w-full mb-4 p-2 border rounded"
+              className="w-full mb-3 p-2 border rounded"
               value={form.role}
               onChange={(e) =>
                 setForm({ ...form, role: e.target.value })
@@ -281,17 +296,25 @@ export default function UsersPage() {
                   }
                 />
 
-                {/* ✅ classId required */}
-                <input
+                {/* ✅ CLASS DROPDOWN (FIXED) */}
+                <select
                   required
-                  type="number"
-                  placeholder="Class ID"
                   className="w-full mb-3 p-2 border rounded"
                   value={form.classId}
                   onChange={(e) =>
-                    setForm({ ...form, classId: e.target.value })
+                    setForm({
+                      ...form,
+                      classId: Number(e.target.value),
+                    })
                   }
-                />
+                >
+                  <option value="">Select Class</option>
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
 
                 <input
                   type="date"
@@ -302,7 +325,6 @@ export default function UsersPage() {
                   }
                 />
 
-                {/* ✅ Password field */}
                 <input
                   required
                   type="password"
@@ -324,6 +346,7 @@ export default function UsersPage() {
               >
                 Cancel
               </button>
+
               <button
                 type="submit"
                 className="px-3 py-1 text-sm bg-blue-600 text-white rounded"
