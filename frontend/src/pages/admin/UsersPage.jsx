@@ -16,6 +16,11 @@ export default function UsersPage() {
   const [students, setStudents] = useState([]);
   const [activeTab, setActiveTab] = useState("teachers");
 
+  // ✅ DEBUG — LOG STUDENTS DATA
+  useEffect(() => {
+    console.log("Students data:", students);
+  }, [students]);
+
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
 
