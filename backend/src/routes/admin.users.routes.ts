@@ -84,6 +84,7 @@ async function createUser({
       password: hashedPassword,
       role,
       mustChangePassword: true,
+      isActive: true,
     },
     select: {
       id: true,
@@ -140,8 +141,8 @@ router.post(
 );
 
 /**
- * ✅ ATOMIC FIXED: POST /api/admin/users/student
- * Strict validation + class existence check + atomic transaction
+ * ✅ FINAL ATOMIC VERSION MARKER — POST /api/admin/users/student
+ * If you see any other validation message, Render is running old code.
  */
 router.post(
   "/users/student",
@@ -149,6 +150,9 @@ router.post(
   requireRole(["ADMIN"]),
   async (req, res) => {
     try {
+      console.log("🔥 NEW BACKEND VERSION ACTIVE");
+      console.log("Incoming student payload:", req.body);
+
       const {
         firstName,
         lastName,
@@ -159,7 +163,9 @@ router.post(
         dob,
       } = req.body;
 
-      // ✅ Strict validation (type-safe)
+      /**
+       * STRICT VALIDATION (TYPE SAFE)
+       */
       if (
         typeof firstName !== "string" ||
         typeof lastName !== "string" ||
@@ -169,12 +175,15 @@ router.post(
         typeof classId !== "number"
       ) {
         return res.status(400).json({
-          message: "Invalid or missing fields",
+          message: "THIS IS THE NEW BACKEND VERSION",
+          reason: "Invalid or missing fields",
           received: req.body,
         });
       }
 
-      // ✅ Verify class exists
+      /**
+       * VERIFY CLASS EXISTS
+       */
       const classExists = await prisma.class.findUnique({
         where: { id: classId },
       });
@@ -186,7 +195,9 @@ router.post(
         });
       }
 
-      // ✅ Verify email uniqueness
+      /**
+       * VERIFY EMAIL UNIQUE
+       */
       const existingUser = await prisma.user.findUnique({
         where: { email },
       });
@@ -197,7 +208,9 @@ router.post(
         });
       }
 
-      // ✅ Verify admission number uniqueness
+      /**
+       * VERIFY ADMISSION NUMBER UNIQUE
+       */
       const existingStudent = await prisma.student.findUnique({
         where: { admissionNo },
       });
@@ -210,7 +223,9 @@ router.post(
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      // 🔥 Atomic transaction
+      /**
+       * ATOMIC TRANSACTION
+       */
       const result = await prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
           data: {
@@ -219,6 +234,7 @@ router.post(
             password: hashedPassword,
             role: "STUDENT",
             mustChangePassword: true,
+            isActive: true,
           },
         });
 
