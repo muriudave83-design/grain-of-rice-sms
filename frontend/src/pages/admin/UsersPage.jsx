@@ -30,6 +30,14 @@ export default function UsersPage() {
     email: "",
     role: "STUDENT",
     isActive: true,
+
+    // Student-specific
+    firstName: "",
+    lastName: "",
+    admissionNo: "",
+    classId: "",
+    dob: "",
+    password: "",
   });
 
   // ✅ Identity role separation (CORRECT SOURCE)
@@ -79,6 +87,14 @@ export default function UsersPage() {
       email: "",
       role: "STUDENT",
       isActive: true,
+
+      // Student-specific
+      firstName: "",
+      lastName: "",
+      admissionNo: "",
+      classId: "",
+      dob: "",
+      password: "",
     });
     setShowForm(true);
   }
@@ -90,6 +106,14 @@ export default function UsersPage() {
       email: user.email || "",
       role: user.role || "STUDENT",
       isActive: user.isActive ?? true,
+
+      // Student-specific (left empty for edit unless implemented)
+      firstName: "",
+      lastName: "",
+      admissionNo: "",
+      classId: "",
+      dob: "",
+      password: "",
     });
     setShowForm(true);
   }
@@ -101,13 +125,28 @@ export default function UsersPage() {
       if (editingUser) {
         await apiClient.put(`/admin/users/${editingUser.id}`, form);
       } else {
-        await apiClient.post("/admin/users", form);
+        if (form.role === "STUDENT") {
+          await apiClient.post("/admin/users/student", {
+            firstName: form.firstName,
+            lastName: form.lastName,
+            admissionNo: form.admissionNo,
+            classId: Number(form.classId),
+            dob: form.dob || null,
+            email: form.email,
+            password: form.password,
+          });
+        } else if (form.role === "TEACHER") {
+          await apiClient.post("/admin/users/teacher", form);
+        } else if (form.role === "PARENT") {
+          await apiClient.post("/admin/users/parent", form);
+        }
       }
 
       setShowForm(false);
       fetchUsers();
     } catch (err) {
       console.error("Failed to save user", err);
+      alert(err?.response?.data?.message || "Failed to save user");
     }
   }
 
@@ -150,7 +189,7 @@ export default function UsersPage() {
 
       {activeTab === "students" && (
         <StudentsPanel
-          students={studentUsers} // ✅ FIXED: identity users, not academic students
+          students={studentUsers}
           onEdit={openEdit}
           onToggle={toggleActive}
         />
@@ -209,6 +248,71 @@ export default function UsersPage() {
                 </option>
               ))}
             </select>
+
+            {form.role === "STUDENT" && (
+              <>
+                <input
+                  required
+                  placeholder="First Name"
+                  className="w-full mb-3 p-2 border rounded"
+                  value={form.firstName}
+                  onChange={(e) =>
+                    setForm({ ...form, firstName: e.target.value })
+                  }
+                />
+
+                <input
+                  required
+                  placeholder="Last Name"
+                  className="w-full mb-3 p-2 border rounded"
+                  value={form.lastName}
+                  onChange={(e) =>
+                    setForm({ ...form, lastName: e.target.value })
+                  }
+                />
+
+                <input
+                  required
+                  placeholder="Admission Number"
+                  className="w-full mb-3 p-2 border rounded"
+                  value={form.admissionNo}
+                  onChange={(e) =>
+                    setForm({ ...form, admissionNo: e.target.value })
+                  }
+                />
+
+                <input
+                  required
+                  type="number"
+                  placeholder="Class ID"
+                  className="w-full mb-3 p-2 border rounded"
+                  value={form.classId}
+                  onChange={(e) =>
+                    setForm({ ...form, classId: e.target.value })
+                  }
+                />
+
+                <input
+                  type="date"
+                  className="w-full mb-3 p-2 border rounded"
+                  value={form.dob}
+                  onChange={(e) =>
+                    setForm({ ...form, dob: e.target.value })
+                  }
+                />
+
+                <input
+                  required
+                  type="password"
+                  placeholder="Temporary Password"
+                  className="w-full mb-3 p-2 border rounded"
+                  value={form.password}
+                  onChange={(e) =>
+                    setForm({ ...form, password: e.target.value })
+                  }
+                />
+              </>
+            )}
 
             <div className="flex justify-end space-x-2">
               <button
