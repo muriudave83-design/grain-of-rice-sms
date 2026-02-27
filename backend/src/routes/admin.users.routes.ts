@@ -149,26 +149,42 @@ router.post(
   requireRole(["ADMIN"]),
   async (req, res) => {
     try {
+
+      console.log("Incoming student payload:", req.body);
+
       const {
         firstName,
         lastName,
         admissionNo,
-        classId,
         email,
         password,
-        dob,
+        classId,
       } = req.body;
 
-      if (
-        !firstName ||
-        !lastName ||
-        !admissionNo ||
-        !email ||
-        !password ||
-        !classId
-      ) {
-        return res.status(400).json({ message: "Missing required fields" });
+      if (!firstName || !lastName || !admissionNo || !email || !password || !classId) {
+        console.log("Validation failed:", {
+          firstName,
+          lastName,
+          admissionNo,
+          email,
+          password,
+          classId,
+        });
+
+        return res.status(400).json({
+          message: "Missing required fields",
+          received: {
+            firstName,
+            lastName,
+            admissionNo,
+            email,
+            password,
+            classId,
+          },
+        });
       }
+
+      const { dob } = req.body;
 
       const existingUser = await prisma.user.findUnique({
         where: { email },
@@ -216,6 +232,7 @@ router.post(
       });
 
       return res.status(201).json(result);
+
     } catch (error: any) {
       console.error("Failed to create student:", error);
       return res.status(400).json({ message: error.message });
