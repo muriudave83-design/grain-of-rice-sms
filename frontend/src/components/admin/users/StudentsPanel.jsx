@@ -5,19 +5,18 @@ export default function StudentsPanel({ students = [] }) {
   const [search, setSearch] = useState("");
   const [openGrades, setOpenGrades] = useState({});
 
-  // Filter students
   const filteredStudents = useMemo(() => {
     return students.filter((student) => {
+      const fullName = `${student.firstName} ${student.lastName}`;
       return (
-        student.name?.toLowerCase().includes(search.toLowerCase()) ||
-        student.admissionNumber
+        fullName.toLowerCase().includes(search.toLowerCase()) ||
+        student.admissionNo
           ?.toLowerCase()
           .includes(search.toLowerCase())
       );
     });
   }, [students, search]);
 
-  // Group by class name
   const groupedStudents = useMemo(() => {
     return filteredStudents.reduce((acc, student) => {
       const grade = student.class?.name || "Unassigned";
@@ -54,7 +53,6 @@ export default function StudentsPanel({ students = [] }) {
             key={grade}
             className="mb-6 border border-gray-200 rounded overflow-hidden"
           >
-            {/* Grade Header */}
             <button
               onClick={() => toggleGrade(grade)}
               className="w-full flex justify-between items-center px-4 py-3 bg-gray-100 text-left font-medium text-gray-800"
@@ -62,7 +60,7 @@ export default function StudentsPanel({ students = [] }) {
               <span>
                 {grade} ({gradeStudents.length})
               </span>
-              <span className="text-gray-600">
+              <span>
                 {openGrades[grade] ? "−" : "+"}
               </span>
             </button>
@@ -70,7 +68,7 @@ export default function StudentsPanel({ students = [] }) {
             {openGrades[grade] && (
               <div className="bg-white overflow-x-auto">
                 <table className="w-full text-left">
-                  <thead className="bg-gray-100 text-gray-600 text-xs uppercase">
+                  <thead className="bg-gray-50 text-gray-600 text-xs uppercase">
                     <tr>
                       <th className="px-4 py-3">Name</th>
                       <th className="px-4 py-3">Admission No</th>
@@ -79,25 +77,28 @@ export default function StudentsPanel({ students = [] }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {gradeStudents.map((student) => (
-                      <tr
-                        key={student.id}
-                        className="border-t border-gray-200 hover:bg-gray-50 transition"
-                      >
-                        <td className="px-4 py-3 text-gray-800">
-                          {student.name}
-                        </td>
-                        <td className="px-4 py-3 text-gray-800">
-                          {student.admissionNumber}
-                        </td>
-                        <td className="px-4 py-3 text-gray-800">
-                          {student.class?.name || "-"}
-                        </td>
-                        <td className="px-4 py-3 text-gray-800">
-                          {student.parent?.name || "-"}
-                        </td>
-                      </tr>
-                    ))}
+                    {gradeStudents.map((student) => {
+                      const fullName = `${student.firstName} ${student.lastName}`;
+
+                      const parentName =
+                        student.parentLinks?.[0]?.parent?.name || "-";
+
+                      return (
+                        <tr
+                          key={student.id}
+                          className="border-t border-gray-200 hover:bg-gray-50 transition"
+                        >
+                          <td className="px-4 py-3">{fullName}</td>
+                          <td className="px-4 py-3">
+                            {student.admissionNo}
+                          </td>
+                          <td className="px-4 py-3">
+                            {student.class?.name || "-"}
+                          </td>
+                          <td className="px-4 py-3">{parentName}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
