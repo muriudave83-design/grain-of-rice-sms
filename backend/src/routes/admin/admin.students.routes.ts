@@ -49,10 +49,16 @@ router.post("/students", async (req, res) => {
     classId = Number(classId);
     parentId = parentId ? Number(parentId) : null;
 
-    if (!firstName || !lastName || !admissionNo || !classId) {
-      return res
-        .status(400)
-        .json({ message: "Missing required fields." });
+    if (
+      typeof firstName !== "string" ||
+      typeof lastName !== "string" ||
+      typeof admissionNo !== "string" ||
+      isNaN(classId)
+    ) {
+      return res.status(400).json({
+        message: "Invalid or missing fields",
+        received: req.body,
+      });
     }
 
     // Verify class exists
