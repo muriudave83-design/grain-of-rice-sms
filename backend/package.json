@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon --exec ts-node --files src/server.ts",
     "build": "prisma generate && tsc",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy"
   },
