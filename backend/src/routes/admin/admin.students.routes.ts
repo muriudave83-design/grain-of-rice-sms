@@ -51,11 +51,12 @@ router.post("/students", async (req, res) => {
     classId = Number(classId);
     parentId = parentId ? Number(parentId) : null;
 
+    // ✅ FIXED VALIDATION BLOCK
     if (
       typeof firstName !== "string" ||
       typeof lastName !== "string" ||
       typeof admissionNo !== "string" ||
-      isNaN(classId)
+      Number.isNaN(classId)
     ) {
       return res.status(400).json({
         message: "Invalid or missing fields",
