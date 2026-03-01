@@ -1,4 +1,5 @@
 import { Router } from "express";
+console.log("🔥 ADMIN.STUDENTS.ROUTES FILE LOADED");
 import { prisma } from "../../prisma/client";
 
 const router = Router();

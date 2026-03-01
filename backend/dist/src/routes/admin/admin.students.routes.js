@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
+console.log("🔥 ADMIN.STUDENTS.ROUTES FILE LOADED");
 const client_1 = require("../../prisma/client");
 const router = (0, express_1.Router)();
 /**
