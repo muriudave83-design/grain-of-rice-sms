@@ -7,16 +7,11 @@ import { Role } from "@prisma/client";
 /**
  * ADMIN: List Users
  * GET /api/admin/users
- * Optional query:
- *   ?role=TEACHER | PARENT | STUDENT | ADMIN
  */
 export const listUsers = async (req: Request, res: Response) => {
   try {
     const roleQuery = req.query.role as string | undefined;
 
-    console.log("ROLE FILTER:", roleQuery);
-
-    // Validate role against Prisma enum
     const role: Role | undefined =
       roleQuery && Object.values(Role).includes(roleQuery as Role)
         ? (roleQuery as Role)
@@ -30,6 +25,9 @@ export const listUsers = async (req: Request, res: Response) => {
         email: true,
         role: true,
         createdAt: true,
+        lastLoginAt: true,
+        mustChangePassword: true,
+        isActive: true,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -42,8 +40,72 @@ export const listUsers = async (req: Request, res: Response) => {
 };
 
 /**
+ * 🔐 ADMIN: Reset User Password
+ * PATCH /api/admin/users/:id/reset-password
+ */
+export const resetUserPassword = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const userId = Number(req.params.id);
+
+    if (!userId) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Prevent admin resetting themselves
+    if (user.id === req.user!.id) {
+      return res.status(400).json({
+        message: "You cannot reset your own password.",
+      });
+    }
+
+    // Generate temporary password
+    const tempPassword = Math.random().toString(36).slice(-8);
+    const hashed = await bcrypt.hash(tempPassword, 10);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashed,
+        mustChangePassword: true,
+      },
+    });
+
+    await createAuditLog({
+      action: "USER_PASSWORD_RESET",
+      entityType: "User",
+      entityId: String(user.id),
+      actorUserId: String(req.user!.id),
+      actorRole: req.user!.role,
+      metadata: {
+        email: user.email,
+      },
+    });
+
+    return res.json({
+      message: "Password reset successful",
+      temporaryPassword: tempPassword,
+    });
+  } catch (error) {
+    console.error("Failed to reset password:", error);
+    return res.status(500).json({
+      message: "Failed to reset password",
+    });
+  }
+};
+
+/**
  * INTERNAL HELPER
- * Centralized user creation logic for ADMIN actions
  */
 async function createUserInternal(
   req: Request,
@@ -98,7 +160,6 @@ async function createUserInternal(
 
 /**
  * ADMIN: Create Teacher
- * POST /api/admin/users/teacher
  */
 export async function createTeacher(req: Request, res: Response) {
   return createUserInternal(req, res, "TEACHER");
@@ -106,7 +167,6 @@ export async function createTeacher(req: Request, res: Response) {
 
 /**
  * ADMIN: Create Parent
- * POST /api/admin/users/parent
  */
 export async function createParent(req: Request, res: Response) {
   return createUserInternal(req, res, "PARENT");
@@ -114,7 +174,6 @@ export async function createParent(req: Request, res: Response) {
 
 /**
  * ADMIN: Create Student
- * POST /api/admin/users/student
  */
 export async function createStudent(req: Request, res: Response) {
   return createUserInternal(req, res, "STUDENT");
