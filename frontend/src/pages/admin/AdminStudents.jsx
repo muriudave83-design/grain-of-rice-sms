@@ -41,7 +41,7 @@ export default function AdminStudents() {
     }
   }
 
-  // ✅ FINAL CORRECT VERSION
+  // ✅ DEBUG VERSION
   async function submitForm(e) {
     e.preventDefault();
 
@@ -58,12 +58,24 @@ export default function AdminStudents() {
         classId: Number(form.classId),
       };
 
-      // only attach parentId if selected
       if (form.parentId) {
         payload.parentId = Number(form.parentId);
       }
 
-      await apiClient.post("/admin/students", payload);
+      // 🔥 DEBUG LOGS
+      console.log("======================================");
+      console.log("🚀 BACKEND VERSION TEST 123");
+      console.log("API BASE URL:", apiClient.defaults.baseURL);
+      console.log(
+        "FULL URL:",
+        `${apiClient.defaults.baseURL}/admin/students`
+      );
+      console.log("PAYLOAD:", payload);
+      console.log("======================================");
+
+      const response = await apiClient.post("/admin/students", payload);
+
+      console.log("✅ RESPONSE:", response.data);
 
       setForm({
         firstName: "",
@@ -75,8 +87,11 @@ export default function AdminStudents() {
 
       setShowForm(false);
       fetchData();
+
     } catch (err) {
-      console.error("Failed to create student", err);
+      console.error("❌ CREATE STUDENT ERROR:", err);
+      console.error("❌ RESPONSE:", err?.response);
+
       alert(
         err?.response?.data?.message ||
         "Failed to create student"
