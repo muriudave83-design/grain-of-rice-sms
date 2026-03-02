@@ -1,8 +1,12 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 console.log("🔥 ADMIN.STUDENTS.ROUTES FILE LOADED");
 const client_1 = require("../../prisma/client");
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const router = (0, express_1.Router)();
 /**
  * GET /api/admin/students
@@ -18,10 +22,10 @@ router.get("/students", async (req, res) => {
                         parent: true,
                     },
                 },
+                user: true, // include linked login
             },
             orderBy: { id: "asc" },
         });
-        // Flatten parent for easier frontend use
         const result = students.map((s) => ({
             ...s,
             parent: s.parentLinks[0]?.parent || null,
@@ -35,42 +39,72 @@ router.get("/students", async (req, res) => {
 });
 /**
  * POST /api/admin/students
- * Create a new student
+ * Create student + auto-create login account
  */
 router.post("/students", async (req, res) => {
     console.log("🔥 ADMIN STUDENTS ROUTE HIT");
     try {
         let { firstName, lastName, admissionNo, classId, parentId } = req.body;
-        // Normalize values
         firstName = firstName?.trim();
         lastName = lastName?.trim();
         admissionNo = admissionNo?.trim();
         classId = Number(classId);
         parentId = parentId ? Number(parentId) : null;
-        // ✅ FIXED VALIDATION BLOCK
         if (typeof firstName !== "string" ||
             typeof lastName !== "string" ||
             typeof admissionNo !== "string" ||
             Number.isNaN(classId)) {
             return res.status(400).json({
                 message: "Invalid or missing fields",
-                received: req.body,
             });
         }
-        // Verify class exists
+        // Ensure class exists
         const classExists = await client_1.prisma.class.findUnique({
             where: { id: classId },
         });
         if (!classExists) {
             return res.status(404).json({ message: "Class not found." });
         }
-        // Create student
+        // Prevent duplicate admission numbers
+        const existingStudent = await client_1.prisma.student.findUnique({
+            where: { admissionNo },
+        });
+        if (existingStudent) {
+            return res.status(409).json({
+                message: "Student with this admission number already exists.",
+            });
+        }
+        // Generate student email
+        const email = `${admissionNo.toLowerCase()}@student.school.com`;
+        // Check duplicate email
+        const existingUser = await client_1.prisma.user.findUnique({
+            where: { email },
+        });
+        if (existingUser) {
+            return res.status(409).json({
+                message: "Generated email already exists.",
+            });
+        }
+        // Default password (force change later if desired)
+        const defaultPassword = "student123";
+        const hashedPassword = await bcryptjs_1.default.hash(defaultPassword, 10);
+        // Create login user first
+        const user = await client_1.prisma.user.create({
+            data: {
+                email,
+                password: hashedPassword,
+                role: "STUDENT",
+                name: `${firstName} ${lastName}`,
+            },
+        });
+        // Create student linked to user
         const student = await client_1.prisma.student.create({
             data: {
                 firstName,
                 lastName,
                 admissionNo,
                 classId,
+                userId: user.id,
             },
         });
         // Link parent if provided
@@ -82,11 +116,25 @@ router.post("/students", async (req, res) => {
                 },
             });
         }
-        res.json(student);
+        res.json({
+            message: "Student and login account created successfully.",
+            student,
+            login: {
+                email,
+                password: defaultPassword,
+            },
+        });
     }
     catch (err) {
         console.error("Create student error:", err);
-        res.status(500).json({ message: "Failed to create student." });
+        if (err.code === "P2002") {
+            return res.status(409).json({
+                message: "Duplicate field detected.",
+            });
+        }
+        res.status(500).json({
+            message: "Failed to create student.",
+        });
     }
 });
 /**

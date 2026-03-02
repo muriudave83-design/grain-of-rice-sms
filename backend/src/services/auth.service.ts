@@ -10,7 +10,6 @@ const NotificationService = {
   emitEvent: (..._args: any[]) => {},
 };
 
-
 interface LoginInput {
   email: string;
   password: string;
@@ -30,6 +29,12 @@ export async function login({ email, password }: LoginInput) {
     throw new Error("Invalid credentials");
   }
 
+  // ✅ Track last login timestamp
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date() },
+  });
+
   const token = jwt.sign(
     {
       id: user.id,
@@ -40,7 +45,6 @@ export async function login({ email, password }: LoginInput) {
     { expiresIn: "7d" }
   );
 
-  // inside login() AFTER successful auth
   try {
     NotificationService.emitEvent({
       name: "user.login",

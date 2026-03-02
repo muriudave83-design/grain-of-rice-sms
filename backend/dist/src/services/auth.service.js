@@ -25,12 +25,16 @@ async function login({ email, password }) {
     if (!isValid) {
         throw new Error("Invalid credentials");
     }
+    // ✅ Track last login timestamp
+    await client_1.prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+    });
     const token = jsonwebtoken_1.default.sign({
         id: user.id,
         email: user.email,
         role: user.role,
     }, process.env.JWT_SECRET || "dev_secret", { expiresIn: "7d" });
-    // inside login() AFTER successful auth
     try {
         NotificationService.emitEvent({
             name: "user.login",
