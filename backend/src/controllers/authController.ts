@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, AuditAction } from "@prisma/client";
 import jwt from "jsonwebtoken";
 import { createAuditLog } from "../services/auditLog.service";
 import { hashPassword, verifyPassword } from "../utils/password";
@@ -20,11 +20,8 @@ export const registerUser = async (req: Request, res: Response) => {
       });
     }
 
-    console.log("📥 Register request:", req.body);
-
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) {
-      console.log("❌ Email already exists:", email);
       return res.status(400).json({ message: "Email already registered" });
     }
 
@@ -33,8 +30,6 @@ export const registerUser = async (req: Request, res: Response) => {
     const user = await prisma.user.create({
       data: { name, email, password: hashed, role },
     });
-
-    console.log("✅ Registered new user ID:", user.id);
 
     res.status(201).json({
       message: "User registered successfully",
@@ -56,11 +51,6 @@ export const registerUser = async (req: Request, res: Response) => {
 // ======================================================
 export const loginUser = async (req: Request, res: Response) => {
   try {
-    console.log("\n======================================");
-    console.log("📡 RAW HEADERS:", req.headers);
-    console.log("📥 Login Body:", req.body);
-    console.log("======================================");
-
     if (!req.body || Object.keys(req.body).length === 0) {
       return res.status(400).json({
         message: "Empty request body — is Content-Type application/json?",
@@ -72,23 +62,16 @@ export const loginUser = async (req: Request, res: Response) => {
     if (!email || !password) {
       return res.status(400).json({
         message: "Email and password are required",
-        received: req.body,
       });
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
 
-    console.log("🔍 Prisma returned user:", user ? "FOUND" : "NOT FOUND");
-
     if (!user) {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
-    console.log("👤 USER ROLE FROM DB:", user.role);
-    console.log("👤 USER ID:", user.id);
-
     const valid = await verifyPassword(password, user.password);
-    console.log("🔐 Password valid:", valid);
 
     if (!valid) {
       return res.status(400).json({ message: "Invalid email or password" });
@@ -104,7 +87,6 @@ export const loginUser = async (req: Request, res: Response) => {
       { expiresIn: "1h" }
     );
 
-    // ✅ FIXED COOKIE FOR LOCAL + PRODUCTION
     const isProduction = process.env.NODE_ENV === "production";
 
     res.cookie("access_token", token, {
@@ -183,8 +165,9 @@ export const changePassword = async (req: Request, res: Response) => {
       },
     });
 
+    // ✅ FIXED: Use Prisma Enum
     await createAuditLog({
-      action: "PASSWORD_CHANGED",
+      action: AuditAction.PASSWORD_CHANGED,
       entityType: "User",
       entityId: String(userId),
       actorUserId: String(userId),

@@ -21,17 +21,14 @@ const registerUser = async (req, res) => {
                 message: "Admin accounts cannot be created via public registration",
             });
         }
-        console.log("📥 Register request:", req.body);
         const exists = await prisma.user.findUnique({ where: { email } });
         if (exists) {
-            console.log("❌ Email already exists:", email);
             return res.status(400).json({ message: "Email already registered" });
         }
         const hashed = await (0, password_1.hashPassword)(password);
         const user = await prisma.user.create({
             data: { name, email, password: hashed, role },
         });
-        console.log("✅ Registered new user ID:", user.id);
         res.status(201).json({
             message: "User registered successfully",
             user: {
@@ -53,10 +50,6 @@ exports.registerUser = registerUser;
 // ======================================================
 const loginUser = async (req, res) => {
     try {
-        console.log("\n======================================");
-        console.log("📡 RAW HEADERS:", req.headers);
-        console.log("📥 Login Body:", req.body);
-        console.log("======================================");
         if (!req.body || Object.keys(req.body).length === 0) {
             return res.status(400).json({
                 message: "Empty request body — is Content-Type application/json?",
@@ -66,18 +59,13 @@ const loginUser = async (req, res) => {
         if (!email || !password) {
             return res.status(400).json({
                 message: "Email and password are required",
-                received: req.body,
             });
         }
         const user = await prisma.user.findUnique({ where: { email } });
-        console.log("🔍 Prisma returned user:", user ? "FOUND" : "NOT FOUND");
         if (!user) {
             return res.status(400).json({ message: "Invalid email or password" });
         }
-        console.log("👤 USER ROLE FROM DB:", user.role);
-        console.log("👤 USER ID:", user.id);
         const valid = await (0, password_1.verifyPassword)(password, user.password);
-        console.log("🔐 Password valid:", valid);
         if (!valid) {
             return res.status(400).json({ message: "Invalid email or password" });
         }
@@ -86,7 +74,6 @@ const loginUser = async (req, res) => {
             email: user.email,
             role: user.role,
         }, JWT_SECRET, { expiresIn: "1h" });
-        // ✅ FIXED COOKIE FOR LOCAL + PRODUCTION
         const isProduction = process.env.NODE_ENV === "production";
         res.cookie("access_token", token, {
             httpOnly: true,
@@ -151,8 +138,9 @@ const changePassword = async (req, res) => {
                 mustChangePassword: false,
             },
         });
+        // ✅ FIXED: Use Prisma Enum
         await (0, auditLog_service_1.createAuditLog)({
-            action: "PASSWORD_CHANGED",
+            action: client_1.AuditAction.PASSWORD_CHANGED,
             entityType: "User",
             entityId: String(userId),
             actorUserId: String(userId),

@@ -3,6 +3,7 @@ import {
   AttendanceSessionStatus,
 } from "@prisma/client";
 import { createAuditLog } from "../auditLog.service";
+import { AuditAction } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -93,7 +94,7 @@ export class AttendanceSessionService {
 
       // ✅ AUDIT: Attendance session submitted
       await createAuditLog({
-        action: "ATTENDANCE_SUBMITTED",
+        action: AuditAction.ATTENDANCE_SUBMITTED,
         entityType: "AttendanceSession",
         entityId: String(updated.id),
         actorUserId: String(teacherId),

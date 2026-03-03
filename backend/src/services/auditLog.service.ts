@@ -1,19 +1,17 @@
 import { prisma } from "../prisma/client";
+import { AuditAction } from "@prisma/client";
 
-export type AuditAction =
-  | "USER_LOGIN"
-  | "USER_CREATED"
-  | "PASSWORD_CHANGED"   // ✅ ADDED
-  | "ROLE_CHANGED"
-  | "REPORT_CARD_PUBLISHED"
-  | "ATTENDANCE_SUBMITTED";
+/**
+ * Uses Prisma's AuditAction enum directly.
+ * DO NOT redefine AuditAction anywhere in the codebase.
+ */
 
 export interface CreateAuditLogInput {
   action: AuditAction;
   entityType: string;
   entityId?: string;
   actorUserId: string;
-  actorRole: string; // ✅ REQUIRED — matches Prisma schema
+  actorRole: string; // must match Prisma schema
   metadata?: Record<string, any>;
 }
 

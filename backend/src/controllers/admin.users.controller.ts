@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import bcrypt from "bcrypt";
 import { prisma } from "../prisma/client";
 import { createAuditLog } from "../services/auditLog.service";
-import { Role } from "@prisma/client";
+import { Role, AuditAction } from "@prisma/client";
 
 /**
  * ADMIN: List Users
@@ -32,10 +32,10 @@ export const listUsers = async (req: Request, res: Response) => {
       orderBy: { createdAt: "desc" },
     });
 
-    res.json(users);
+    return res.json(users);
   } catch (err) {
     console.error("Failed to list users:", err);
-    res.status(500).json({ message: "Failed to fetch users" });
+    return res.status(500).json({ message: "Failed to fetch users" });
   }
 };
 
@@ -54,6 +54,10 @@ export const resetUserPassword = async (
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
     });
@@ -63,7 +67,7 @@ export const resetUserPassword = async (
     }
 
     // Prevent admin resetting themselves
-    if (user.id === req.user!.id) {
+    if (user.id === req.user.id) {
       return res.status(400).json({
         message: "You cannot reset your own password.",
       });
@@ -71,22 +75,23 @@ export const resetUserPassword = async (
 
     // Generate temporary password
     const tempPassword = Math.random().toString(36).slice(-8);
-    const hashed = await bcrypt.hash(tempPassword, 10);
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     await prisma.user.update({
       where: { id: userId },
       data: {
-        password: hashed,
+        password: hashedPassword,
         mustChangePassword: true,
       },
     });
 
+    // ✅ Prisma Enum (NO STRING LITERAL)
     await createAuditLog({
-      action: "USER_PASSWORD_RESET",
+      action: AuditAction.USER_PASSWORD_RESET,
       entityType: "User",
       entityId: String(user.id),
-      actorUserId: String(req.user!.id),
-      actorRole: req.user!.role,
+      actorUserId: String(req.user.id),
+      actorRole: req.user.role,
       metadata: {
         email: user.email,
       },
@@ -112,50 +117,59 @@ async function createUserInternal(
   res: Response,
   role: "TEACHER" | "PARENT" | "STUDENT"
 ) {
-  const { name, email, tempPassword } = req.body;
+  try {
+    const { name, email, tempPassword } = req.body;
 
-  if (!name || !email || !tempPassword) {
-    return res.status(400).json({ message: "Missing required fields" });
+    if (!name || !email || !tempPassword) {
+      return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existing) {
+      return res.status(409).json({ message: "User already exists" });
+    }
+
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role,
+        mustChangePassword: true,
+      },
+    });
+
+    await createAuditLog({
+      action: AuditAction.USER_CREATED,
+      entityType: "User",
+      entityId: String(user.id),
+      actorUserId: String(req.user.id),
+      actorRole: req.user.role,
+      metadata: {
+        role,
+        email,
+      },
+    });
+
+    return res.status(201).json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    });
+  } catch (error) {
+    console.error("Failed to create user:", error);
+    return res.status(500).json({ message: "Failed to create user" });
   }
-
-  const existing = await prisma.user.findUnique({
-    where: { email },
-  });
-
-  if (existing) {
-    return res.status(409).json({ message: "User already exists" });
-  }
-
-  const hashedPassword = await bcrypt.hash(tempPassword, 10);
-
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      password: hashedPassword,
-      role,
-      mustChangePassword: true,
-    },
-  });
-
-  await createAuditLog({
-    action: "USER_CREATED",
-    entityType: "User",
-    entityId: String(user.id),
-    actorUserId: String(req.user!.id),
-    actorRole: req.user!.role,
-    metadata: {
-      role,
-      email,
-    },
-  });
-
-  return res.status(201).json({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-  });
 }
 
 /**

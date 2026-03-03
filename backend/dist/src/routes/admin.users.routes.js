@@ -11,6 +11,17 @@ const rolesMiddleware_1 = require("../middlewares/rolesMiddleware");
 const admin_users_controller_1 = require("../controllers/admin.users.controller");
 const router = (0, express_1.Router)();
 /**
+ * Utility: Generate temporary password
+ */
+function generateTempPassword(length = 10) {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+        password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+}
+/**
  * ✅ GET /api/admin/stats
  */
 router.get("/stats", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (_req, res) => {
@@ -39,6 +50,50 @@ router.get("/stats", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requir
  * ✅ GET /api/admin/users
  */
 router.get("/users", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), admin_users_controller_1.listUsers);
+/**
+ * 🔐 PATCH /api/admin/users/:id/reset-password
+ * Admin resets any user's password
+ */
+router.patch("/users/:id/reset-password", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
+    try {
+        const userId = Number(req.params.id);
+        if (Number.isNaN(userId)) {
+            return res.status(400).json({ message: "Invalid user ID" });
+        }
+        const user = await client_1.prisma.user.findUnique({
+            where: { id: userId },
+        });
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        // Prevent admin from resetting their own password via this endpoint
+        // (optional safety rule)
+        if (req.user?.id === userId) {
+            return res.status(400).json({
+                message: "You cannot reset your own password here",
+            });
+        }
+        const tempPassword = generateTempPassword();
+        const hashedPassword = await bcryptjs_1.default.hash(tempPassword, 10);
+        await client_1.prisma.user.update({
+            where: { id: userId },
+            data: {
+                password: hashedPassword,
+                mustChangePassword: true,
+            },
+        });
+        return res.json({
+            message: "Password reset successfully",
+            temporaryPassword: tempPassword, // shown once
+        });
+    }
+    catch (error) {
+        console.error("Failed to reset password:", error);
+        return res.status(500).json({
+            message: "Failed to reset password",
+        });
+    }
+});
 /**
  * Shared admin user creation helper
  */
@@ -102,7 +157,6 @@ router.post("/users/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_
 });
 /**
  * 🚨 TEMPORARY TEST ROUTE
- * POST /api/admin/users/student
  */
 router.post("/users/student", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (_req, res) => {
     return res.status(400).json({

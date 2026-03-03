@@ -277,14 +277,14 @@ model AttendanceEntry {
 }
 
 model AuditLog {
-  id          String   @id @default(uuid())
+  id          String      @id @default(uuid())
   actorUserId String
   actorRole   String
-  action      String
+  action      AuditAction
   entityType  String
   entityId    String?
   metadata    Json?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime    @default(now())
 }
 
 model AssignmentCategory {
@@ -330,4 +330,9 @@ enum AuditAction {
   USER_UPDATED
   USER_DELETED
   USER_PASSWORD_RESET
+  USER_LOGIN
+  PASSWORD_CHANGED
+  ATTENDANCE_SUBMITTED
+  REPORT_CARDS_PUBLISHED
+  REPORT_CARDS_UNPUBLISHED
 }

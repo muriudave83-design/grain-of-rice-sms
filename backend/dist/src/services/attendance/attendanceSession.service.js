@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AttendanceSessionService = void 0;
 const client_1 = require("@prisma/client");
 const auditLog_service_1 = require("../auditLog.service");
+const client_2 = require("@prisma/client");
 const prisma = new client_1.PrismaClient();
 /* ------------------------------------------------------------------ */
 /* TEMP stub — Phase 9 Notifications not implemented yet               */
@@ -71,7 +72,7 @@ class AttendanceSessionService {
             });
             // ✅ AUDIT: Attendance session submitted
             await (0, auditLog_service_1.createAuditLog)({
-                action: "ATTENDANCE_SUBMITTED",
+                action: client_2.AuditAction.ATTENDANCE_SUBMITTED,
                 entityType: "AttendanceSession",
                 entityId: String(updated.id),
                 actorUserId: String(teacherId),
