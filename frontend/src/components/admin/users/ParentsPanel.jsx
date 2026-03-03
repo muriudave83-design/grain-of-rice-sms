@@ -3,23 +3,23 @@ import UserSearch from "./UserSearch";
 
 export default function ParentsPanel({
   parents = [],
-  onEdit,
-  onToggle,
-  onReset, // ✅ added
+  onEdit = () => {},
+  onArchive = () => {},   // ✅ replaced onToggle
+  onReset = () => {},
 }) {
   const [search, setSearch] = useState("");
 
   const filteredParents = useMemo(() => {
+    const searchLower = search.toLowerCase();
+
     return parents.filter((parent) => {
-      const nameMatch = parent.name
-        ?.toLowerCase()
-        .includes(search.toLowerCase());
+      const name = parent?.name || "";
+      const email = parent?.email || "";
 
-      const emailMatch = parent.email
-        ?.toLowerCase()
-        .includes(search.toLowerCase());
-
-      return nameMatch || emailMatch;
+      return (
+        name.toLowerCase().includes(searchLower) ||
+        email.toLowerCase().includes(searchLower)
+      );
     });
   }, [parents, search]);
 
@@ -31,7 +31,7 @@ export default function ParentsPanel({
         placeholder="Search parents by name or email..."
       />
 
-      <div className="overflow-x-auto bg-white rounded border border-gray-200">
+      <div className="overflow-x-auto bg-white rounded border border-gray-200 mt-4">
         <table className="w-full text-left">
           <thead className="bg-gray-100 text-gray-600 text-xs uppercase">
             <tr>
@@ -53,50 +53,64 @@ export default function ParentsPanel({
                 </td>
               </tr>
             ) : (
-              filteredParents.map((parent) => (
-                <tr
-                  key={parent.id}
-                  className="border-t border-gray-200 hover:bg-gray-50 transition"
-                >
-                  <td className="px-4 py-3 text-gray-800">
-                    {parent.name}
-                  </td>
+              filteredParents.map((parent) => {
+                const isActive = !!parent?.isActive;
 
-                  <td className="px-4 py-3 text-gray-800">
-                    {parent.email}
-                  </td>
+                return (
+                  <tr
+                    key={parent.id}
+                    className="border-t border-gray-200 hover:bg-gray-50 transition"
+                  >
+                    <td className="px-4 py-3 text-gray-800">
+                      {parent.name || "—"}
+                    </td>
 
-                  <td className="px-4 py-3">
-                    <span className="text-sm text-gray-600">
-                      {parent.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </td>
+                    <td className="px-4 py-3 text-gray-800">
+                      {parent.email || "—"}
+                    </td>
 
-                  <td className="px-4 py-3 flex gap-2">
-                    <button
-                      onClick={() => onEdit?.(parent)}
-                      className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                      Edit
-                    </button>
+                    <td className="px-4 py-3">
+                      {isActive ? (
+                        <span className="text-sm text-green-600">
+                          Active
+                        </span>
+                      ) : (
+                        <span className="text-sm text-red-600">
+                          Archived
+                        </span>
+                      )}
+                    </td>
 
-                    <button
-                      onClick={() => onToggle?.(parent)}
-                      className="px-3 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                    >
-                      Toggle
-                    </button>
+                    <td className="px-4 py-3 flex gap-2">
+                      {/* Edit */}
+                      <button
+                        onClick={() => onEdit(parent)}
+                        className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                      >
+                        Edit
+                      </button>
 
-                    {/* ✅ NEW RESET BUTTON */}
-                    <button
-                      onClick={() => onReset?.(parent)}
-                      className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600"
-                    >
-                      Reset
-                    </button>
-                  </td>
-                </tr>
-              ))
+                      {/* Archive (only if active) */}
+                      {isActive && (
+                        <button
+                          onClick={() => onArchive(parent.id)}
+                          className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                        >
+                          Archive
+                        </button>
+                      )}
+
+                      {/* Reset Password */}
+                      <button
+                        onClick={() => onReset(parent)}
+                        className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600"
+                      >
+                        Reset
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

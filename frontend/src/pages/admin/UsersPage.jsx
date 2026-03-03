@@ -152,18 +152,21 @@ export default function UsersPage() {
     }
   }
 
-  async function toggleActive(user) {
+  // ✅ NEW: Archive User
+  async function handleArchive(userId) {
+    if (!window.confirm("Are you sure you want to archive this user?"))
+      return;
+
     try {
-      await apiClient.patch(`/admin/users/${user.id}/status`, {
-        isActive: !user.isActive,
-      });
+      await apiClient.patch(`/admin/users/${userId}/archive`);
       fetchUsers();
     } catch (err) {
-      console.error("Failed to update status", err);
+      console.error("Archive failed", err);
+      alert(err?.response?.data?.message || "Failed to archive user.");
     }
   }
 
-  // ✅ NEW: Reset Password Function
+  // ✅ Reset Password
   async function resetPassword(user) {
     if (!window.confirm(`Reset password for ${user.email}?`)) return;
 
@@ -203,8 +206,8 @@ export default function UsersPage() {
         <TeachersPanel
           teachers={teachers}
           onEdit={openEdit}
-          onToggle={toggleActive}
-          onReset={resetPassword}   // ✅ passed down
+          onArchive={handleArchive}
+          onReset={resetPassword}
         />
       )}
 
@@ -212,8 +215,8 @@ export default function UsersPage() {
         <StudentsPanel
           students={studentUsers}
           onEdit={openEdit}
-          onToggle={toggleActive}
-          onReset={resetPassword}   // ✅ passed down
+          onArchive={handleArchive}
+          onReset={resetPassword}
         />
       )}
 
@@ -221,8 +224,8 @@ export default function UsersPage() {
         <ParentsPanel
           parents={parents}
           onEdit={openEdit}
-          onToggle={toggleActive}
-          onReset={resetPassword}   // ✅ passed down
+          onArchive={handleArchive}
+          onReset={resetPassword}
         />
       )}
 

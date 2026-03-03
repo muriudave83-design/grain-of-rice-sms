@@ -4,8 +4,8 @@ import UserSearch from "./UserSearch";
 export default function TeachersPanel({
   teachers = [],
   onEdit,
-  onToggle,
-  onReset, // ✅ added
+  onArchive,   // ✅ replaced onToggle
+  onReset,
 }) {
   const [search, setSearch] = useState("");
 
@@ -67,12 +67,19 @@ export default function TeachersPanel({
                   </td>
 
                   <td className="px-4 py-3">
-                    <span className="text-sm text-gray-600">
-                      {teacher.isActive ? "Active" : "Inactive"}
+                    <span
+                      className={`text-sm ${
+                        teacher.isActive
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {teacher.isActive ? "Active" : "Archived"}
                     </span>
                   </td>
 
                   <td className="px-4 py-3 flex gap-2">
+                    {/* Edit */}
                     <button
                       onClick={() => onEdit?.(teacher)}
                       className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -80,14 +87,17 @@ export default function TeachersPanel({
                       Edit
                     </button>
 
-                    <button
-                      onClick={() => onToggle?.(teacher)}
-                      className="px-3 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                    >
-                      Toggle
-                    </button>
+                    {/* Archive (only if active) */}
+                    {teacher.isActive && (
+                      <button
+                        onClick={() => onArchive?.(teacher.id)}
+                        className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                      >
+                        Archive
+                      </button>
+                    )}
 
-                    {/* ✅ NEW RESET BUTTON */}
+                    {/* Reset Password */}
                     <button
                       onClick={() => onReset?.(teacher)}
                       className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600"

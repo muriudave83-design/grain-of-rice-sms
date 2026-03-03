@@ -4,8 +4,8 @@ import UserSearch from "./UserSearch";
 export default function StudentsPanel({
   students = [],
   onEdit = () => {},
-  onToggle = () => {},
-  onReset = () => {}, // ✅ added
+  onArchive = () => {},   // ✅ replaced onToggle
+  onReset = () => {},
 }) {
   const [search, setSearch] = useState("");
 
@@ -54,7 +54,10 @@ export default function StudentsPanel({
                 const isActive = !!user?.isActive;
 
                 return (
-                  <tr key={user.id} className="border-t">
+                  <tr
+                    key={user.id}
+                    className="border-t hover:bg-gray-50 transition"
+                  >
                     <td className="p-3">{name}</td>
                     <td className="p-3">{email}</td>
 
@@ -64,13 +67,14 @@ export default function StudentsPanel({
                           Active
                         </span>
                       ) : (
-                        <span className="text-gray-400 text-xs">
-                          Inactive
+                        <span className="text-red-600 text-xs">
+                          Archived
                         </span>
                       )}
                     </td>
 
                     <td className="p-3 space-x-3">
+                      {/* Edit */}
                       <button
                         onClick={() => onEdit(user)}
                         className="text-blue-600 text-xs hover:underline"
@@ -78,14 +82,17 @@ export default function StudentsPanel({
                         Edit
                       </button>
 
-                      <button
-                        onClick={() => onToggle(user)}
-                        className="text-red-600 text-xs hover:underline"
-                      >
-                        {isActive ? "Deactivate" : "Activate"}
-                      </button>
+                      {/* Archive (only if active) */}
+                      {isActive && (
+                        <button
+                          onClick={() => onArchive(user.id)}
+                          className="text-red-600 text-xs hover:underline"
+                        >
+                          Archive
+                        </button>
+                      )}
 
-                      {/* ✅ NEW RESET BUTTON */}
+                      {/* Reset Password */}
                       <button
                         onClick={() => onReset(user)}
                         className="text-orange-600 text-xs hover:underline"
