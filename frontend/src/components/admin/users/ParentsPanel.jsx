@@ -5,6 +5,7 @@ export default function ParentsPanel({
   parents = [],
   onEdit,
   onToggle,
+  onReset, // ✅ added
 }) {
   const [search, setSearch] = useState("");
 
@@ -67,7 +68,7 @@ export default function ParentsPanel({
 
                   <td className="px-4 py-3">
                     <span className="text-sm text-gray-600">
-                      {parent.status || "Inactive"}
+                      {parent.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
 
@@ -85,8 +86,15 @@ export default function ParentsPanel({
                     >
                       Toggle
                     </button>
-                  </td>
 
+                    {/* ✅ NEW RESET BUTTON */}
+                    <button
+                      onClick={() => onReset?.(parent)}
+                      className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600"
+                    >
+                      Reset
+                    </button>
+                  </td>
                 </tr>
               ))
             )}

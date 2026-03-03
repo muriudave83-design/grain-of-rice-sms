@@ -50,18 +50,32 @@ export default function Login() {
 
       console.log("✅ LOGIN RESPONSE:", res.data);
 
-      const { user, token } = res.data;
-      console.log("👉 ROLE:", user.role);
+      const { user, token, mustChangePassword } = res.data;
 
-      // Persist auth
+      console.log("👉 ROLE:", user.role);
+      console.log("🔐 mustChangePassword:", mustChangePassword);
+
+      // Persist token
       localStorage.setItem("token", token);
-      login(user);
+
+      // Store user in auth context INCLUDING password flag
+      login({
+        ...user,
+        forcePasswordChange: mustChangePassword,
+      });
 
       /**
-       * ✅ FIXED REDIRECT LOGIC (LOOP BREAKER)
-       * - Parents ALWAYS go to /parent
-       * - Stored redirect is ignored for parents
-       * - Other roles behave normally
+       * 🔐 PASSWORD ENFORCEMENT
+       * If backend requires password change,
+       * user MUST go to change-password page.
+       */
+      if (mustChangePassword) {
+        navigate("/change-password", { replace: true });
+        return;
+      }
+
+      /**
+       * ✅ EXISTING REDIRECT LOGIC (UNCHANGED)
        */
       const fromLocation = location.state?.from;
       const home = getHomeRouteForRole(user.role);
@@ -80,8 +94,8 @@ export default function Login() {
       console.error("❌ LOGIN ERROR:", err);
       setError(
         err?.response?.data?.message ||
-          err?.message ||
-          "Login failed"
+        err?.message ||
+        "Login failed"
       );
     } finally {
       setLoading(false);

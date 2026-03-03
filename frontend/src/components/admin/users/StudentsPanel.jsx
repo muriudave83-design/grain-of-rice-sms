@@ -5,6 +5,7 @@ export default function StudentsPanel({
   students = [],
   onEdit = () => {},
   onToggle = () => {},
+  onReset = () => {}, // ✅ added
 }) {
   const [search, setSearch] = useState("");
 
@@ -42,7 +43,7 @@ export default function StudentsPanel({
                 <th className="p-3">Name</th>
                 <th className="p-3">Email</th>
                 <th className="p-3">Status</th>
-                <th className="p-3 w-40">Actions</th>
+                <th className="p-3 w-56">Actions</th>
               </tr>
             </thead>
 
@@ -69,19 +70,27 @@ export default function StudentsPanel({
                       )}
                     </td>
 
-                    <td className="p-3 space-x-2">
+                    <td className="p-3 space-x-3">
                       <button
                         onClick={() => onEdit(user)}
-                        className="text-blue-600 text-xs"
+                        className="text-blue-600 text-xs hover:underline"
                       >
                         Edit
                       </button>
 
                       <button
                         onClick={() => onToggle(user)}
-                        className="text-red-600 text-xs"
+                        className="text-red-600 text-xs hover:underline"
                       >
                         {isActive ? "Deactivate" : "Activate"}
+                      </button>
+
+                      {/* ✅ NEW RESET BUTTON */}
+                      <button
+                        onClick={() => onReset(user)}
+                        className="text-orange-600 text-xs hover:underline"
+                      >
+                        Reset
                       </button>
                     </td>
                   </tr>

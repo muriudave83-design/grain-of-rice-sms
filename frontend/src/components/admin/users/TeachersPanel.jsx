@@ -5,6 +5,7 @@ export default function TeachersPanel({
   teachers = [],
   onEdit,
   onToggle,
+  onReset, // ✅ added
 }) {
   const [search, setSearch] = useState("");
 
@@ -37,7 +38,7 @@ export default function TeachersPanel({
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Actions</th> {/* NEW */}
+              <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
 
@@ -67,11 +68,10 @@ export default function TeachersPanel({
 
                   <td className="px-4 py-3">
                     <span className="text-sm text-gray-600">
-                      {teacher.status || "Inactive"}
+                      {teacher.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
 
-                  {/* NEW ACTIONS */}
                   <td className="px-4 py-3 flex gap-2">
                     <button
                       onClick={() => onEdit?.(teacher)}
@@ -86,8 +86,15 @@ export default function TeachersPanel({
                     >
                       Toggle
                     </button>
-                  </td>
 
+                    {/* ✅ NEW RESET BUTTON */}
+                    <button
+                      onClick={() => onReset?.(teacher)}
+                      className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600"
+                    >
+                      Reset
+                    </button>
+                  </td>
                 </tr>
               ))
             )}

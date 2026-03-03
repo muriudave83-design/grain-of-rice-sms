@@ -12,12 +12,8 @@ export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Academic students (optional debug)
   const [students, setStudents] = useState([]);
-
-  // ✅ Classes for dropdown
   const [classes, setClasses] = useState([]);
-
   const [activeTab, setActiveTab] = useState("teachers");
 
   const [showForm, setShowForm] = useState(false);
@@ -28,8 +24,6 @@ export default function UsersPage() {
     email: "",
     role: "STUDENT",
     isActive: true,
-
-    // Student-specific
     firstName: "",
     lastName: "",
     admissionNo: "",
@@ -38,7 +32,6 @@ export default function UsersPage() {
     password: "",
   });
 
-  // Identity role separation
   const teachers = users.filter((u) => u.role === "TEACHER");
   const parents = users.filter((u) => u.role === "PARENT");
   const studentUsers = users.filter((u) => u.role === "STUDENT");
@@ -51,8 +44,8 @@ export default function UsersPage() {
 
   useEffect(() => {
     fetchUsers();
-    fetchStudents(); // optional debug
-    fetchClasses();  // ✅ fetch classes for dropdown
+    fetchStudents();
+    fetchClasses();
   }, []);
 
   async function fetchUsers() {
@@ -76,7 +69,6 @@ export default function UsersPage() {
     }
   }
 
-  // ✅ Fetch classes
   async function fetchClasses() {
     try {
       const res = await apiClient.get("/admin/classes");
@@ -86,7 +78,6 @@ export default function UsersPage() {
     }
   }
 
-  // Reset form cleanly
   function openCreate() {
     setEditingUser(null);
     setForm({
@@ -111,7 +102,6 @@ export default function UsersPage() {
       email: user.email || "",
       role: user.role || "STUDENT",
       isActive: user.isActive ?? true,
-
       firstName: "",
       lastName: "",
       admissionNo: "",
@@ -173,6 +163,24 @@ export default function UsersPage() {
     }
   }
 
+  // ✅ NEW: Reset Password Function
+  async function resetPassword(user) {
+    if (!window.confirm(`Reset password for ${user.email}?`)) return;
+
+    try {
+      const res = await apiClient.patch(
+        `/admin/users/${user.id}/reset-password`
+      );
+
+      alert(
+        `Temporary Password:\n\n${res.data.temporaryPassword}\n\nGive this to the user.`
+      );
+    } catch (err) {
+      console.error("Reset failed", err);
+      alert(err?.response?.data?.message || "Reset failed.");
+    }
+  }
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -196,6 +204,7 @@ export default function UsersPage() {
           teachers={teachers}
           onEdit={openEdit}
           onToggle={toggleActive}
+          onReset={resetPassword}   // ✅ passed down
         />
       )}
 
@@ -204,6 +213,7 @@ export default function UsersPage() {
           students={studentUsers}
           onEdit={openEdit}
           onToggle={toggleActive}
+          onReset={resetPassword}   // ✅ passed down
         />
       )}
 
@@ -212,6 +222,7 @@ export default function UsersPage() {
           parents={parents}
           onEdit={openEdit}
           onToggle={toggleActive}
+          onReset={resetPassword}   // ✅ passed down
         />
       )}
 
@@ -225,7 +236,6 @@ export default function UsersPage() {
               {editingUser ? "Edit User" : "Create User"}
             </h2>
 
-            {/* Full Name ONLY for non-students */}
             {form.role !== "STUDENT" && (
               <input
                 required
@@ -296,7 +306,6 @@ export default function UsersPage() {
                   }
                 />
 
-                {/* ✅ CLASS DROPDOWN (FIXED) */}
                 <select
                   required
                   className="w-full mb-3 p-2 border rounded"

@@ -19,9 +19,8 @@ import UsersPage from "../pages/admin/UsersPage";
 import AdminStudents from "../pages/admin/AdminStudents";
 import AdminClassStudents from "../pages/admin/AdminClassStudents";
 import AdminTeachers from "../pages/admin/AdminTeachers";
-
 import AdminSubjects from "../pages/admin/AdminSubjects";
-import AdminCategories from "../pages/admin/AdminCategories"; // ✅ ADDED
+import AdminCategories from "../pages/admin/AdminCategories";
 import AdminTeacherSubjectAssignments from "../pages/admin/AdminTeacherSubjectAssignments";
 import AdminClassSubjects from "../pages/admin/AdminClassSubjects";
 import AdminAttendanceOverview from "../pages/admin/attendance/AdminAttendanceOverview";
@@ -61,6 +60,7 @@ import Notifications from "../pages/notifications/Notifications";
 // AUTH
 // =======================
 import LoginPage from "../pages/Login";
+import ChangePassword from "../pages/ChangePassword"; // ✅ ADDED
 
 export default function AppRoutes() {
   return (
@@ -73,6 +73,11 @@ export default function AppRoutes() {
         {/* AUTH */}
         <Route path="/login" element={<LoginPage />} />
 
+        {/* 🔐 CHANGE PASSWORD (ALL LOGGED-IN USERS) */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/change-password" element={<ChangePassword />} />
+        </Route>
+
         {/* ======================= */}
         {/* ADMIN */}
         {/* ======================= */}
@@ -83,7 +88,7 @@ export default function AppRoutes() {
             <Route path="/dashboard/admin/students" element={<AdminStudents />} />
             <Route path="/dashboard/admin/teachers" element={<AdminTeachers />} />
             <Route path="/dashboard/admin/classes" element={<Classes />} />
-            
+
             <Route
               path="/dashboard/admin/classes/:classId/students"
               element={<AdminClassStudents />}
@@ -95,13 +100,7 @@ export default function AppRoutes() {
             <Route path="/dashboard/admin/payments" element={<Payments />} />
             <Route path="/dashboard/admin/users" element={<UsersPage />} />
             <Route path="/dashboard/admin/subjects" element={<AdminSubjects />} />
-
-            {/* ✅ NEW ROUTE ADDED HERE */}
-            <Route
-              path="/dashboard/admin/categories"
-              element={<AdminCategories />}
-            />
-
+            <Route path="/dashboard/admin/categories" element={<AdminCategories />} />
             <Route
               path="/dashboard/admin/teacher-subjects"
               element={<AdminTeacherSubjectAssignments />}
