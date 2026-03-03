@@ -28,6 +28,7 @@ export const listUsers = async (req: Request, res: Response) => {
         lastLoginAt: true,
         mustChangePassword: true,
         isActive: true,
+        isArchived: true,
       },
       orderBy: { createdAt: "desc" },
     });
@@ -36,6 +37,83 @@ export const listUsers = async (req: Request, res: Response) => {
   } catch (err) {
     console.error("Failed to list users:", err);
     return res.status(500).json({ message: "Failed to fetch users" });
+  }
+};
+
+/**
+ * 🗂️ ADMIN: Archive User (Soft Delete)
+ * PATCH /api/admin/users/:id/archive
+ */
+export const archiveUser = async (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.params.id);
+
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const currentAdminId = req.user.id;
+
+    if (!userId) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
+    // 🚫 Prevent self-archive
+    if (userId === currentAdminId) {
+      return res.status(400).json({
+        message: "You cannot archive your own account.",
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // 🛡️ Prevent archiving last active ADMIN
+    if (user.role === "ADMIN") {
+      const adminCount = await prisma.user.count({
+        where: {
+          role: "ADMIN",
+          isArchived: false,
+        },
+      });
+
+      if (adminCount <= 1) {
+        return res.status(400).json({
+          message: "Cannot archive the last active ADMIN.",
+        });
+      }
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        isArchived: true,
+        isActive: false,
+      },
+    });
+
+    await createAuditLog({
+      action: AuditAction.USER_UPDATED,
+      entityType: "User",
+      entityId: String(user.id),
+      actorUserId: String(currentAdminId),
+      actorRole: req.user.role,
+      metadata: {
+        archived: true,
+      },
+    });
+
+    return res.json({ message: "User archived successfully." });
+  } catch (error) {
+    console.error("Failed to archive user:", error);
+    return res.status(500).json({
+      message: "Failed to archive user.",
+    });
   }
 };
 
@@ -73,7 +151,6 @@ export const resetUserPassword = async (
       });
     }
 
-    // Generate temporary password
     const tempPassword = Math.random().toString(36).slice(-8);
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
@@ -85,7 +162,6 @@ export const resetUserPassword = async (
       },
     });
 
-    // ✅ Prisma Enum (NO STRING LITERAL)
     await createAuditLog({
       action: AuditAction.USER_PASSWORD_RESET,
       entityType: "User",

@@ -71,6 +71,20 @@ export const loginUser = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
+    // 🛡️ BLOCK ARCHIVED ACCOUNTS
+    if (user.isArchived) {
+      return res.status(403).json({
+        message: "Account is archived. Contact administrator.",
+      });
+    }
+
+    // 🛡️ BLOCK DEACTIVATED ACCOUNTS
+    if (!user.isActive) {
+      return res.status(403).json({
+        message: "Account is deactivated.",
+      });
+    }
+
     const valid = await verifyPassword(password, user.password);
 
     if (!valid) {

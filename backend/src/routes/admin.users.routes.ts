@@ -3,7 +3,10 @@ import bcrypt from "bcryptjs";
 import { prisma } from "../prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
-import { listUsers } from "../controllers/admin.users.controller";
+import {
+  listUsers,
+  archiveUser,
+} from "../controllers/admin.users.controller";
 
 const router = Router();
 
@@ -65,8 +68,17 @@ router.get(
 );
 
 /**
+ * 🗂️ PATCH /api/admin/users/:id/archive
+ */
+router.patch(
+  "/users/:id/archive",
+  authenticate,
+  requireRole(["ADMIN"]),
+  archiveUser
+);
+
+/**
  * 🔐 PATCH /api/admin/users/:id/reset-password
- * Admin resets any user's password
  */
 router.patch(
   "/users/:id/reset-password",
@@ -88,8 +100,6 @@ router.patch(
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Prevent admin from resetting their own password via this endpoint
-      // (optional safety rule)
       if ((req as any).user?.id === userId) {
         return res.status(400).json({
           message: "You cannot reset your own password here",
@@ -109,7 +119,7 @@ router.patch(
 
       return res.json({
         message: "Password reset successfully",
-        temporaryPassword: tempPassword, // shown once
+        temporaryPassword: tempPassword,
       });
     } catch (error) {
       console.error("Failed to reset password:", error);
