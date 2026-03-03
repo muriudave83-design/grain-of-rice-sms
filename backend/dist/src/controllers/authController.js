@@ -116,18 +116,20 @@ const changePassword = async (req, res) => {
         const userRole = req.user.role;
         const { currentPassword, newPassword } = req.body;
         if (!currentPassword || !newPassword) {
-            return res.status(400).json({ message: "Missing required fields" });
+            return res.status(400).json({
+                message: "All fields are required.",
+            });
         }
         const user = await prisma.user.findUnique({
             where: { id: userId },
         });
         if (!user) {
-            return res.status(404).json({ message: "User not found" });
+            return res.status(404).json({ message: "User not found." });
         }
-        const passwordMatches = await (0, password_1.verifyPassword)(currentPassword, user.password);
-        if (!passwordMatches) {
-            return res.status(401).json({
-                message: "Current password is incorrect",
+        const isValid = await (0, password_1.verifyPassword)(currentPassword, user.password);
+        if (!isValid) {
+            return res.status(400).json({
+                message: "Current password is incorrect.",
             });
         }
         const hashedNewPassword = await (0, password_1.hashPassword)(newPassword);
@@ -136,9 +138,10 @@ const changePassword = async (req, res) => {
             data: {
                 password: hashedNewPassword,
                 mustChangePassword: false,
+                updatedAt: new Date(),
             },
         });
-        // ✅ FIXED: Use Prisma Enum
+        // ✅ Audit log entry
         await (0, auditLog_service_1.createAuditLog)({
             action: client_1.AuditAction.PASSWORD_CHANGED,
             entityType: "User",
@@ -147,13 +150,13 @@ const changePassword = async (req, res) => {
             actorRole: userRole,
         });
         return res.json({
-            message: "Password changed successfully",
+            message: "Password updated successfully.",
         });
     }
     catch (err) {
         console.error("🔥 CHANGE PASSWORD ERROR:", err);
         return res.status(500).json({
-            message: "Server error",
+            message: "Server error.",
             error: err.message,
         });
     }

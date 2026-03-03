@@ -2,7 +2,7 @@ import { Router } from "express";
 import {
   registerUser,
   loginUser,
-  changePassword
+  changePassword,
 } from "../controllers/authController";
 import { authenticate } from "../middlewares/authMiddleware";
 
@@ -24,16 +24,15 @@ router.post("/login", loginUser);
 // AUTH — CURRENT USER
 // GET /api/auth/me
 // ======================================================
-  router.get("/me", authenticate, (req, res) => {
-    return res.json(req.user);
-  });
-
+router.get("/me", authenticate, (req, res) => {
+  return res.json(req.user);
+});
 
 // ======================================================
-// CHANGE PASSWORD
-// POST /api/auth/change-password
+// AUTH — CHANGE PASSWORD
+// PATCH /api/auth/change-password
 // ======================================================
-router.post(
+router.patch(
   "/change-password",
   authenticate,
   changePassword

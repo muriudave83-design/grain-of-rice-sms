@@ -133,7 +133,9 @@ export const changePassword = async (req: Request, res: Response) => {
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: "Missing required fields" });
+      return res.status(400).json({
+        message: "All fields are required.",
+      });
     }
 
     const user = await prisma.user.findUnique({
@@ -141,17 +143,14 @@ export const changePassword = async (req: Request, res: Response) => {
     });
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found." });
     }
 
-    const passwordMatches = await verifyPassword(
-      currentPassword,
-      user.password
-    );
+    const isValid = await verifyPassword(currentPassword, user.password);
 
-    if (!passwordMatches) {
-      return res.status(401).json({
-        message: "Current password is incorrect",
+    if (!isValid) {
+      return res.status(400).json({
+        message: "Current password is incorrect.",
       });
     }
 
@@ -162,10 +161,11 @@ export const changePassword = async (req: Request, res: Response) => {
       data: {
         password: hashedNewPassword,
         mustChangePassword: false,
+        updatedAt: new Date(),
       },
     });
 
-    // ✅ FIXED: Use Prisma Enum
+    // ✅ Audit log entry
     await createAuditLog({
       action: AuditAction.PASSWORD_CHANGED,
       entityType: "User",
@@ -175,12 +175,12 @@ export const changePassword = async (req: Request, res: Response) => {
     });
 
     return res.json({
-      message: "Password changed successfully",
+      message: "Password updated successfully.",
     });
   } catch (err: any) {
     console.error("🔥 CHANGE PASSWORD ERROR:", err);
     return res.status(500).json({
-      message: "Server error",
+      message: "Server error.",
       error: err.message,
     });
   }
