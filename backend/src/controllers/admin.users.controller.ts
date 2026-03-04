@@ -58,7 +58,6 @@ export const archiveUser = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Invalid user ID" });
     }
 
-    // 🚫 Prevent self-archive
     if (userId === currentAdminId) {
       return res.status(400).json({
         message: "You cannot archive your own account.",
@@ -73,7 +72,6 @@ export const archiveUser = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "User not found." });
     }
 
-    // 🛡️ Prevent archiving last active ADMIN
     if (user.role === "ADMIN") {
       const adminCount = await prisma.user.count({
         where: {
@@ -144,7 +142,6 @@ export const resetUserPassword = async (
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Prevent admin resetting themselves
     if (user.id === req.user.id) {
       return res.status(400).json({
         message: "You cannot reset your own password.",
@@ -194,7 +191,10 @@ async function createUserInternal(
   role: "TEACHER" | "PARENT" | "STUDENT"
 ) {
   try {
-    const { name, email, tempPassword } = req.body;
+    const { name, tempPassword } = req.body;
+
+    // ✅ Normalize email to lowercase
+    const email = req.body.email?.toLowerCase();
 
     if (!name || !email || !tempPassword) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -217,7 +217,7 @@ async function createUserInternal(
     const user = await prisma.user.create({
       data: {
         name,
-        email,
+        email, // ✅ normalized email stored
         password: hashedPassword,
         role,
         mustChangePassword: true,
