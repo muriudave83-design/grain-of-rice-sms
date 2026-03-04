@@ -1,6 +1,7 @@
 import React from "react";
 
 const tabs = [
+  { key: "admins", label: "Admins" }, // ✅ Added
   { key: "teachers", label: "Teachers" },
   { key: "students", label: "Students" },
   { key: "parents", label: "Parents" },

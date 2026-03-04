@@ -32,11 +32,16 @@ export default function UsersPage() {
     password: "",
   });
 
+  // Existing filters
   const teachers = users.filter((u) => u.role === "TEACHER");
   const parents = users.filter((u) => u.role === "PARENT");
   const studentUsers = users.filter((u) => u.role === "STUDENT");
 
+  // ✅ NEW: Admin filter
+  const admins = users.filter((u) => u.role === "ADMIN");
+
   const counts = {
+    admins: admins.length, // ✅ added
     teachers: teachers.length,
     students: studentUsers.length,
     parents: parents.length,
@@ -152,7 +157,7 @@ export default function UsersPage() {
     }
   }
 
-  // ✅ NEW: Archive User
+  // Archive User
   async function handleArchive(userId) {
     if (!window.confirm("Are you sure you want to archive this user?"))
       return;
@@ -166,7 +171,7 @@ export default function UsersPage() {
     }
   }
 
-  // ✅ Reset Password
+  // Reset Password
   async function resetPassword(user) {
     if (!window.confirm(`Reset password for ${user.email}?`)) return;
 
@@ -201,6 +206,16 @@ export default function UsersPage() {
         setActiveTab={setActiveTab}
         counts={counts}
       />
+
+      {/* ✅ NEW: Admin Panel */}
+      {activeTab === "admins" && (
+        <TeachersPanel
+          teachers={admins}
+          onEdit={openEdit}
+          onArchive={handleArchive}
+          onReset={resetPassword}
+        />
+      )}
 
       {activeTab === "teachers" && (
         <TeachersPanel

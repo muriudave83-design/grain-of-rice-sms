@@ -4,7 +4,7 @@ import UserSearch from "./UserSearch";
 export default function TeachersPanel({
   teachers = [],
   onEdit,
-  onArchive,   // ✅ replaced onToggle
+  onArchive,
   onReset,
 }) {
   const [search, setSearch] = useState("");
@@ -28,7 +28,7 @@ export default function TeachersPanel({
       <UserSearch
         value={search}
         onChange={setSearch}
-        placeholder="Search teachers by name or email..."
+        placeholder="Search by name or email..."
       />
 
       <div className="overflow-x-auto bg-white rounded border border-gray-200">
@@ -49,7 +49,7 @@ export default function TeachersPanel({
                   colSpan="4"
                   className="px-4 py-6 text-center text-gray-500"
                 >
-                  No teachers found
+                  No users found
                 </td>
               </tr>
             ) : (
