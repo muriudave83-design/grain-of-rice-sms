@@ -7,7 +7,7 @@ const rolesMiddleware_1 = require("../../middlewares/rolesMiddleware");
 const router = (0, express_1.Router)();
 /**
  * GET /api/admin/teacher-subjects
- * Returns all teacher → subject → class assignments
+ * List all teacher → subject → class assignments
  */
 router.get("/teacher-subjects", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
     try {
@@ -42,8 +42,38 @@ router.get("/teacher-subjects", authMiddleware_1.authenticate, (0, rolesMiddlewa
     }
     catch (error) {
         console.error("Error fetching teacher-subject assignments:", error);
+        res.status(500).json({ message: "Failed to fetch teacher assignments" });
+    }
+});
+/**
+ * POST /api/admin/teacher-subjects
+ * Assign a teacher to a subject
+ */
+router.post("/teacher-subjects", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
+    try {
+        const { teacherId, subjectId } = req.body;
+        if (!teacherId || !subjectId) {
+            return res.status(400).json({
+                message: "teacherId and subjectId are required"
+            });
+        }
+        const updated = await client_1.prisma.subject.update({
+            where: {
+                id: subjectId
+            },
+            data: {
+                teacherId: teacherId
+            }
+        });
+        res.json({
+            message: "Teacher assigned successfully",
+            subject: updated
+        });
+    }
+    catch (error) {
+        console.error("Error assigning teacher:", error);
         res.status(500).json({
-            message: "Failed to fetch teacher assignments"
+            message: "Failed to assign teacher"
         });
     }
 });

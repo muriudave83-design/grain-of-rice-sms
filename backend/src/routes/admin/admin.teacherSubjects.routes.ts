@@ -7,7 +7,7 @@ const router = Router();
 
 /**
  * GET /api/admin/teacher-subjects
- * Returns all teacher → subject → class assignments
+ * List all teacher → subject → class assignments
  */
 router.get(
   "/teacher-subjects",
@@ -49,8 +49,46 @@ router.get(
       res.json(assignments);
     } catch (error) {
       console.error("Error fetching teacher-subject assignments:", error);
+      res.status(500).json({ message: "Failed to fetch teacher assignments" });
+    }
+  }
+);
+
+/**
+ * POST /api/admin/teacher-subjects
+ * Assign a teacher to a subject
+ */
+router.post(
+  "/teacher-subjects",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    try {
+      const { teacherId, subjectId } = req.body;
+
+      if (!teacherId || !subjectId) {
+        return res.status(400).json({
+          message: "teacherId and subjectId are required"
+        });
+      }
+
+      const updated = await prisma.subject.update({
+        where: {
+          id: subjectId
+        },
+        data: {
+          teacherId: teacherId
+        }
+      });
+
+      res.json({
+        message: "Teacher assigned successfully",
+        subject: updated
+      });
+    } catch (error) {
+      console.error("Error assigning teacher:", error);
       res.status(500).json({
-        message: "Failed to fetch teacher assignments"
+        message: "Failed to assign teacher"
       });
     }
   }
