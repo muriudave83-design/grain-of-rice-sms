@@ -2,8 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const client_1 = require("../../prisma/client");
-const authMiddleware_1 = require("../../middleware/authMiddleware");
-const rolesMiddleware_1 = require("../../middleware/rolesMiddleware");
+const authMiddleware_1 = require("../../middlewares/authMiddleware");
+const rolesMiddleware_1 = require("../../middlewares/rolesMiddleware");
 const router = (0, express_1.Router)();
 /**
  * GET /api/admin/teacher-subjects

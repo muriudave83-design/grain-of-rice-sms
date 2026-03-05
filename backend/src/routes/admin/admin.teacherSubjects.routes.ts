@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { prisma } from "../../prisma/client";
-import { authenticate } from "../../middleware/authMiddleware";
-import { requireRole } from "../../middleware/rolesMiddleware";
+import { authenticate } from "../../middlewares/authMiddleware";
+import { requireRole } from "../../middlewares/rolesMiddleware";
 
 const router = Router();
 
