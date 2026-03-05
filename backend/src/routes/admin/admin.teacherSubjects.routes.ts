@@ -64,7 +64,8 @@ router.post(
   requireRole(["ADMIN"]),
   async (req, res) => {
     try {
-      const { teacherId, subjectId } = req.body;
+      const teacherId = Number(req.body.teacherId);
+      const subjectId = Number(req.body.subjectId);
 
       if (!teacherId || !subjectId) {
         return res.status(400).json({
@@ -72,21 +73,18 @@ router.post(
         });
       }
 
-      const updated = await prisma.subject.update({
-        where: {
-          id: subjectId
-        },
-        data: {
-          teacherId: teacherId
-        }
+      const updatedSubject = await prisma.subject.update({
+        where: { id: subjectId },
+        data: { teacherId: teacherId }
       });
 
       res.json({
         message: "Teacher assigned successfully",
-        subject: updated
+        subject: updatedSubject
       });
+
     } catch (error) {
-      console.error("Error assigning teacher:", error);
+      console.error("Assign teacher error:", error);
       res.status(500).json({
         message: "Failed to assign teacher"
       });

@@ -51,27 +51,24 @@ router.get("/teacher-subjects", authMiddleware_1.authenticate, (0, rolesMiddlewa
  */
 router.post("/teacher-subjects", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
     try {
-        const { teacherId, subjectId } = req.body;
+        const teacherId = Number(req.body.teacherId);
+        const subjectId = Number(req.body.subjectId);
         if (!teacherId || !subjectId) {
             return res.status(400).json({
                 message: "teacherId and subjectId are required"
             });
         }
-        const updated = await client_1.prisma.subject.update({
-            where: {
-                id: subjectId
-            },
-            data: {
-                teacherId: teacherId
-            }
+        const updatedSubject = await client_1.prisma.subject.update({
+            where: { id: subjectId },
+            data: { teacherId: teacherId }
         });
         res.json({
             message: "Teacher assigned successfully",
-            subject: updated
+            subject: updatedSubject
         });
     }
     catch (error) {
-        console.error("Error assigning teacher:", error);
+        console.error("Assign teacher error:", error);
         res.status(500).json({
             message: "Failed to assign teacher"
         });
