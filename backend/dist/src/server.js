@@ -29,6 +29,8 @@ const admin_subjects_routes_1 = __importDefault(require("./routes/admin/admin.su
 const admin_students_routes_1 = __importDefault(require("./routes/admin/admin.students.routes"));
 const admin_class_students_routes_1 = __importDefault(require("./routes/admin/admin.class.students.routes"));
 const admin_classSubjects_routes_1 = __importDefault(require("./routes/admin/admin.classSubjects.routes"));
+// ✅ NEW: Teacher ↔ Subject assignments
+const admin_teacherSubjects_routes_1 = __importDefault(require("./routes/admin/admin.teacherSubjects.routes"));
 // ✅ Phase-7: Report Cards
 const reportCardReadRoutes_1 = require("./routes/reportCardReadRoutes");
 // ✅ Phase-7.5: Parent ↔ Student linking
@@ -118,6 +120,8 @@ app.use("/api/admin", admin_classes_routes_1.default);
 app.use("/api/admin", admin_subjects_routes_1.default);
 app.use("/api/admin", admin_class_students_routes_1.default);
 app.use("/api/admin", admin_classSubjects_routes_1.default);
+// ✅ NEW: Teacher Subject Assignments
+app.use("/api/admin", admin_teacherSubjects_routes_1.default);
 // ----------------------------------
 // FALLBACK
 // ----------------------------------

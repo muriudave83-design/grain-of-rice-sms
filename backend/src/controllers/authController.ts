@@ -12,7 +12,14 @@ const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
 // ======================================================
 export const registerUser = async (req: Request, res: Response) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, password, role } = req.body;
+
+    // ✅ Normalize email to lowercase
+    const email = req.body.email?.toLowerCase();
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
 
     if (role === "ADMIN") {
       return res.status(403).json({
@@ -57,7 +64,9 @@ export const loginUser = async (req: Request, res: Response) => {
       });
     }
 
-    const { email, password } = req.body;
+    // ✅ Normalize email to lowercase
+    const email = req.body.email?.toLowerCase();
+    const { password } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({

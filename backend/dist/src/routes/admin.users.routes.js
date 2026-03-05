@@ -51,8 +51,11 @@ router.get("/stats", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requir
  */
 router.get("/users", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), admin_users_controller_1.listUsers);
 /**
+ * 🗂️ PATCH /api/admin/users/:id/archive
+ */
+router.patch("/users/:id/archive", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), admin_users_controller_1.archiveUser);
+/**
  * 🔐 PATCH /api/admin/users/:id/reset-password
- * Admin resets any user's password
  */
 router.patch("/users/:id/reset-password", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
     try {
@@ -66,8 +69,6 @@ router.patch("/users/:id/reset-password", authMiddleware_1.authenticate, (0, rol
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
-        // Prevent admin from resetting their own password via this endpoint
-        // (optional safety rule)
         if (req.user?.id === userId) {
             return res.status(400).json({
                 message: "You cannot reset your own password here",
@@ -84,7 +85,7 @@ router.patch("/users/:id/reset-password", authMiddleware_1.authenticate, (0, rol
         });
         return res.json({
             message: "Password reset successfully",
-            temporaryPassword: tempPassword, // shown once
+            temporaryPassword: tempPassword,
         });
     }
     catch (error) {

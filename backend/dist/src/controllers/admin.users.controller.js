@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resetUserPassword = exports.listUsers = void 0;
+exports.resetUserPassword = exports.archiveUser = exports.listUsers = void 0;
 exports.createTeacher = createTeacher;
 exports.createParent = createParent;
 exports.createStudent = createStudent;
@@ -32,6 +32,7 @@ const listUsers = async (req, res) => {
                 lastLoginAt: true,
                 mustChangePassword: true,
                 isActive: true,
+                isArchived: true,
             },
             orderBy: { createdAt: "desc" },
         });
@@ -43,6 +44,71 @@ const listUsers = async (req, res) => {
     }
 };
 exports.listUsers = listUsers;
+/**
+ * 🗂️ ADMIN: Archive User (Soft Delete)
+ * PATCH /api/admin/users/:id/archive
+ */
+const archiveUser = async (req, res) => {
+    try {
+        const userId = Number(req.params.id);
+        if (!req.user) {
+            return res.status(401).json({ message: "Unauthorized" });
+        }
+        const currentAdminId = req.user.id;
+        if (!userId) {
+            return res.status(400).json({ message: "Invalid user ID" });
+        }
+        if (userId === currentAdminId) {
+            return res.status(400).json({
+                message: "You cannot archive your own account.",
+            });
+        }
+        const user = await client_1.prisma.user.findUnique({
+            where: { id: userId },
+        });
+        if (!user) {
+            return res.status(404).json({ message: "User not found." });
+        }
+        if (user.role === "ADMIN") {
+            const adminCount = await client_1.prisma.user.count({
+                where: {
+                    role: "ADMIN",
+                    isArchived: false,
+                },
+            });
+            if (adminCount <= 1) {
+                return res.status(400).json({
+                    message: "Cannot archive the last active ADMIN.",
+                });
+            }
+        }
+        await client_1.prisma.user.update({
+            where: { id: userId },
+            data: {
+                isArchived: true,
+                isActive: false,
+            },
+        });
+        await (0, auditLog_service_1.createAuditLog)({
+            action: client_2.AuditAction.USER_UPDATED,
+            entityType: "User",
+            entityId: String(user.id),
+            actorUserId: String(currentAdminId),
+            actorRole: req.user.role,
+            metadata: {
+                archived: true,
+            },
+        });
+        return res.json({ message: "User archived successfully." });
+    }
+    catch (error) {
+        console.error("Failed to archive user:", error);
+        return res.status(500).json({
+            message: "Failed to archive user.",
+        });
+    }
+};
+exports.archiveUser = archiveUser;
 /**
  * 🔐 ADMIN: Reset User Password
  * PATCH /api/admin/users/:id/reset-password
@@ -62,13 +128,11 @@ const resetUserPassword = async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
-        // Prevent admin resetting themselves
         if (user.id === req.user.id) {
             return res.status(400).json({
                 message: "You cannot reset your own password.",
             });
         }
-        // Generate temporary password
         const tempPassword = Math.random().toString(36).slice(-8);
         const hashedPassword = await bcrypt_1.default.hash(tempPassword, 10);
         await client_1.prisma.user.update({
@@ -78,7 +142,6 @@ const resetUserPassword = async (req, res) => {
                 mustChangePassword: true,
             },
         });
-        // ✅ Prisma Enum (NO STRING LITERAL)
         await (0, auditLog_service_1.createAuditLog)({
             action: client_2.AuditAction.USER_PASSWORD_RESET,
             entityType: "User",
@@ -107,7 +170,9 @@ exports.resetUserPassword = resetUserPassword;
  */
 async function createUserInternal(req, res, role) {
     try {
-        const { name, email, tempPassword } = req.body;
+        const { name, tempPassword } = req.body;
+        // ✅ Normalize email to lowercase
+        const email = req.body.email?.toLowerCase();
         if (!name || !email || !tempPassword) {
             return res.status(400).json({ message: "Missing required fields" });
         }
@@ -124,7 +189,7 @@ async function createUserInternal(req, res, role) {
         const user = await client_1.prisma.user.create({
             data: {
                 name,
-                email,
+                email, // ✅ normalized email stored
                 password: hashedPassword,
                 role,
                 mustChangePassword: true,

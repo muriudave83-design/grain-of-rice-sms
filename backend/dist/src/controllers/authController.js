@@ -15,7 +15,12 @@ const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
 // ======================================================
 const registerUser = async (req, res) => {
     try {
-        const { name, email, password, role } = req.body;
+        const { name, password, role } = req.body;
+        // ✅ Normalize email to lowercase
+        const email = req.body.email?.toLowerCase();
+        if (!email) {
+            return res.status(400).json({ message: "Email is required" });
+        }
         if (role === "ADMIN") {
             return res.status(403).json({
                 message: "Admin accounts cannot be created via public registration",
@@ -55,7 +60,9 @@ const loginUser = async (req, res) => {
                 message: "Empty request body — is Content-Type application/json?",
             });
         }
-        const { email, password } = req.body;
+        // ✅ Normalize email to lowercase
+        const email = req.body.email?.toLowerCase();
+        const { password } = req.body;
         if (!email || !password) {
             return res.status(400).json({
                 message: "Email and password are required",
@@ -64,6 +71,18 @@ const loginUser = async (req, res) => {
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) {
             return res.status(400).json({ message: "Invalid email or password" });
+        }
+        // 🛡️ BLOCK ARCHIVED ACCOUNTS
+        if (user.isArchived) {
+            return res.status(403).json({
+                message: "Account is archived. Contact administrator.",
+            });
+        }
+        // 🛡️ BLOCK DEACTIVATED ACCOUNTS
+        if (!user.isActive) {
+            return res.status(403).json({
+                message: "Account is deactivated.",
+            });
         }
         const valid = await (0, password_1.verifyPassword)(password, user.password);
         if (!valid) {
