@@ -7,6 +7,7 @@ const router = Router();
 
 /**
  * GET /api/admin/teacher-subjects
+ * Returns all teacher → subject → class assignments
  */
 router.get(
   "/teacher-subjects",
@@ -28,21 +29,29 @@ router.get(
         }
       });
 
-      const assignments = subjects.flatMap((subject: any) =>
-        subject.classSubjects.map((cs: any) => ({
-          teacherId: subject.teacher?.id,
-          teacherName: subject.teacher?.name,
-          subjectId: subject.id,
-          subjectName: subject.name,
-          classId: cs.class.id,
-          className: cs.class.name
+      const assignments = subjects.flatMap((subject) =>
+        subject.classSubjects.map((cs) => ({
+          teacher: {
+            id: subject.teacher?.id,
+            name: subject.teacher?.name
+          },
+          subject: {
+            id: subject.id,
+            name: subject.name
+          },
+          class: {
+            id: cs.class.id,
+            name: cs.class.name
+          }
         }))
       );
 
       res.json(assignments);
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Failed to fetch teacher assignments" });
+      console.error("Error fetching teacher-subject assignments:", error);
+      res.status(500).json({
+        message: "Failed to fetch teacher assignments"
+      });
     }
   }
 );

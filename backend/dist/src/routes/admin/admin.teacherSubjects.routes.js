@@ -7,6 +7,7 @@ const rolesMiddleware_1 = require("../../middlewares/rolesMiddleware");
 const router = (0, express_1.Router)();
 /**
  * GET /api/admin/teacher-subjects
+ * Returns all teacher → subject → class assignments
  */
 router.get("/teacher-subjects", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
     try {
@@ -24,18 +25,26 @@ router.get("/teacher-subjects", authMiddleware_1.authenticate, (0, rolesMiddlewa
             }
         });
         const assignments = subjects.flatMap((subject) => subject.classSubjects.map((cs) => ({
-            teacherId: subject.teacher?.id,
-            teacherName: subject.teacher?.name,
-            subjectId: subject.id,
-            subjectName: subject.name,
-            classId: cs.class.id,
-            className: cs.class.name
+            teacher: {
+                id: subject.teacher?.id,
+                name: subject.teacher?.name
+            },
+            subject: {
+                id: subject.id,
+                name: subject.name
+            },
+            class: {
+                id: cs.class.id,
+                name: cs.class.name
+            }
         })));
         res.json(assignments);
     }
     catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Failed to fetch teacher assignments" });
+        console.error("Error fetching teacher-subject assignments:", error);
+        res.status(500).json({
+            message: "Failed to fetch teacher assignments"
+        });
     }
 });
 exports.default = router;
