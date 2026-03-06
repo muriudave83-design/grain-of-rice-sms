@@ -19,14 +19,18 @@ model User {
   isArchived         Boolean             @default(false)
   lastLoginAt        DateTime?           @db.Timestamp(6)
   updatedAt          DateTime?           @db.Timestamp(6)
+
   attendanceSessions AttendanceSession[]
   disciplineRecords  Discipline[]        @relation("UserDisciplineRecords")
   guardians          Guardian[]          @relation("UserToGuardian")
   invoices           Invoice[]           @relation("AccountantInvoices")
   parentStudents     ParentStudent[]     @relation("ParentLinks")
   sponsorships       Sponsorship[]
+
   studentProfile     Student?
-  subjects           Subject[]           @relation("TeacherSubjects")
+
+  teacherSubjects    TeacherSubject[]
+  taughtSubjects     Subject[]           @relation("TeacherSubjectsLegacy")
 }
 
 model Student {
@@ -38,6 +42,7 @@ model Student {
   dob               DateTime?
   userId            Int?              @unique
   classId           Int
+
   assessmentScores  AssessmentScore[]
   attendanceEntries AttendanceEntry[]
   disciplines       Discipline[]
@@ -48,6 +53,7 @@ model Student {
   parentLinks       ParentStudent[]
   reportCards       ReportCard[]
   sponsorships      Sponsorship[]
+
   class             Class             @relation(fields: [classId], references: [id])
   user              User?             @relation(fields: [userId], references: [id])
 }
@@ -57,11 +63,14 @@ model Class {
   name               String
   level              String?
   createdAt          DateTime            @default(now())
+
   assessments        Assessment[]
   attendanceSessions AttendanceSession[]
   classSubjects      ClassSubject[]
   reportCards        ReportCard[]
   students           Student[]
+
+  teacherSubjects    TeacherSubject[]
 }
 
 model Guardian {
@@ -70,6 +79,7 @@ model Guardian {
   studentId Int
   relation  String?
   createdAt DateTime @default(now())
+
   student   Student  @relation(fields: [studentId], references: [id])
   user      User     @relation("UserToGuardian", fields: [userId], references: [id])
 
@@ -80,6 +90,7 @@ model ParentStudent {
   id        Int     @id @default(autoincrement())
   parentId  Int
   studentId Int
+
   parent    User    @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
   student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
@@ -92,6 +103,7 @@ model Sponsorship {
   studentId Int
   notes     String?
   createdAt DateTime @default(now())
+
   sponsor   User     @relation(fields: [sponsorId], references: [id])
   student   Student  @relation(fields: [studentId], references: [id])
 
@@ -103,23 +115,42 @@ model Subject {
   name          String
   code          String?                  @unique
   createdAt     DateTime                 @default(now())
+
   teacherId     Int?
+  teacher       User?                    @relation("TeacherSubjectsLegacy", fields: [teacherId], references: [id])
+
   assessments   Assessment[]
   classSubjects ClassSubject[]
   enrollments   Enrollment[]
   grades        Grade[]
   reportEntries ReportCardSubjectEntry[]
-  teacher       User?                    @relation("TeacherSubjects", fields: [teacherId], references: [id])
+
+  teacherSubjects TeacherSubject[]
 }
 
 model ClassSubject {
   id        Int     @id @default(autoincrement())
   classId   Int
   subjectId Int
+
   class     Class   @relation(fields: [classId], references: [id])
   subject   Subject @relation(fields: [subjectId], references: [id])
 
   @@unique([classId, subjectId])
+}
+
+model TeacherSubject {
+  id        Int      @id @default(autoincrement())
+  teacherId Int
+  subjectId Int
+  classId   Int
+  createdAt DateTime @default(now())
+
+  teacher   User     @relation(fields: [teacherId], references: [id])
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+  class     Class    @relation(fields: [classId], references: [id])
+
+  @@unique([teacherId, subjectId, classId])
 }
 
 model Enrollment {
@@ -127,6 +158,7 @@ model Enrollment {
   studentId Int
   subjectId Int
   createdAt DateTime @default(now())
+
   student   Student  @relation(fields: [studentId], references: [id])
   subject   Subject  @relation(fields: [subjectId], references: [id])
 
@@ -146,11 +178,14 @@ model Assessment {
   isPublished Boolean             @default(false)
   createdAt   DateTime            @default(now())
   status      AssessmentStatus    @default(DRAFT)
+
   categoryId  Int?
   category    AssignmentCategory? @relation(fields: [categoryId], references: [id])
+
   class       Class               @relation(fields: [classId], references: [id])
   subject     Subject             @relation(fields: [subjectId], references: [id])
   term        Term                @relation(fields: [termId], references: [id])
+
   scores      AssessmentScore[]
 }
 
@@ -160,6 +195,7 @@ model AssessmentScore {
   studentId    Int
   score        Float
   createdAt    DateTime   @default(now())
+
   assessment   Assessment @relation(fields: [assessmentId], references: [id])
   student      Student    @relation(fields: [studentId], references: [id])
 
@@ -173,6 +209,7 @@ model Grade {
   average   Float
   termId    Int
   total     Float
+
   student   Student @relation(fields: [studentId], references: [id])
   subject   Subject @relation(fields: [subjectId], references: [id])
   term      Term    @relation(fields: [termId], references: [id])
@@ -187,6 +224,7 @@ model Discipline {
   recordedById Int?
   notes        String?
   type         String
+
   recordedBy   User?    @relation("UserDisciplineRecords", fields: [recordedById], references: [id])
   student      Student  @relation(fields: [studentId], references: [id])
 }
@@ -200,6 +238,7 @@ model Invoice {
   dueDate     DateTime?
   notes       String?
   createdById Int?
+
   createdBy   User?     @relation("AccountantInvoices", fields: [createdById], references: [id])
   student     Student   @relation(fields: [studentId], references: [id])
 }
@@ -211,8 +250,10 @@ model Term {
   endDate      DateTime
   academicYear String
   isActive     Boolean      @default(true)
+
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+
   assessments  Assessment[]
   grades       Grade[]
   reportCards  ReportCard[]
@@ -228,9 +269,11 @@ model ReportCard {
   publishedAt DateTime?
   total       Float
   status      ReportCardStatus
+
   class       Class                    @relation(fields: [classId], references: [id])
   student     Student                  @relation(fields: [studentId], references: [id])
   term        Term                     @relation(fields: [termId], references: [id])
+
   subjects    ReportCardSubjectEntry[]
 
   @@unique([studentId, termId])
@@ -242,6 +285,7 @@ model ReportCardSubjectEntry {
   subjectId    Int
   average      Float
   total        Float
+
   reportCard   ReportCard @relation(fields: [reportCardId], references: [id])
   subject      Subject    @relation(fields: [subjectId], references: [id])
 
@@ -254,9 +298,12 @@ model AttendanceSession {
   teacherId Int
   date      DateTime
   status    AttendanceSessionStatus @default(DRAFT)
+
   createdAt DateTime                @default(now())
   updatedAt DateTime                @updatedAt
+
   entries   AttendanceEntry[]
+
   class     Class                   @relation(fields: [classId], references: [id])
   teacher   User                    @relation(fields: [teacherId], references: [id])
 
@@ -269,7 +316,9 @@ model AttendanceEntry {
   studentId           Int
   status              AttendanceStatus
   note                String?
+
   createdAt           DateTime          @default(now())
+
   session             AttendanceSession @relation(fields: [attendanceSessionId], references: [id])
   student             Student           @relation(fields: [studentId], references: [id])
 
@@ -291,6 +340,7 @@ model AssignmentCategory {
   id          Int          @id @default(autoincrement())
   name        String       @unique
   weight      Float        @default(1)
+
   assessments Assessment[]
 }
 
