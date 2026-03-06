@@ -31,14 +31,20 @@ router.get(
 
       const assignments = subjects.flatMap((subject) =>
         subject.classSubjects.map((cs) => ({
-          teacher: {
-            id: subject.teacher?.id,
-            name: subject.teacher?.name
-          },
+          id: `${subject.id}-${cs.class.id}`, // synthetic ID for UI actions
+
+          teacher: subject.teacher
+            ? {
+                id: subject.teacher.id,
+                name: subject.teacher.name
+              }
+            : null,
+
           subject: {
             id: subject.id,
             name: subject.name
           },
+
           class: {
             id: cs.class.id,
             name: cs.class.name
@@ -49,7 +55,9 @@ router.get(
       res.json(assignments);
     } catch (error) {
       console.error("Error fetching teacher-subject assignments:", error);
-      res.status(500).json({ message: "Failed to fetch teacher assignments" });
+      res.status(500).json({
+        message: "Failed to fetch teacher assignments"
+      });
     }
   }
 );
@@ -75,18 +83,52 @@ router.post(
 
       const updatedSubject = await prisma.subject.update({
         where: { id: subjectId },
-        data: { teacherId: teacherId }
+        data: { teacherId }
       });
 
       res.json({
         message: "Teacher assigned successfully",
         subject: updatedSubject
       });
-
     } catch (error) {
       console.error("Assign teacher error:", error);
       res.status(500).json({
         message: "Failed to assign teacher"
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /api/admin/teacher-subjects/:subjectId
+ * Remove teacher from a subject
+ */
+router.delete(
+  "/teacher-subjects/:subjectId",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    try {
+      const subjectId = Number(req.params.subjectId);
+
+      if (!subjectId) {
+        return res.status(400).json({
+          message: "Invalid subjectId"
+        });
+      }
+
+      await prisma.subject.update({
+        where: { id: subjectId },
+        data: { teacherId: null }
+      });
+
+      res.json({
+        message: "Teacher removed from subject"
+      });
+    } catch (error) {
+      console.error("Remove teacher error:", error);
+      res.status(500).json({
+        message: "Failed to remove teacher"
       });
     }
   }

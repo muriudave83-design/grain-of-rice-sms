@@ -25,10 +25,13 @@ router.get("/teacher-subjects", authMiddleware_1.authenticate, (0, rolesMiddlewa
             }
         });
         const assignments = subjects.flatMap((subject) => subject.classSubjects.map((cs) => ({
-            teacher: {
-                id: subject.teacher?.id,
-                name: subject.teacher?.name
-            },
+            id: `${subject.id}-${cs.class.id}`, // synthetic ID for UI actions
+            teacher: subject.teacher
+                ? {
+                    id: subject.teacher.id,
+                    name: subject.teacher.name
+                }
+                : null,
             subject: {
                 id: subject.id,
                 name: subject.name
@@ -42,7 +45,9 @@ router.get("/teacher-subjects", authMiddleware_1.authenticate, (0, rolesMiddlewa
     }
     catch (error) {
         console.error("Error fetching teacher-subject assignments:", error);
-        res.status(500).json({ message: "Failed to fetch teacher assignments" });
+        res.status(500).json({
+            message: "Failed to fetch teacher assignments"
+        });
     }
 });
 /**
@@ -60,7 +65,7 @@ router.post("/teacher-subjects", authMiddleware_1.authenticate, (0, rolesMiddlew
         }
         const updatedSubject = await client_1.prisma.subject.update({
             where: { id: subjectId },
-            data: { teacherId: teacherId }
+            data: { teacherId }
         });
         res.json({
             message: "Teacher assigned successfully",
@@ -71,6 +76,33 @@ router.post("/teacher-subjects", authMiddleware_1.authenticate, (0, rolesMiddlew
         console.error("Assign teacher error:", error);
         res.status(500).json({
             message: "Failed to assign teacher"
+        });
+    }
+});
+/**
+ * DELETE /api/admin/teacher-subjects/:subjectId
+ * Remove teacher from a subject
+ */
+router.delete("/teacher-subjects/:subjectId", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
+    try {
+        const subjectId = Number(req.params.subjectId);
+        if (!subjectId) {
+            return res.status(400).json({
+                message: "Invalid subjectId"
+            });
+        }
+        await client_1.prisma.subject.update({
+            where: { id: subjectId },
+            data: { teacherId: null }
+        });
+        res.json({
+            message: "Teacher removed from subject"
+        });
+    }
+    catch (error) {
+        console.error("Remove teacher error:", error);
+        res.status(500).json({
+            message: "Failed to remove teacher"
         });
     }
 });
