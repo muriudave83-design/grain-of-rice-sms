@@ -6,104 +6,100 @@ const authMiddleware_1 = require("../../middlewares/authMiddleware");
 const rolesMiddleware_1 = require("../../middlewares/rolesMiddleware");
 const router = (0, express_1.Router)();
 /**
- * GET /api/admin/teacher-subjects
- * List all teacher → subject → class assignments
+ * GET all assignments
  */
 router.get("/teacher-subjects", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
     try {
-        const subjects = await client_1.prisma.subject.findMany({
-            where: {
-                teacherId: { not: null }
-            },
+        const assignments = await client_1.prisma.teacherSubject.findMany({
             include: {
                 teacher: true,
-                classSubjects: {
-                    include: {
-                        class: true
-                    }
-                }
+                subject: true,
+                class: true
             }
         });
-        const assignments = subjects.flatMap((subject) => subject.classSubjects.map((cs) => ({
-            id: `${subject.id}-${cs.class.id}`, // synthetic ID for UI actions
-            teacher: subject.teacher
-                ? {
-                    id: subject.teacher.id,
-                    name: subject.teacher.name
-                }
-                : null,
+        const result = assignments.map((a) => ({
+            id: a.id,
+            teacher: {
+                id: a.teacher.id,
+                name: a.teacher.name
+            },
             subject: {
-                id: subject.id,
-                name: subject.name
+                id: a.subject.id,
+                name: a.subject.name
             },
             class: {
-                id: cs.class.id,
-                name: cs.class.name
+                id: a.class.id,
+                name: a.class.name
             }
-        })));
-        res.json(assignments);
+        }));
+        res.json(result);
     }
     catch (error) {
-        console.error("Error fetching teacher-subject assignments:", error);
-        res.status(500).json({
-            message: "Failed to fetch teacher assignments"
-        });
+        console.error(error);
+        res.status(500).json({ message: "Failed to load assignments" });
     }
 });
 /**
- * POST /api/admin/teacher-subjects
- * Assign a teacher to a subject
+ * CREATE assignment
  */
 router.post("/teacher-subjects", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
     try {
         const teacherId = Number(req.body.teacherId);
         const subjectId = Number(req.body.subjectId);
-        if (!teacherId || !subjectId) {
+        const classId = Number(req.body.classId);
+        if (!teacherId || !subjectId || !classId) {
             return res.status(400).json({
-                message: "teacherId and subjectId are required"
+                message: "teacherId, subjectId, and classId are required"
             });
         }
-        const updatedSubject = await client_1.prisma.subject.update({
-            where: { id: subjectId },
-            data: { teacherId }
+        /**
+         * Prevent duplicate assignments
+         */
+        const existing = await client_1.prisma.teacherSubject.findFirst({
+            where: {
+                teacherId,
+                subjectId,
+                classId
+            }
         });
-        res.json({
-            message: "Teacher assigned successfully",
-            subject: updatedSubject
+        if (existing) {
+            return res.status(400).json({
+                message: "Teacher already assigned to this subject for this class"
+            });
+        }
+        const assignment = await client_1.prisma.teacherSubject.create({
+            data: {
+                teacherId,
+                subjectId,
+                classId
+            }
         });
+        res.json(assignment);
     }
     catch (error) {
-        console.error("Assign teacher error:", error);
-        res.status(500).json({
-            message: "Failed to assign teacher"
-        });
+        console.error(error);
+        res.status(500).json({ message: "Failed to assign teacher" });
     }
 });
 /**
- * DELETE /api/admin/teacher-subjects/:subjectId
- * Remove teacher from a subject
+ * DELETE assignment
  */
-router.delete("/teacher-subjects/:subjectId", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
+router.delete("/teacher-subjects/:id", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
     try {
-        const subjectId = Number(req.params.subjectId);
-        if (!subjectId) {
+        const id = Number(req.params.id);
+        if (!id) {
             return res.status(400).json({
-                message: "Invalid subjectId"
+                message: "Invalid assignment id"
             });
         }
-        await client_1.prisma.subject.update({
-            where: { id: subjectId },
-            data: { teacherId: null }
+        await client_1.prisma.teacherSubject.delete({
+            where: { id }
         });
-        res.json({
-            message: "Teacher removed from subject"
-        });
+        res.json({ message: "Assignment removed" });
     }
     catch (error) {
-        console.error("Remove teacher error:", error);
-        res.status(500).json({
-            message: "Failed to remove teacher"
-        });
+        console.error(error);
+        res.status(500).json({ message: "Failed to remove assignment" });
     }
 });
 exports.default = router;
