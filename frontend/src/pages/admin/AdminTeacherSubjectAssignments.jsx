@@ -4,12 +4,14 @@ import apiClient from "../../services/apiClient";
 export default function AdminTeacherSubjectAssignments() {
   const [teachers, setTeachers] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [classes, setClasses] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
     teacherId: "",
     subjectId: "",
+    classId: "",
   });
 
   useEffect(() => {
@@ -19,14 +21,17 @@ export default function AdminTeacherSubjectAssignments() {
   async function fetchData() {
     setLoading(true);
     try {
-      const [teachersRes, subjectsRes, assignmentsRes] = await Promise.all([
-        apiClient.get("/admin/users?role=TEACHER"),
-        apiClient.get("/admin/subjects"),
-        apiClient.get("/admin/teacher-subjects"),
-      ]);
+      const [teachersRes, subjectsRes, classesRes, assignmentsRes] =
+        await Promise.all([
+          apiClient.get("/admin/users?role=TEACHER"),
+          apiClient.get("/admin/subjects"),
+          apiClient.get("/admin/classes"),
+          apiClient.get("/admin/teacher-subjects"),
+        ]);
 
       setTeachers(teachersRes.data);
       setSubjects(subjectsRes.data);
+      setClasses(classesRes.data);
       setAssignments(assignmentsRes.data);
     } finally {
       setLoading(false);
@@ -38,7 +43,7 @@ export default function AdminTeacherSubjectAssignments() {
 
     await apiClient.post("/admin/teacher-subjects", form);
 
-    setForm({ teacherId: "", subjectId: "" });
+    setForm({ teacherId: "", subjectId: "", classId: "" });
     fetchData();
   }
 
@@ -56,7 +61,7 @@ export default function AdminTeacherSubjectAssignments() {
         onSubmit={submitAssignment}
         className="bg-white border rounded p-4 space-y-4"
       >
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <select
             required
             className="p-2 border rounded"
@@ -84,7 +89,23 @@ export default function AdminTeacherSubjectAssignments() {
             <option value="">Select subject</option>
             {subjects.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name} ({s.class?.name})
+                {s.name}
+              </option>
+            ))}
+          </select>
+
+          <select
+            required
+            className="p-2 border rounded"
+            value={form.classId}
+            onChange={(e) =>
+              setForm({ ...form, classId: e.target.value })
+            }
+          >
+            <option value="">Select class</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </select>
@@ -128,7 +149,7 @@ export default function AdminTeacherSubjectAssignments() {
                 <tr key={a.id} className="border-t">
                   <td className="p-3">{a.teacher.name}</td>
                   <td className="p-3">{a.subject.name}</td>
-                  <td className="p-3">{a.subject.class?.name}</td>
+                  <td className="p-3">{a.class.name}</td>
                   <td className="p-3 text-right">
                     <button
                       onClick={() => removeAssignment(a.id)}
