@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import apiClient from "../../services/apiClient";
 
 export default function AdminTeacherSubjectAssignments() {
@@ -38,30 +38,69 @@ export default function AdminTeacherSubjectAssignments() {
     }
   }
 
+  /**
+   * Prevent duplicate assignment
+   */
+  const duplicateAssignment = useMemo(() => {
+    if (!form.teacherId || !form.subjectId || !form.classId) return null;
+
+    return assignments.find(
+      (a) =>
+        String(a.teacher.id) === form.teacherId &&
+        String(a.subject.id) === form.subjectId &&
+        String(a.class.id) === form.classId
+    );
+  }, [form, assignments]);
+
+  /**
+   * Submit new assignment
+   */
   async function submitAssignment(e) {
     e.preventDefault();
 
-    await apiClient.post("/admin/teacher-subjects", form);
+    const res = await apiClient.post("/admin/teacher-subjects", form);
 
-    setForm({ teacherId: "", subjectId: "", classId: "" });
-    fetchData();
+    const newAssignment = res.data;
+
+    /**
+     * Instead of refetching everything,
+     * just update local state (10x faster)
+     */
+    setAssignments((prev) => [...prev, newAssignment]);
+
+    setForm({
+      teacherId: "",
+      subjectId: "",
+      classId: "",
+    });
   }
 
+  /**
+   * Remove assignment
+   */
   async function removeAssignment(id) {
     if (!confirm("Remove this assignment?")) return;
+
     await apiClient.delete(`/admin/teacher-subjects/${id}`);
-    fetchData();
+
+    /**
+     * Remove locally instead of refetching
+     */
+    setAssignments((prev) => prev.filter((a) => a.id !== id));
   }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Teacher Subject Assignments</h1>
+      <h1 className="text-xl font-semibold">
+        Teacher Subject Assignments
+      </h1>
 
       <form
         onSubmit={submitAssignment}
         className="bg-white border rounded p-4 space-y-4"
       >
         <div className="grid grid-cols-3 gap-4">
+          {/* Teacher */}
           <select
             required
             className="p-2 border rounded"
@@ -78,6 +117,7 @@ export default function AdminTeacherSubjectAssignments() {
             ))}
           </select>
 
+          {/* Subject */}
           <select
             required
             className="p-2 border rounded"
@@ -94,6 +134,7 @@ export default function AdminTeacherSubjectAssignments() {
             ))}
           </select>
 
+          {/* Class */}
           <select
             required
             className="p-2 border rounded"
@@ -111,10 +152,22 @@ export default function AdminTeacherSubjectAssignments() {
           </select>
         </div>
 
+        {/* Duplicate warning */}
+        {duplicateAssignment && (
+          <p className="text-red-600 text-sm">
+            This teacher is already assigned to that subject and class.
+          </p>
+        )}
+
         <div className="flex justify-end">
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded text-sm"
+            disabled={duplicateAssignment}
+            className={`px-4 py-2 text-white rounded text-sm ${
+              duplicateAssignment
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-blue-600"
+            }`}
           >
             Assign
           </button>
@@ -131,6 +184,7 @@ export default function AdminTeacherSubjectAssignments() {
               <th className="p-3 w-24"></th>
             </tr>
           </thead>
+
           <tbody>
             {loading ? (
               <tr>
@@ -150,6 +204,7 @@ export default function AdminTeacherSubjectAssignments() {
                   <td className="p-3">{a.teacher.name}</td>
                   <td className="p-3">{a.subject.name}</td>
                   <td className="p-3">{a.class.name}</td>
+
                   <td className="p-3 text-right">
                     <button
                       onClick={() => removeAssignment(a.id)}

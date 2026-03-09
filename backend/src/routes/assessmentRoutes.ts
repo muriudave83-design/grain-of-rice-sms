@@ -12,13 +12,11 @@ import { createAssessment } from "../controllers/assessmentController";
 
 const router = Router();
 
-// ✅ VERY TOP — EXACT POSITION, EXACT STRING
 console.log("✅ assessmentRoutes LOADED");
 
 /**
  * ============================================================
- * 🟢 CREATE ASSESSMENT
- * POST /assessments
+ * CREATE ASSESSMENT
  * ============================================================
  */
 router.post(
@@ -30,8 +28,7 @@ router.post(
 
 /**
  * ============================================================
- * 🟢 TEACHER OWNERSHIP ENDPOINT
- * GET /assessments/mine
+ * TEACHER OWN ASSESSMENTS
  * ============================================================
  */
 router.get(
@@ -39,20 +36,26 @@ router.get(
   authenticate,
   requireRole([Role.TEACHER]),
   async (req, res) => {
-    const user = req.user!;
+    const teacherId = req.user!.id;
+
+    const assignments = await prisma.teacherSubject.findMany({
+      where: { teacherId },
+      select: { subjectId: true, classId: true }
+    });
 
     const data = await prisma.assessment.findMany({
       where: {
-        subject: {
-          teacherId: user.id,
-        },
+        OR: assignments.map((a: any) => ({
+          subjectId: a.subjectId,
+          classId: a.classId
+        }))
       },
       include: {
         subject: true,
         class: true,
-        term: true,
+        term: true
       },
-      orderBy: { date: "desc" },
+      orderBy: { date: "desc" }
     });
 
     res.json(data);
@@ -61,7 +64,7 @@ router.get(
 
 /**
  * ============================================================
- * 🟢 TEACHER — GET ALLOWED SUBJECTS FOR CLASS
+ * ⭐ TEACHER SUBJECTS FILTERED BY CLASS
  * GET /assessments/teacher/subjects?classId=1
  * ============================================================
  */
@@ -77,15 +80,20 @@ router.get(
       return res.status(400).json({ message: "classId is required" });
     }
 
-    const subjects = await prisma.subject.findMany({
+    const assignments = await prisma.teacherSubject.findMany({
       where: {
         teacherId,
-        classSubjects: {
-          some: { classId },
-        },
+        classId
       },
-      orderBy: { name: "asc" },
+      include: {
+        subject: true
+      },
+      orderBy: {
+        subject: { name: "asc" }
+      }
     });
+
+    const subjects = assignments.map((a: any) => a.subject);
 
     res.json(subjects);
   }
@@ -93,7 +101,7 @@ router.get(
 
 /**
  * ============================================================
- * GET assessments (Admin all / Teacher own)
+ * GET ASSESSMENTS
  * ============================================================
  */
 router.get(
@@ -103,19 +111,30 @@ router.get(
   async (req, res) => {
     const user = req.user!;
 
-    const where =
-      user.role === Role.TEACHER
-        ? { subject: { teacherId: user.id } }
-        : {};
+    let where: any = {};
+
+    if (user.role === Role.TEACHER) {
+      const assignments = await prisma.teacherSubject.findMany({
+        where: { teacherId: user.id },
+        select: { subjectId: true, classId: true }
+      });
+
+      where = {
+        OR: assignments.map((a: any) => ({
+          subjectId: a.subjectId,
+          classId: a.classId
+        }))
+      };
+    }
 
     const data = await prisma.assessment.findMany({
       where,
       include: {
         subject: true,
         class: true,
-        term: true,
+        term: true
       },
-      orderBy: { date: "desc" },
+      orderBy: { date: "desc" }
     });
 
     res.json(data);
@@ -125,7 +144,6 @@ router.get(
 /**
  * ============================================================
  * GET SINGLE ASSESSMENT
- * GET /assessments/:id
  * ============================================================
  */
 router.get(
@@ -144,21 +162,28 @@ router.get(
       include: {
         subject: true,
         class: true,
-        term: true,
-      },
+        term: true
+      }
     });
 
     if (!assessment) {
       return res.status(404).json({ message: "Assessment not found" });
     }
 
-    if (
-      req.user!.role === Role.TEACHER &&
-      assessment.subject.teacherId !== req.user!.id
-    ) {
-      return res.status(403).json({
-        message: "You are not allowed to access this assessment",
+    if (req.user!.role === Role.TEACHER) {
+      const assignment = await prisma.teacherSubject.findFirst({
+        where: {
+          teacherId: req.user!.id,
+          subjectId: assessment.subjectId,
+          classId: assessment.classId
+        }
       });
+
+      if (!assignment) {
+        return res.status(403).json({
+          message: "You are not allowed to access this assessment"
+        });
+      }
     }
 
     res.json(assessment);
@@ -167,7 +192,7 @@ router.get(
 
 /**
  * ============================================================
- * A. GET SCORES
+ * GET SCORES
  * ============================================================
  */
 router.get(
@@ -177,48 +202,34 @@ router.get(
   async (req, res) => {
     const assessmentId = Number(req.params.id);
 
-    if (Number.isNaN(assessmentId)) {
-      return res.status(400).json({ message: "Invalid assessment id" });
-    }
-
     const assessment = await prisma.assessment.findUnique({
-      where: { id: assessmentId },
-      include: { subject: true },
+      where: { id: assessmentId }
     });
 
     if (!assessment) {
       return res.status(404).json({ message: "Assessment not found" });
     }
 
-    if (assessment.subject.teacherId !== req.user!.id) {
-      return res.status(403).json({
-        message: "You are not allowed to access this assessment.",
-      });
-    }
-
-    const link = await prisma.classSubject.findFirst({
+    const assignment = await prisma.teacherSubject.findFirst({
       where: {
-        classId: assessment.classId,
+        teacherId: req.user!.id,
         subjectId: assessment.subjectId,
-      },
+        classId: assessment.classId
+      }
     });
 
-    if (!link) {
+    if (!assignment) {
       return res.status(403).json({
-        message: "You are not allowed to access this assessment.",
+        message: "You are not allowed to access this assessment"
       });
     }
 
     const students = await prisma.student.findMany({
-      where: {
-        enrollments: {
-          some: { subjectId: assessment.subjectId },
-        },
-      },
+      where: { classId: assessment.classId }
     });
 
     const scores = await prisma.assessmentScore.findMany({
-      where: { assessmentId },
+      where: { assessmentId }
     });
 
     res.json({ assessment, students, scores });
@@ -227,7 +238,7 @@ router.get(
 
 /**
  * ============================================================
- * B. SAVE SCORES (DRAFT only)
+ * SAVE SCORES
  * ============================================================
  */
 router.post(
@@ -237,22 +248,25 @@ router.post(
   async (req, res) => {
     const id = Number(req.params.id);
 
-    if (Number.isNaN(id)) {
-      return res.status(400).json({ message: "Invalid assessment id" });
-    }
-
     const assessment = await prisma.assessment.findUnique({
-      where: { id },
-      include: { subject: true },
+      where: { id }
     });
 
     if (!assessment) {
       return res.status(404).json({ message: "Assessment not found" });
     }
 
-    if (assessment.subject.teacherId !== req.user!.id) {
+    const assignment = await prisma.teacherSubject.findFirst({
+      where: {
+        teacherId: req.user!.id,
+        subjectId: assessment.subjectId,
+        classId: assessment.classId
+      }
+    });
+
+    if (!assignment) {
       return res.status(403).json({
-        message: "You are not allowed to access this assessment.",
+        message: "You are not allowed to access this assessment"
       });
     }
 
@@ -262,26 +276,20 @@ router.post(
 
     const { scores } = req.body;
 
-    if (!Array.isArray(scores)) {
-      return res.status(400).json({
-        message: "Invalid payload. Expected scores to be an array.",
-      });
-    }
-
     for (const s of scores) {
       await prisma.assessmentScore.upsert({
         where: {
           assessmentId_studentId: {
             assessmentId: id,
-            studentId: s.studentId,
-          },
+            studentId: s.studentId
+          }
         },
         update: { score: s.score },
         create: {
           assessmentId: id,
           studentId: s.studentId,
-          score: s.score,
-        },
+          score: s.score
+        }
       });
     }
 
@@ -291,7 +299,7 @@ router.post(
 
 /**
  * ============================================================
- * C. SUBMIT
+ * SUBMIT
  * ============================================================
  */
 router.patch(
@@ -301,42 +309,37 @@ router.patch(
   async (req, res) => {
     const id = Number(req.params.id);
 
-    if (Number.isNaN(id)) {
-      return res.status(400).json({
-        message: "Invalid or missing assessment id in URL",
-      });
-    }
-
     const assessment = await prisma.assessment.findUnique({
-      where: { id },
-      include: { subject: true },
+      where: { id }
     });
 
     if (!assessment) {
       return res.status(404).json({ message: "Assessment not found" });
     }
 
-    if (assessment.subject.teacherId !== req.user!.id) {
-      return res.status(403).json({
-        message: "You are not allowed to access this assessment.",
-      });
-    }
+    const assignment = await prisma.teacherSubject.findFirst({
+      where: {
+        teacherId: req.user!.id,
+        subjectId: assessment.subjectId,
+        classId: assessment.classId
+      }
+    });
 
-    if (assessment.status !== "DRAFT") {
-      return res.status(400).json({
-        message: "Only DRAFT assessments can be submitted",
+    if (!assignment) {
+      return res.status(403).json({
+        message: "You are not allowed to access this assessment"
       });
     }
 
     await prisma.assessment.update({
       where: { id },
-      data: { status: "SUBMITTED" },
+      data: { status: "SUBMITTED" }
     });
 
     await computeGradesForSubject({
       classId: assessment.classId,
       subjectId: assessment.subjectId,
-      termId: assessment.termId,
+      termId: assessment.termId
     });
 
     res.json({ message: "Locked" });
@@ -345,7 +348,7 @@ router.patch(
 
 /**
  * ============================================================
- * DELETE assessment
+ * DELETE
  * ============================================================
  */
 router.delete(
@@ -355,26 +358,28 @@ router.delete(
   async (req, res) => {
     const id = Number(req.params.id);
 
-    if (Number.isNaN(id)) {
-      return res.status(400).json({ message: "Invalid assessment id" });
-    }
-
     const assessment = await prisma.assessment.findUnique({
-      where: { id },
-      include: { subject: true },
+      where: { id }
     });
 
     if (!assessment) {
       return res.status(404).json({ message: "Not found" });
     }
 
-    if (
-      req.user!.role === Role.TEACHER &&
-      assessment.subject.teacherId !== req.user!.id
-    ) {
-      return res.status(403).json({
-        message: "You cannot delete another teacher's assessment",
+    if (req.user!.role === Role.TEACHER) {
+      const assignment = await prisma.teacherSubject.findFirst({
+        where: {
+          teacherId: req.user!.id,
+          subjectId: assessment.subjectId,
+          classId: assessment.classId
+        }
       });
+
+      if (!assignment) {
+        return res.status(403).json({
+          message: "You cannot delete another teacher's assessment"
+        });
+      }
     }
 
     await prisma.assessment.delete({ where: { id } });
