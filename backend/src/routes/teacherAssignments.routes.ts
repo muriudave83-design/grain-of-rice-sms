@@ -1,14 +1,15 @@
 import { Router } from "express";
 import { prisma } from "../prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
-import { authorizeRoles } from "../middlewares/rolesMiddleware";
+import { requireRole } from "../middlewares/rolesMiddleware";
+import { Role } from "@prisma/client";
 
 const router = Router();
 
 router.get(
   "/teacher/assignments",
   authenticate,
-  authorizeRoles("TEACHER"),
+  requireRole([Role.TEACHER]),
   async (req: any, res) => {
     try {
       const teacherId = req.user.id;
