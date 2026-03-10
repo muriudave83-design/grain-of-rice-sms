@@ -6,7 +6,7 @@ const prisma: any = basePrisma;
 
 import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
-import { requireTeacherAssignment } from "../middlewares/teacherAssignmentGuard"; // ✅ NEW
+import { requireTeacherAssignment } from "../middlewares/teacherAssignmentGuard";
 import { Role } from "@prisma/client";
 import { computeGradesForSubject } from "../services/grade.service";
 import { createAssessment } from "../controllers/assessmentController";
@@ -24,7 +24,7 @@ router.post(
   "/",
   authenticate,
   requireRole([Role.TEACHER]),
-  requireTeacherAssignment, // ✅ NEW SECURITY GUARD
+  requireTeacherAssignment,
   createAssessment
 );
 
@@ -67,7 +67,6 @@ router.get(
 /**
  * ============================================================
  * ⭐ TEACHER SUBJECTS FILTERED BY CLASS
- * GET /assessments/teacher/subjects?classId=1
  * ============================================================
  */
 router.get(
@@ -83,16 +82,9 @@ router.get(
     }
 
     const assignments = await prisma.teacherSubject.findMany({
-      where: {
-        teacherId,
-        classId
-      },
-      include: {
-        subject: true
-      },
-      orderBy: {
-        subject: { name: "asc" }
-      }
+      where: { teacherId, classId },
+      include: { subject: true },
+      orderBy: { subject: { name: "asc" } }
     });
 
     const subjects = assignments.map((a: any) => a.subject);
@@ -112,7 +104,6 @@ router.get(
   requireRole([Role.TEACHER, Role.ADMIN]),
   async (req, res) => {
     const user = req.user!;
-
     let where: any = {};
 
     if (user.role === Role.TEACHER) {
@@ -161,11 +152,7 @@ router.get(
 
     const assessment = await prisma.assessment.findUnique({
       where: { id },
-      include: {
-        subject: true,
-        class: true,
-        term: true
-      }
+      include: { subject: true, class: true, term: true }
     });
 
     if (!assessment) {
@@ -351,11 +338,10 @@ router.patch(
 /**
  * ============================================================
  * SUBMIT (FRONTEND COMPATIBILITY ROUTE)
- * POST /assessments/:id/submit
  * ============================================================
  */
 router.post(
-  "/assessments/:id/submit",
+  "/:id/submit",
   authenticate,
   requireRole([Role.TEACHER]),
   async (req: any, res) => {
@@ -363,7 +349,6 @@ router.post(
       const assessmentId = Number(req.params.id);
       const teacherId = req.user.id;
 
-      // verify assessment belongs to teacher
       const assessment = await prisma.assessment.findFirst({
         where: {
           id: assessmentId,
@@ -377,12 +362,19 @@ router.post(
         });
       }
 
-      // update status
+      const scores = await prisma.score.count({
+        where: { assessmentId }
+      });
+
+      if (scores === 0) {
+        return res.status(400).json({
+          message: "No scores entered"
+        });
+      }
+
       const updated = await prisma.assessment.update({
         where: { id: assessmentId },
-        data: {
-          status: "SUBMITTED"
-        }
+        data: { status: "SUBMITTED" }
       });
 
       res.json(updated);
