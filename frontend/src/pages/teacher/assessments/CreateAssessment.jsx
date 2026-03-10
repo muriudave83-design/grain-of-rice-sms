@@ -5,12 +5,12 @@ import api from "@/services/apiClient";
 export default function CreateAssessment() {
   const navigate = useNavigate();
 
-  const [classes, setClasses] = useState([]);
-  const [subjects, setSubjects] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [categories, setCategories] = useState([]);
 
   const [form, setForm] = useState({
     title: "",
+    teacherSubjectId: "",
     classId: "",
     subjectId: "",
     categoryId: "",
@@ -23,23 +23,24 @@ export default function CreateAssessment() {
   const [error, setError] = useState(null);
 
   // ─────────────────────────────────────────────
-  // LOAD CLASSES + CATEGORIES
+  // LOAD ASSIGNMENTS + CATEGORIES
   // ─────────────────────────────────────────────
   useEffect(() => {
-    async function loadClasses() {
+    async function loadAssignments() {
       try {
         setError(null);
-        const res = await api.get("/classes/mine");
-        setClasses(res.data);
+
+        const res = await api.get("/teacher/assignments");
+        setAssignments(res.data);
 
         if (res.data.length === 0) {
-          setError("You are not assigned to any classes.");
+          setError("You are not assigned to teach any subjects.");
         }
       } catch (err) {
-        setClasses([]);
+        setAssignments([]);
         setError(
           err.response?.data?.message ||
-            "Failed to load your classes."
+            "Failed to load teaching assignments."
         );
       }
     }
@@ -53,57 +54,37 @@ export default function CreateAssessment() {
       }
     }
 
-    loadClasses();
+    loadAssignments();
     fetchCategories();
   }, []);
 
   // ─────────────────────────────────────────────
-  // LOAD SUBJECTS FOR SELECTED CLASS
-  // ─────────────────────────────────────────────
-  async function loadSubjects(classId) {
-    if (!classId) {
-      setSubjects([]);
-      setForm((f) => ({ ...f, subjectId: "" }));
-      return;
-    }
-
-    try {
-      setError(null);
-
-      const res = await api.get(
-        "/assessments/teacher/subjects",
-        { params: { classId } }
-      );
-
-      setSubjects(res.data);
-      setForm((f) => ({ ...f, subjectId: "" }));
-
-      if (res.data.length === 0) {
-        setError("You are not assigned any subjects in this class.");
-      }
-    } catch (err) {
-      setSubjects([]);
-      setForm((f) => ({ ...f, subjectId: "" }));
-
-      setError(
-        err.response?.data?.message ||
-          "No subjects assigned to you for this class."
-      );
-    }
-  }
-
-  useEffect(() => {
-    if (form.classId) {
-      loadSubjects(form.classId);
-    }
-  }, [form.classId]);
-
-  // ─────────────────────────────────────────────
   // FORM HANDLERS
   // ─────────────────────────────────────────────
+
   function handleChange(e) {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  }
+
+  function handleAssignmentChange(e) {
+    const teacherSubjectId = e.target.value;
+
+    const assignment = assignments.find(
+      (a) => a.id === Number(teacherSubjectId)
+    );
+
+    if (!assignment) return;
+
+    setForm((prev) => ({
+      ...prev,
+      teacherSubjectId,
+      classId: assignment.classId,
+      subjectId: assignment.subjectId,
+    }));
   }
 
   async function handleSubmit(e) {
@@ -117,7 +98,7 @@ export default function CreateAssessment() {
         classId: Number(form.classId),
         subjectId: Number(form.subjectId),
         categoryId: Number(form.categoryId),
-        termId: 2,
+        termId: Number(form.termId),
         maxScore: Number(form.maxScore),
         date: form.date || null,
         type: "EXAM",
@@ -150,55 +131,27 @@ export default function CreateAssessment() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* CLASS */}
+
+        {/* ASSIGNMENT */}
         <div>
           <label className="block text-sm mb-1 font-medium">
-            Class
+            Teaching Assignment
           </label>
 
           <select
-            name="classId"
             required
-            value={form.classId}
-            onChange={handleChange}
+            value={form.teacherSubjectId}
+            onChange={handleAssignmentChange}
             className="w-full border p-2 rounded"
           >
-            <option value="">Select class</option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
+            <option value="">Select assignment</option>
+
+            {assignments.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.subject.name} — {a.class.name}
               </option>
             ))}
           </select>
-        </div>
-
-        {/* SUBJECT */}
-        <div>
-          <label className="block text-sm mb-1 font-medium">
-            Subject (Only your assigned subjects)
-          </label>
-
-          <select
-            name="subjectId"
-            required
-            value={form.subjectId}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            disabled={!form.classId || subjects.length === 0}
-          >
-            <option value="">Select subject</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-
-          {form.classId && subjects.length === 0 && (
-            <p className="text-sm text-red-600 mt-1">
-              No subjects assigned to you in this class.
-            </p>
-          )}
         </div>
 
         {/* CATEGORY */}
@@ -215,6 +168,7 @@ export default function CreateAssessment() {
             className="w-full border p-2 rounded"
           >
             <option value="">Select category</option>
+
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -293,13 +247,14 @@ export default function CreateAssessment() {
         <button
           disabled={
             loading ||
-            !form.subjectId ||
+            !form.teacherSubjectId ||
             !form.categoryId
           }
           className="bg-blue-600 text-white px-6 py-2 rounded disabled:opacity-50"
         >
           {loading ? "Creating..." : "Create Assessment"}
         </button>
+
       </form>
     </div>
   );
