@@ -6,7 +6,6 @@ import { getMissingAssignmentsForStudent } from "../utils/missingAssignments";
 /**
  * Create an assessment (DRAFT only)
  */
-
 export const createAssessment = async (req: Request, res: Response) => {
   try {
     console.log("BODY:", req.body);
@@ -28,13 +27,12 @@ export const createAssessment = async (req: Request, res: Response) => {
       categoryId,
     } = req.body;
 
-    // ✅ Required field validation
     if (
       !subjectId ||
       !classId ||
       !termId ||
       !title ||
-      !type || // 🔥 REQUIRED
+      !type ||
       !date ||
       !maxScore ||
       !categoryId
@@ -44,7 +42,6 @@ export const createAssessment = async (req: Request, res: Response) => {
       });
     }
 
-    // Default weight to 0 if not provided
     const safeWeight = weight ?? 0;
 
     if (safeWeight < 0) {
@@ -53,9 +50,30 @@ export const createAssessment = async (req: Request, res: Response) => {
       });
     }
 
-    // ✅ Check total weight limit
+    /**
+     * 🔐 TEACHER PERMISSION CHECK (NEW STRUCTURE)
+     */
+
+    const assignment = await prisma.teacherSubject.findFirst({
+      where: {
+        teacherId: req.user.id,
+        subjectId: Number(subjectId),
+        classId: Number(classId),
+      },
+    });
+
+    if (!assignment) {
+      return res.status(403).json({
+        error: "Forbidden: insufficient privileges",
+      });
+    }
+
+    /**
+     * Weight validation
+     */
+
     const existing = await prisma.assessment.aggregate({
-      where: { subjectId, termId, classId },
+      where: { subjectId: Number(subjectId), termId: Number(termId), classId: Number(classId) },
       _sum: { weight: true },
     });
 
@@ -73,7 +91,7 @@ export const createAssessment = async (req: Request, res: Response) => {
         classId: Number(classId),
         termId: Number(termId),
         title,
-        type, // ✅ Now guaranteed to exist
+        type,
         date: new Date(date),
         maxScore: Number(maxScore),
         weight: safeWeight,
@@ -128,7 +146,7 @@ export const setStudentScore = async (req: Request, res: Response) => {
 };
 
 /**
- * Submit assessment (LOCKS IT) — Teacher only, ownership enforced
+ * Submit assessment (LOCKS IT)
  */
 export const submitAssessment = async (req: Request, res: Response) => {
   try {
@@ -137,17 +155,25 @@ export const submitAssessment = async (req: Request, res: Response) => {
 
     const assessment = await prisma.assessment.findUnique({
       where: { id: assessmentId },
-      include: {
-        subject: true,
-      },
     });
 
     if (!assessment) {
       return res.status(404).json({ message: "Assessment not found" });
     }
 
-    console.log("❌ Authorization failed");
-    if (assessment.subject.teacherId !== teacherId) {
+    /**
+     * 🔐 TEACHER PERMISSION CHECK (NEW STRUCTURE)
+     */
+
+    const assignment = await prisma.teacherSubject.findFirst({
+      where: {
+        teacherId,
+        subjectId: assessment.subjectId,
+        classId: assessment.classId,
+      },
+    });
+
+    if (!assignment) {
       return res.status(403).json({ message: "Not authorized" });
     }
 
@@ -172,7 +198,7 @@ export const submitAssessment = async (req: Request, res: Response) => {
 };
 
 /**
- * Recalculate final grade (SAFE — only reads)
+ * Recalculate final grade
  */
 const recalculateFinalGrade = async (
   studentId: number,
