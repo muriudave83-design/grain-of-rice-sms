@@ -15,25 +15,25 @@ export const createAssessment = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const {
-      subjectId,
-      classId,
-      termId,
-      title,
-      type,
-      date,
-      maxScore,
-      weight,
-      categoryId,
-    } = req.body;
+    // Normalize IDs
+    const subjectId = Number(req.body.subjectId);
+    const classId = Number(req.body.classId);
+    const termId = Number(req.body.termId);
+    const categoryId = Number(req.body.categoryId);
+    const maxScore = Number(req.body.maxScore);
 
+    const title = req.body.title;
+    const type = req.body.type;
+    const weight = req.body.weight ?? 0;
+    const date = req.body.date ? new Date(req.body.date) : undefined;
+
+    // Required validation (date optional)
     if (
       !subjectId ||
       !classId ||
       !termId ||
       !title ||
       !type ||
-      !date ||
       !maxScore ||
       !categoryId
     ) {
@@ -42,68 +42,81 @@ export const createAssessment = async (req: Request, res: Response) => {
       });
     }
 
-    const safeWeight = weight ?? 0;
-
-    if (safeWeight < 0) {
+    if (weight < 0) {
       return res.status(400).json({
         error: "Weight cannot be negative",
       });
     }
 
     /**
-     * 🔐 TEACHER PERMISSION CHECK (NEW STRUCTURE)
+     * 🔐 TEACHER PERMISSION CHECK
      */
 
     const assignment = await prisma.teacherSubject.findFirst({
       where: {
         teacherId: req.user.id,
-        subjectId: Number(subjectId),
-        classId: Number(classId),
+        subjectId: subjectId,
+        classId: classId,
       },
     });
 
+    console.log("ASSIGNMENT FOUND:", assignment);
+
     if (!assignment) {
       return res.status(403).json({
-        error: "Forbidden: insufficient privileges",
+        error: "Forbidden: teacher not assigned to this class and subject",
       });
     }
 
     /**
-     * Weight validation
+     * ⚖️ Weight validation
      */
 
     const existing = await prisma.assessment.aggregate({
-      where: { subjectId: Number(subjectId), termId: Number(termId), classId: Number(classId) },
+      where: {
+        subjectId: subjectId,
+        termId: termId,
+        classId: classId,
+      },
       _sum: { weight: true },
     });
 
     const currentWeight = existing._sum.weight ?? 0;
 
-    if (currentWeight + safeWeight > 1) {
+    if (currentWeight + weight > 1) {
       return res.status(400).json({
-        error: `Weight limit exceeded. Current: ${currentWeight}, Adding: ${safeWeight}`,
+        error: `Weight limit exceeded. Current: ${currentWeight}, Adding: ${weight}`,
       });
     }
 
+    /**
+     * ✅ Create assessment
+     */
+
     const assessment = await prisma.assessment.create({
       data: {
-        subjectId: Number(subjectId),
-        classId: Number(classId),
-        termId: Number(termId),
+        subjectId,
+        classId,
+        termId,
         title,
         type,
-        date: new Date(date),
-        maxScore: Number(maxScore),
-        weight: safeWeight,
+        date,
+        maxScore,
+        weight,
         status: AssessmentStatus.DRAFT,
-        categoryId: Number(categoryId),
+        categoryId,
       },
     });
 
-    res.json(assessment);
+    console.log("ASSESSMENT CREATED:", assessment.id);
+
+    return res.json(assessment);
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to create assessment" });
+    console.error("CREATE ASSESSMENT ERROR:", err);
+    return res.status(500).json({
+      error: "Failed to create assessment",
+    });
   }
 };
 
@@ -162,7 +175,7 @@ export const submitAssessment = async (req: Request, res: Response) => {
     }
 
     /**
-     * 🔐 TEACHER PERMISSION CHECK (NEW STRUCTURE)
+     * 🔐 TEACHER PERMISSION CHECK
      */
 
     const assignment = await prisma.teacherSubject.findFirst({
