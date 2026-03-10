@@ -7,6 +7,7 @@ const client_1 = require("../prisma/client");
 const prisma = client_1.prisma;
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 const rolesMiddleware_1 = require("../middlewares/rolesMiddleware");
+const teacherAssignmentGuard_1 = require("../middlewares/teacherAssignmentGuard"); // ✅ NEW
 const client_2 = require("@prisma/client");
 const grade_service_1 = require("../services/grade.service");
 const assessmentController_1 = require("../controllers/assessmentController");
@@ -18,7 +19,8 @@ console.log("✅ assessmentRoutes LOADED");
  * CREATE ASSESSMENT
  * ============================================================
  */
-router.post("/", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.TEACHER]), assessmentController_1.createAssessment);
+router.post("/", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.TEACHER]), teacherAssignmentGuard_1.requireTeacherAssignment, // ✅ NEW SECURITY GUARD
+assessmentController_1.createAssessment);
 /**
  * ============================================================
  * TEACHER OWN ASSESSMENTS
@@ -256,6 +258,44 @@ router.patch("/:id/submit", authMiddleware_1.authenticate, (0, rolesMiddleware_1
         termId: assessment.termId
     });
     res.json({ message: "Locked" });
+});
+/**
+ * ============================================================
+ * SUBMIT (FRONTEND COMPATIBILITY ROUTE)
+ * POST /assessments/:id/submit
+ * ============================================================
+ */
+router.post("/assessments/:id/submit", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.TEACHER]), async (req, res) => {
+    try {
+        const assessmentId = Number(req.params.id);
+        const teacherId = req.user.id;
+        // verify assessment belongs to teacher
+        const assessment = await prisma.assessment.findFirst({
+            where: {
+                id: assessmentId,
+                teacherId: teacherId
+            }
+        });
+        if (!assessment) {
+            return res.status(403).json({
+                message: "You cannot submit this assessment"
+            });
+        }
+        // update status
+        const updated = await prisma.assessment.update({
+            where: { id: assessmentId },
+            data: {
+                status: "SUBMITTED"
+            }
+        });
+        res.json(updated);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({
+            message: "Failed to submit assessment"
+        });
+    }
 });
 /**
  * ============================================================

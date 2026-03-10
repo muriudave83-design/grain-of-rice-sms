@@ -6,6 +6,7 @@ const prisma: any = basePrisma;
 
 import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
+import { requireTeacherAssignment } from "../middlewares/teacherAssignmentGuard"; // ✅ NEW
 import { Role } from "@prisma/client";
 import { computeGradesForSubject } from "../services/grade.service";
 import { createAssessment } from "../controllers/assessmentController";
@@ -23,6 +24,7 @@ router.post(
   "/",
   authenticate,
   requireRole([Role.TEACHER]),
+  requireTeacherAssignment, // ✅ NEW SECURITY GUARD
   createAssessment
 );
 
@@ -343,6 +345,54 @@ router.patch(
     });
 
     res.json({ message: "Locked" });
+  }
+);
+
+/**
+ * ============================================================
+ * SUBMIT (FRONTEND COMPATIBILITY ROUTE)
+ * POST /assessments/:id/submit
+ * ============================================================
+ */
+router.post(
+  "/assessments/:id/submit",
+  authenticate,
+  requireRole([Role.TEACHER]),
+  async (req: any, res) => {
+    try {
+      const assessmentId = Number(req.params.id);
+      const teacherId = req.user.id;
+
+      // verify assessment belongs to teacher
+      const assessment = await prisma.assessment.findFirst({
+        where: {
+          id: assessmentId,
+          teacherId: teacherId
+        }
+      });
+
+      if (!assessment) {
+        return res.status(403).json({
+          message: "You cannot submit this assessment"
+        });
+      }
+
+      // update status
+      const updated = await prisma.assessment.update({
+        where: { id: assessmentId },
+        data: {
+          status: "SUBMITTED"
+        }
+      });
+
+      res.json(updated);
+
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({
+        message: "Failed to submit assessment"
+      });
+    }
   }
 );
 
