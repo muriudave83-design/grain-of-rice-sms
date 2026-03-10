@@ -32,8 +32,11 @@ import adminStudentsRoutes from "./routes/admin/admin.students.routes";
 import adminClassStudentsRoutes from "./routes/admin/admin.class.students.routes";
 import adminClassSubjectsRoutes from "./routes/admin/admin.classSubjects.routes";
 
-// ✅ NEW: Teacher ↔ Subject assignments
+// ✅ NEW: Teacher ↔ Subject assignments (ADMIN)
 import teacherSubjectsRoutes from "./routes/admin/admin.teacherSubjects.routes";
+
+// ✅ NEW: Teacher assignments endpoint
+import teacherAssignmentsRoutes from "./routes/teacherAssignments.routes";
 
 // ✅ Phase-7: Report Cards
 import { reportCardReadRoutes } from "./routes/reportCardReadRoutes";
@@ -121,6 +124,9 @@ app.use("/api/terms", termRoutes);
 
 app.use("/api/attendance", attendanceRoutes);
 
+// ✅ NEW: Teacher assignments route
+app.use("/api", teacherAssignmentsRoutes);
+
 // ----------------------------------
 // REPORT CARDS
 // ----------------------------------
@@ -143,7 +149,7 @@ app.use("/api/admin", adminSubjectsRoutes);
 app.use("/api/admin", adminClassStudentsRoutes);
 app.use("/api/admin", adminClassSubjectsRoutes);
 
-// ✅ NEW: Teacher Subject Assignments
+// ✅ NEW: Teacher Subject Assignments (ADMIN)
 app.use("/api/admin", teacherSubjectsRoutes);
 
 // ----------------------------------

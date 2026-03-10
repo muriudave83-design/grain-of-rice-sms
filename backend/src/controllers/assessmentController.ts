@@ -25,7 +25,7 @@ export const createAssessment = async (req: Request, res: Response) => {
     const title = req.body.title;
     const type = req.body.type;
     const weight = req.body.weight ?? 0;
-    const date = req.body.date ? new Date(req.body.date) : undefined;
+    const date = req.body.date ? new Date(req.body.date) : new Date();
 
     // Required validation (date optional)
     if (
@@ -229,7 +229,10 @@ const recalculateFinalGrade = async (
   const scores = await prisma.assessmentScore.findMany({
     where: {
       studentId,
-      assessment: { subjectId },
+      assessment: {
+        subjectId,
+        termId,
+      },
     },
     include: { assessment: true },
   });

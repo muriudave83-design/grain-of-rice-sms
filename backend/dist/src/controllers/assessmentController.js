@@ -14,57 +14,91 @@ const createAssessment = async (req, res) => {
         if (!req.user) {
             return res.status(401).json({ error: "Unauthorized" });
         }
-        const { subjectId, classId, termId, title, type, date, maxScore, weight, categoryId, } = req.body;
-        // ✅ Required field validation
+        // Normalize IDs
+        const subjectId = Number(req.body.subjectId);
+        const classId = Number(req.body.classId);
+        const termId = Number(req.body.termId);
+        const categoryId = Number(req.body.categoryId);
+        const maxScore = Number(req.body.maxScore);
+        const title = req.body.title;
+        const type = req.body.type;
+        const weight = req.body.weight ?? 0;
+        const date = req.body.date ? new Date(req.body.date) : new Date();
+        // Required validation (date optional)
         if (!subjectId ||
             !classId ||
             !termId ||
             !title ||
-            !type || // 🔥 REQUIRED
-            !date ||
+            !type ||
             !maxScore ||
             !categoryId) {
             return res.status(400).json({
                 error: "Missing required fields",
             });
         }
-        // Default weight to 0 if not provided
-        const safeWeight = weight ?? 0;
-        if (safeWeight < 0) {
+        if (weight < 0) {
             return res.status(400).json({
                 error: "Weight cannot be negative",
             });
         }
-        // ✅ Check total weight limit
+        /**
+         * 🔐 TEACHER PERMISSION CHECK
+         */
+        const assignment = await client_1.prisma.teacherSubject.findFirst({
+            where: {
+                teacherId: req.user.id,
+                subjectId: subjectId,
+                classId: classId,
+            },
+        });
+        console.log("ASSIGNMENT FOUND:", assignment);
+        if (!assignment) {
+            return res.status(403).json({
+                error: "Forbidden: teacher not assigned to this class and subject",
+            });
+        }
+        /**
+         * ⚖️ Weight validation
+         */
         const existing = await client_1.prisma.assessment.aggregate({
-            where: { subjectId, termId, classId },
+            where: {
+                subjectId: subjectId,
+                termId: termId,
+                classId: classId,
+            },
             _sum: { weight: true },
         });
         const currentWeight = existing._sum.weight ?? 0;
-        if (currentWeight + safeWeight > 1) {
+        if (currentWeight + weight > 1) {
             return res.status(400).json({
-                error: `Weight limit exceeded. Current: ${currentWeight}, Adding: ${safeWeight}`,
+                error: `Weight limit exceeded. Current: ${currentWeight}, Adding: ${weight}`,
             });
         }
+        /**
+         * ✅ Create assessment
+         */
         const assessment = await client_1.prisma.assessment.create({
             data: {
-                subjectId: Number(subjectId),
-                classId: Number(classId),
-                termId: Number(termId),
+                subjectId,
+                classId,
+                termId,
                 title,
-                type, // ✅ Now guaranteed to exist
-                date: new Date(date),
-                maxScore: Number(maxScore),
-                weight: safeWeight,
+                type,
+                date,
+                maxScore,
+                weight,
                 status: client_2.AssessmentStatus.DRAFT,
-                categoryId: Number(categoryId),
+                categoryId,
             },
         });
-        res.json(assessment);
+        console.log("ASSESSMENT CREATED:", assessment.id);
+        return res.json(assessment);
     }
     catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Failed to create assessment" });
+        console.error("CREATE ASSESSMENT ERROR:", err);
+        return res.status(500).json({
+            error: "Failed to create assessment",
+        });
     }
 };
 exports.createAssessment = createAssessment;
@@ -102,7 +136,7 @@ const setStudentScore = async (req, res) => {
 };
 exports.setStudentScore = setStudentScore;
 /**
- * Submit assessment (LOCKS IT) — Teacher only, ownership enforced
+ * Submit assessment (LOCKS IT)
  */
 const submitAssessment = async (req, res) => {
     try {
@@ -110,15 +144,21 @@ const submitAssessment = async (req, res) => {
         const teacherId = req.user.id;
         const assessment = await client_1.prisma.assessment.findUnique({
             where: { id: assessmentId },
-            include: {
-                subject: true,
-            },
         });
         if (!assessment) {
             return res.status(404).json({ message: "Assessment not found" });
         }
-        console.log("❌ Authorization failed");
-        if (assessment.subject.teacherId !== teacherId) {
+        /**
+         * 🔐 TEACHER PERMISSION CHECK
+         */
+        const assignment = await client_1.prisma.teacherSubject.findFirst({
+            where: {
+                teacherId,
+                subjectId: assessment.subjectId,
+                classId: assessment.classId,
+            },
+        });
+        if (!assignment) {
             return res.status(403).json({ message: "Not authorized" });
         }
         if (assessment.status !== client_2.AssessmentStatus.DRAFT) {
@@ -141,7 +181,7 @@ const submitAssessment = async (req, res) => {
 };
 exports.submitAssessment = submitAssessment;
 /**
- * Recalculate final grade (SAFE — only reads)
+ * Recalculate final grade
  */
 const recalculateFinalGrade = async (studentId, assessmentId) => {
     const assessment = await client_1.prisma.assessment.findUnique({
@@ -154,7 +194,10 @@ const recalculateFinalGrade = async (studentId, assessmentId) => {
     const scores = await client_1.prisma.assessmentScore.findMany({
         where: {
             studentId,
-            assessment: { subjectId },
+            assessment: {
+                subjectId,
+                termId,
+            },
         },
         include: { assessment: true },
     });
