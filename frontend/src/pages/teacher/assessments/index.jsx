@@ -53,6 +53,38 @@ export default function TeacherAssessments() {
     return new Date(date).toLocaleDateString();
   }
 
+  function getStatusBadge(status) {
+    if (status === "DRAFT") {
+      return (
+        <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700">
+          Draft
+        </span>
+      );
+    }
+
+    if (status === "SUBMITTED") {
+      return (
+        <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700">
+          Submitted
+        </span>
+      );
+    }
+
+    if (status === "PUBLISHED") {
+      return (
+        <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700">
+          Published
+        </span>
+      );
+    }
+
+    return (
+      <span className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-600">
+        {status}
+      </span>
+    );
+  }
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -60,7 +92,7 @@ export default function TeacherAssessments() {
 
         <Link
           to="/teacher/assessments/create"
-          className="px-4 py-2 bg-blue-600 text-white rounded text-sm"
+          className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
         >
           Create Assessment
         </Link>
@@ -77,7 +109,7 @@ export default function TeacherAssessments() {
               <th className="p-3 text-left">Max Score</th>
               <th className="p-3 text-left">Date</th>
               <th className="p-3 text-left">Status</th>
-              <th className="p-3 w-56"></th>
+              <th className="p-3 text-right">Actions</th>
             </tr>
           </thead>
 
@@ -102,10 +134,9 @@ export default function TeacherAssessments() {
               </tr>
             ) : (
               assessments.map((a) => (
-                <tr key={a.id} className="border-t">
-                  <td className="p-3">{a.title}</td>
+                <tr key={a.id} className="border-t hover:bg-gray-50">
+                  <td className="p-3 font-medium">{a.title}</td>
 
-                  {/* SAFE OBJECT ACCESS */}
                   <td className="p-3">
                     {a.subject?.name ?? "—"}
                   </td>
@@ -116,12 +147,10 @@ export default function TeacherAssessments() {
                       "—"}
                   </td>
 
-                  {/* 🔥 FIXED — WAS CRASHING */}
                   <td className="p-3">
                     {a.term?.name ?? "—"}
                   </td>
 
-                  {/* 🔥 FIXED — backend uses maxScore */}
                   <td className="p-3">
                     {a.maxScore ?? "—"}
                   </td>
@@ -130,52 +159,56 @@ export default function TeacherAssessments() {
                     {a.date ? formatDate(a.date) : "—"}
                   </td>
 
-                  <td className="p-3 text-xs">
-                    {a.status}
+                  <td className="p-3">
+                    {getStatusBadge(a.status)}
                   </td>
 
-                  <td className="p-3 space-x-2 text-right">
-                    <Link
-                      to={`/teacher/assessments/${a.id}/scores`}
-                      className="text-green-600 text-xs"
-                    >
-                      Scores
-                    </Link>
+                  <td className="p-3 text-right">
+                    <div className="flex justify-end gap-2 flex-wrap">
 
-                    <Link
-                      to={`/teacher/assessments/${a.id}/review`}
-                      className="text-purple-600 text-xs"
-                    >
-                      Review
-                    </Link>
-
-                    {a.status === "DRAFT" && (
-                      <button
-                        onClick={() => submitAssessment(a.id)}
-                        className="text-orange-600 text-xs"
+                      <Link
+                        to={`/teacher/assessments/${a.id}/scores`}
+                        className="px-2 py-1 text-xs rounded bg-green-100 text-green-700 hover:bg-green-200"
                       >
-                        Submit
+                        Enter Scores
+                      </Link>
+
+                      <Link
+                        to={`/teacher/assessments/${a.id}/review`}
+                        className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                      >
+                        Review
+                      </Link>
+
+                      {a.status === "DRAFT" && (
+                        <button
+                          onClick={() => submitAssessment(a.id)}
+                          className="px-2 py-1 text-xs rounded bg-purple-100 text-purple-700 hover:bg-purple-200"
+                        >
+                          Submit
+                        </button>
+                      )}
+
+                      {a.status === "SUBMITTED" && (
+                        <span className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-600">
+                          Waiting publish
+                        </span>
+                      )}
+
+                      {a.status === "PUBLISHED" && (
+                        <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700">
+                          Published
+                        </span>
+                      )}
+
+                      <button
+                        onClick={() => deleteAssessment(a)}
+                        className="px-2 py-1 text-xs rounded bg-red-100 text-red-700 hover:bg-red-200"
+                      >
+                        Delete
                       </button>
-                    )}
 
-                    {a.status === "SUBMITTED" && (
-                      <span className="text-gray-500 text-xs">
-                        Waiting publish
-                      </span>
-                    )}
-
-                    {a.status === "PUBLISHED" && (
-                      <span className="text-green-600 text-xs">
-                        Published
-                      </span>
-                    )}
-
-                    <button
-                      onClick={() => deleteAssessment(a)}
-                      className="text-red-600 text-xs"
-                    >
-                      Delete
-                    </button>
+                    </div>
                   </td>
                 </tr>
               ))

@@ -120,6 +120,15 @@ export default function CreateAssessment() {
   // ─────────────────────────────────────────────
   return (
     <div className="max-w-3xl mx-auto p-6">
+
+      {/* BACK BUTTON */}
+      <button
+        onClick={() => navigate("/teacher/assessments")}
+        className="mb-4 text-sm text-blue-600 hover:text-blue-800"
+      >
+        ← Back to Assessments
+      </button>
+
       <h1 className="text-2xl font-semibold mb-6">
         Create Assessment
       </h1>
@@ -250,7 +259,7 @@ export default function CreateAssessment() {
             !form.teacherSubjectId ||
             !form.categoryId
           }
-          className="bg-blue-600 text-white px-6 py-2 rounded disabled:opacity-50"
+          className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
         >
           {loading ? "Creating..." : "Create Assessment"}
         </button>

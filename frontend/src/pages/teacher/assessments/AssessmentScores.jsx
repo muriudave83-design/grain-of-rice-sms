@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import api from "@/services/apiClient";
 
 export default function AssessmentScores() {
   const { assessmentId } = useParams();
+  const navigate = useNavigate();
 
   const [assessment, setAssessment] = useState(null);
   const [students, setStudents] = useState([]);
@@ -29,7 +30,6 @@ export default function AssessmentScores() {
         setAssessment(assessment);
         setStudents(students);
 
-        // Map existing scores into controlled state
         const initialScores = {};
         students.forEach((s) => {
           const found = existingScores?.find(
@@ -51,7 +51,7 @@ export default function AssessmentScores() {
   }, [assessmentId]);
 
   // ===============================
-  // UPDATE SCORE (CONTROLLED)
+  // UPDATE SCORE
   // ===============================
   function updateScore(studentId, value) {
     setScores((prev) => ({
@@ -61,7 +61,7 @@ export default function AssessmentScores() {
   }
 
   // ===============================
-  // SAVE SCORES (BULK, IDEMPOTENT)
+  // SAVE SCORES
   // ===============================
   async function saveScores() {
     setSaving(true);
@@ -104,6 +104,15 @@ export default function AssessmentScores() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
+
+      {/* BACK BUTTON */}
+      <button
+        onClick={() => navigate("/teacher/assessments")}
+        className="mb-4 text-sm text-blue-600 hover:text-blue-800"
+      >
+        ← Back to Assessments
+      </button>
+
       {/* ===============================
           CONTEXT HEADER
          =============================== */}
@@ -111,10 +120,14 @@ export default function AssessmentScores() {
         {assessment.title}
       </h1>
 
-      <p className="text-sm text-gray-600 mb-4">
+      <p className="text-sm text-gray-600 mb-1">
         Subject: {assessment.subject?.name} • Class:{" "}
         {assessment.subject?.class?.name} • Total Marks:{" "}
         {assessment.totalMarks}
+      </p>
+
+      <p className="text-sm text-gray-500 mb-4">
+        {students.length} Students
       </p>
 
       {success && (
@@ -126,45 +139,49 @@ export default function AssessmentScores() {
       {/* ===============================
           SCORES TABLE
          =============================== */}
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-2">Student</th>
-            <th className="text-left py-2 w-32">
-              Score / {assessment.totalMarks}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {students.map((s) => {
-            const value = scores[s.id];
-            const isInvalid =
-              value !== "" &&
-              (Number(value) < 0 ||
-                Number(value) > assessment.totalMarks);
+      <div className="bg-white border rounded p-4">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left py-2">Student</th>
+              <th className="text-left py-2 w-32">
+                Score / {assessment.totalMarks}
+              </th>
+            </tr>
+          </thead>
 
-            return (
-              <tr key={s.id} className="border-b">
-                <td className="py-2">{s.name}</td>
-                <td className="py-2">
-                  <input
-                    type="number"
-                    min="0"
-                    max={assessment.totalMarks}
-                    value={value}
-                    onChange={(e) =>
-                      updateScore(s.id, e.target.value)
-                    }
-                    className={`w-24 border rounded px-2 py-1 ${
-                      isInvalid ? "border-red-500" : ""
-                    }`}
-                  />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+          <tbody>
+            {students.map((s) => {
+              const value = scores[s.id];
+              const isInvalid =
+                value !== "" &&
+                (Number(value) < 0 ||
+                  Number(value) > assessment.totalMarks);
+
+              return (
+                <tr key={s.id} className="border-b">
+                  <td className="py-2">{s.name}</td>
+
+                  <td className="py-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max={assessment.totalMarks}
+                      value={value}
+                      onChange={(e) =>
+                        updateScore(s.id, e.target.value)
+                      }
+                      className={`w-24 border rounded px-2 py-1 ${
+                        isInvalid ? "border-red-500" : ""
+                      }`}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {/* ===============================
           ACTIONS
@@ -173,7 +190,7 @@ export default function AssessmentScores() {
         <button
           onClick={saveScores}
           disabled={saving}
-          className="bg-blue-600 text-white px-6 py-2 rounded disabled:opacity-50"
+          className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save Scores"}
         </button>

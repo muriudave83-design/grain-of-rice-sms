@@ -24,13 +24,11 @@ export default function AssessmentReview() {
 
       const { assessment, students, scores } = res.data;
 
-      // Build lookup map: studentId -> score
       const scoreMap = {};
       scores.forEach((s) => {
         scoreMap[s.studentId] = s.score;
       });
 
-      // Normalize review rows
       const reviewRows = students.map((student) => ({
         studentId: student.id,
         studentName: `${student.firstName} ${student.lastName}`,
@@ -98,12 +96,25 @@ export default function AssessmentReview() {
 
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-2">
+
+      {/* BACK BUTTON */}
+      <button
+        onClick={() => navigate("/teacher/assessments")}
+        className="mb-4 text-sm text-blue-600 hover:text-blue-800"
+      >
+        ← Back to Assessments
+      </button>
+
+      <h1 className="text-2xl font-semibold mb-1">
         Review Assessment Before Submission
       </h1>
 
-      <p className="text-gray-600 mb-4">
+      <p className="text-gray-600 mb-1">
         <strong>{assessment.title}</strong> · Total Marks {assessment.maxScore}
+      </p>
+
+      <p className="text-sm text-gray-500 mb-4">
+        {scores.length} Students
       </p>
 
       {missingCount > 0 && !isSubmitted && (
@@ -112,35 +123,39 @@ export default function AssessmentReview() {
         </div>
       )}
 
-      <table className="w-full border-collapse mb-6">
-        <thead>
-          <tr className="border-b">
-            <th className="text-left py-2">Student</th>
-            <th className="text-left py-2">Marks</th>
-          </tr>
-        </thead>
-        <tbody>
-          {scores.map((s) => {
-            const missing =
-              s.marks === null || s.marks === undefined;
+      {/* REVIEW TABLE */}
+      <div className="bg-white border rounded p-4 mb-6">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left py-2">Student</th>
+              <th className="text-left py-2">Marks</th>
+            </tr>
+          </thead>
 
-            return (
-              <tr key={s.studentId} className="border-b">
-                <td className="py-2">{s.studentName}</td>
-                <td className="py-2">
-                  <span
-                    className={
-                      missing ? "text-red-600 font-semibold" : ""
-                    }
-                  >
-                    {missing ? "MISSING" : s.marks}
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+          <tbody>
+            {scores.map((s) => {
+              const missing =
+                s.marks === null || s.marks === undefined;
+
+              return (
+                <tr key={s.studentId} className="border-b">
+                  <td className="py-2">{s.studentName}</td>
+                  <td className="py-2">
+                    <span
+                      className={
+                        missing ? "text-red-600 font-semibold" : ""
+                      }
+                    >
+                      {missing ? "MISSING" : s.marks}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       {isSubmitted ? (
         <div className="bg-green-50 border border-green-200 p-4 rounded">
@@ -168,7 +183,7 @@ export default function AssessmentReview() {
                   `/teacher/assessments/${assessmentId}/scores`
                 )
               }
-              className="border px-5 py-2 rounded"
+              className="border px-5 py-2 rounded hover:bg-gray-50"
             >
               Back to Scores
             </button>
@@ -176,7 +191,7 @@ export default function AssessmentReview() {
             <button
               onClick={submitFinal}
               disabled={submitting}
-              className="bg-green-600 text-white px-6 py-2 rounded disabled:opacity-50"
+              className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 disabled:opacity-50"
             >
               {submitting ? "Submitting…" : "Confirm & Submit"}
             </button>
