@@ -62,26 +62,49 @@ import Notifications from "../pages/notifications/Notifications";
 import LoginPage from "../pages/Login";
 import ChangePassword from "../pages/ChangePassword";
 
-// PUBLIC ROUTE (PREVENT LOGIN WHEN ALREADY AUTHENTICATED)
+
+// ======================================
+// PUBLIC ROUTE (PREVENT LOGIN IF LOGGED)
+// ======================================
 function PublicRoute({ children }) {
+
   const token = localStorage.getItem("token");
+  const role = localStorage.getItem("role");
 
   if (token) {
-    return <Navigate to="/" replace />;
+
+    if (role === "ADMIN") {
+      return <Navigate to="/dashboard/admin" replace />;
+    }
+
+    if (role === "TEACHER") {
+      return <Navigate to="/teacher" replace />;
+    }
+
+    if (role === "PARENT") {
+      return <Navigate to="/parent" replace />;
+    }
+
+    if (role === "STUDENT") {
+      return <Navigate to="/student" replace />;
+    }
   }
 
   return children;
 }
 
+
 export default function AppRoutes() {
+
   return (
     <BrowserRouter>
+
       <Routes>
 
         {/* ROOT */}
         <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {/* AUTH */}
+        {/* LOGIN */}
         <Route
           path="/login"
           element={
@@ -96,95 +119,187 @@ export default function AppRoutes() {
           <Route path="/change-password" element={<ChangePassword />} />
         </Route>
 
+
         {/* ======================= */}
         {/* ADMIN */}
         {/* ======================= */}
+
         <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
           <Route element={<AdminLayout />}>
+
             <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />
+
             <Route path="/dashboard/admin" element={<Dashboard />} />
+
             <Route path="/dashboard/admin/students" element={<AdminStudents />} />
+
             <Route path="/dashboard/admin/teachers" element={<AdminTeachers />} />
+
             <Route path="/dashboard/admin/classes" element={<Classes />} />
+
             <Route
               path="/dashboard/admin/classes/:classId/students"
               element={<AdminClassStudents />}
             />
+
             <Route path="/dashboard/admin/grades" element={<Grades />} />
+
             <Route path="/dashboard/admin/exams" element={<Exams />} />
+
             <Route path="/dashboard/admin/fees" element={<Fees />} />
+
             <Route path="/dashboard/admin/payments" element={<Payments />} />
+
             <Route path="/dashboard/admin/users" element={<UsersPage />} />
+
             <Route path="/dashboard/admin/subjects" element={<AdminSubjects />} />
+
             <Route path="/dashboard/admin/categories" element={<AdminCategories />} />
+
             <Route
               path="/dashboard/admin/teacher-subjects"
               element={<AdminTeacherSubjectAssignments />}
             />
+
             <Route
               path="/dashboard/admin/class-subjects"
               element={<AdminClassSubjects />}
             />
+
             <Route
               path="/dashboard/admin/attendance"
               element={<AdminAttendanceOverview />}
             />
+
             <Route
               path="/dashboard/admin/attendance/:classId"
               element={<AdminAttendanceClass />}
             />
+
             <Route
               path="/dashboard/admin/audit-logs"
               element={<AdminAuditLogs />}
             />
+
           </Route>
         </Route>
+
 
         {/* ======================= */}
         {/* TEACHER */}
         {/* ======================= */}
+
         <Route element={<ProtectedRoute allowedRoles={["TEACHER"]} />}>
           <Route element={<TeacherLayout />}>
-            <Route path="/teacher" element={<Navigate to="/teacher/assessments" replace />} />
-            <Route path="/teacher/assessments" element={<TeacherAssessments />} />
-            <Route path="/teacher/assessments/create" element={<CreateAssessment />} />
-            <Route path="/teacher/assessments/:id/edit" element={<EditAssessmentRedirect />} />
-            <Route path="/teacher/assessments/:id/scores" element={<ScoresEntry />} />
-            <Route path="/teacher/assessments/:id/review" element={<AssessmentReview />} />
-            <Route path="/teacher/gradebook" element={<TeacherGradebook />} />
+
+            <Route
+              path="/teacher"
+              element={<Navigate to="/teacher/assessments" replace />}
+            />
+
+            <Route
+              path="/teacher/assessments"
+              element={<TeacherAssessments />}
+            />
+
+            <Route
+              path="/teacher/assessments/create"
+              element={<CreateAssessment />}
+            />
+
+            <Route
+              path="/teacher/assessments/:id/edit"
+              element={<EditAssessmentRedirect />}
+            />
+
+            <Route
+              path="/teacher/assessments/:id/scores"
+              element={<ScoresEntry />}
+            />
+
+            <Route
+              path="/teacher/assessments/:id/review"
+              element={<AssessmentReview />}
+            />
+
+            <Route
+              path="/teacher/gradebook"
+              element={<TeacherGradebook />}
+            />
+
           </Route>
         </Route>
+
 
         {/* ======================= */}
         {/* PARENT */}
         {/* ======================= */}
+
         <Route element={<ProtectedRoute allowedRoles={["PARENT"]} />}>
+
           <Route path="/parent" element={<ParentDashboard />} />
+
           <Route path="/parent/report-cards" element={<ParentReportCards />} />
-          <Route path="/parent/report-cards/:id" element={<ParentReportCardView />} />
-          <Route path="/parent/attendance" element={<ParentAttendanceSummary />} />
+
+          <Route
+            path="/parent/report-cards/:id"
+            element={<ParentReportCardView />}
+          />
+
+          <Route
+            path="/parent/attendance"
+            element={<ParentAttendanceSummary />}
+          />
+
         </Route>
+
 
         {/* ======================= */}
         {/* STUDENT */}
         {/* ======================= */}
+
         <Route element={<ProtectedRoute allowedRoles={["STUDENT"]} />}>
-          <Route path="/student" element={<Navigate to="/student/report-cards" replace />} />
-          <Route path="/student/report-cards" element={<StudentReportCardsList />} />
-          <Route path="/student/report-cards/:termId" element={<StudentReportCardView />} />
+
+          <Route
+            path="/student"
+            element={<Navigate to="/student/report-cards" replace />}
+          />
+
+          <Route
+            path="/student/report-cards"
+            element={<StudentReportCardsList />}
+          />
+
+          <Route
+            path="/student/report-cards/:termId"
+            element={<StudentReportCardView />}
+          />
+
         </Route>
+
 
         {/* ======================= */}
         {/* SHARED */}
         {/* ======================= */}
-        <Route element={<ProtectedRoute allowedRoles={["ADMIN", "TEACHER", "PARENT"]} />}>
+
+        <Route
+          element={
+            <ProtectedRoute allowedRoles={["ADMIN", "TEACHER", "PARENT"]} />
+          }
+        >
+
           <Route path="/notifications" element={<Notifications />} />
+
         </Route>
 
+
         {/* FALLBACK */}
+
         <Route path="*" element={<Navigate to="/login" replace />} />
 
+
       </Routes>
+
     </BrowserRouter>
   );
 }
