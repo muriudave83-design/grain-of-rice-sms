@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 
 function EditableRow({ student, assessments, onSaved }) {
@@ -71,7 +72,6 @@ function EditableRow({ student, assessments, onSaved }) {
         </td>
       ))}
 
-      {/* ✅ Use backend weighted average */}
       <td
         className={`p-3 font-semibold text-center ${
           student.average != null && Number(student.average) < 40
@@ -98,6 +98,8 @@ function EditableRow({ student, assessments, onSaved }) {
 }
 
 export default function TeacherGradebook() {
+  const navigate = useNavigate();
+
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
 
@@ -150,7 +152,6 @@ export default function TeacherGradebook() {
     fetchGradebook();
   }, [classId, subjectId]);
 
-  // ✅ Compute class average per assessment (unchanged)
   const computeClassAverageForAssessment = (assessmentId) => {
     if (!gradebook) return null;
 
@@ -165,7 +166,6 @@ export default function TeacherGradebook() {
     ).toFixed(1);
   };
 
-  // ✅ Compute class overall average from backend weighted averages
   const computeClassOverallAverage = () => {
     if (!gradebook) return "—";
 
@@ -182,6 +182,15 @@ export default function TeacherGradebook() {
 
   return (
     <div className="p-6">
+
+      {/* Back Button */}
+      <button
+        onClick={() => navigate("/teacher")}
+        className="mb-4 text-blue-600 underline"
+      >
+        ← Back to Dashboard
+      </button>
+
       <h1 className="text-2xl font-semibold mb-6">Gradebook</h1>
 
       <div className="flex gap-4 mb-6">
@@ -245,7 +254,6 @@ export default function TeacherGradebook() {
               ))}
             </tbody>
 
-            {/* ✅ Class Average Footer Row */}
             <tfoot>
               <tr className="border-t bg-gray-50 font-semibold">
                 <td className="p-3">Class Avg</td>

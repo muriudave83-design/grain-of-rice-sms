@@ -1,7 +1,8 @@
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 export default function TeacherLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isActive = (path) =>
     location.pathname.startsWith(path)
@@ -9,8 +10,11 @@ export default function TeacherLayout() {
       : "text-gray-700";
 
   const handleLogout = () => {
+    // Remove authentication token
     localStorage.removeItem("token");
-    window.location.href = "/login";
+
+    // Redirect safely (removes previous route from history)
+    navigate("/login", { replace: true });
   };
 
   return (

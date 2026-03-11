@@ -15,7 +15,7 @@ export default function AssessmentScores() {
   const [success, setSuccess] = useState(false);
 
   // ===============================
-  // LOAD ASSESSMENT + STUDENTS + SCORES
+  // LOAD DATA
   // ===============================
   useEffect(() => {
     async function loadData() {
@@ -90,45 +90,45 @@ export default function AssessmentScores() {
   }
 
   // ===============================
-  // RENDER STATES
+  // STATES
   // ===============================
-  if (loading) {
-    return <div className="p-6">Loading…</div>;
-  }
-
-  if (error) {
-    return <div className="p-6 text-red-600">{error}</div>;
-  }
-
+  if (loading) return <div className="p-6">Loading…</div>;
+  if (error) return <div className="p-6 text-red-600">{error}</div>;
   if (!assessment) return null;
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-5xl mx-auto p-6">
 
-      {/* BACK BUTTON */}
-      <button
-        onClick={() => navigate("/teacher/assessments")}
-        className="mb-4 text-sm text-blue-600 hover:text-blue-800"
-      >
-        ← Back to Assessments
-      </button>
+      {/* HEADER */}
+      <div className="flex items-center justify-between mb-6">
 
-      {/* ===============================
-          CONTEXT HEADER
-         =============================== */}
-      <h1 className="text-2xl font-semibold mb-1">
-        {assessment.title}
-      </h1>
+        <div>
+          <button
+            onClick={() => navigate("/teacher/assessments")}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            ← Back to Assessments
+          </button>
 
-      <p className="text-sm text-gray-600 mb-1">
-        Subject: {assessment.subject?.name} • Class:{" "}
-        {assessment.subject?.class?.name} • Total Marks:{" "}
-        {assessment.totalMarks}
-      </p>
+          <h1 className="text-2xl font-semibold mt-1">
+            Scores — {assessment.title}
+          </h1>
 
-      <p className="text-sm text-gray-500 mb-4">
-        {students.length} Students
-      </p>
+          <p className="text-sm text-gray-600">
+            {assessment.subject?.name} • {assessment.subject?.class?.name} •
+            Total Marks: {assessment.totalMarks}
+          </p>
+        </div>
+
+        <button
+          onClick={saveScores}
+          disabled={saving}
+          className="bg-blue-600 text-white px-5 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save Scores"}
+        </button>
+
+      </div>
 
       {success && (
         <div className="mb-4 p-3 bg-green-100 text-green-700 rounded">
@@ -136,33 +136,44 @@ export default function AssessmentScores() {
         </div>
       )}
 
-      {/* ===============================
-          SCORES TABLE
-         =============================== */}
-      <div className="bg-white border rounded p-4">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b">
-              <th className="text-left py-2">Student</th>
-              <th className="text-left py-2 w-32">
+      {/* STUDENT COUNT */}
+      <p className="text-sm text-gray-500 mb-3">
+        {students.length} Students
+      </p>
+
+      {/* TABLE */}
+      <div className="bg-white border rounded-lg overflow-hidden">
+
+        <table className="w-full">
+
+          <thead className="bg-gray-50 border-b">
+            <tr>
+              <th className="text-left p-3">Student</th>
+              <th className="text-left p-3 w-40">
                 Score / {assessment.totalMarks}
               </th>
             </tr>
           </thead>
 
           <tbody>
+
             {students.map((s) => {
               const value = scores[s.id];
+
               const isInvalid =
                 value !== "" &&
                 (Number(value) < 0 ||
                   Number(value) > assessment.totalMarks);
 
               return (
-                <tr key={s.id} className="border-b">
-                  <td className="py-2">{s.name}</td>
+                <tr key={s.id} className="border-b last:border-none">
 
-                  <td className="py-2">
+                  <td className="p-3 font-medium">
+                    {s.name}
+                  </td>
+
+                  <td className="p-3">
+
                     <input
                       type="number"
                       min="0"
@@ -171,30 +182,24 @@ export default function AssessmentScores() {
                       onChange={(e) =>
                         updateScore(s.id, e.target.value)
                       }
-                      className={`w-24 border rounded px-2 py-1 ${
-                        isInvalid ? "border-red-500" : ""
+                      className={`w-24 border rounded px-2 py-1 focus:outline-none focus:ring ${
+                        isInvalid
+                          ? "border-red-500"
+                          : "border-gray-300"
                       }`}
                     />
+
                   </td>
+
                 </tr>
               );
             })}
+
           </tbody>
         </table>
+
       </div>
 
-      {/* ===============================
-          ACTIONS
-         =============================== */}
-      <div className="mt-6">
-        <button
-          onClick={saveScores}
-          disabled={saving}
-          className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save Scores"}
-        </button>
-      </div>
     </div>
   );
 }

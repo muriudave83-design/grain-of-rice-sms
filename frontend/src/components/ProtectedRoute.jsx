@@ -5,13 +5,15 @@ export default function ProtectedRoute({ allowedRoles }) {
   const { user, isAuthenticated, loading } = useAuth();
   const location = useLocation();
 
+  const token = localStorage.getItem("token");
+
   // ⏳ Wait for auth restoration
   if (loading) {
     return null;
   }
 
-  // 🔒 Not logged in
-  if (!isAuthenticated || !user) {
+  // 🔒 Not logged in OR token missing
+  if (!isAuthenticated || !user || !token) {
     return (
       <Navigate
         to="/login"
@@ -22,7 +24,6 @@ export default function ProtectedRoute({ allowedRoles }) {
   }
 
   // 🔐 FORCE PASSWORD CHANGE ENFORCEMENT
-  // Redirect everywhere except the change-password page
   if (
     user.forcePasswordChange &&
     location.pathname !== "/change-password"
@@ -30,7 +31,7 @@ export default function ProtectedRoute({ allowedRoles }) {
     return <Navigate to="/change-password" replace />;
   }
 
-  // 🚫 Role restriction (only if roles provided)
+  // 🚫 Role restriction
   if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/login" replace />;
   }

@@ -60,7 +60,18 @@ import Notifications from "../pages/notifications/Notifications";
 // AUTH
 // =======================
 import LoginPage from "../pages/Login";
-import ChangePassword from "../pages/ChangePassword"; // ✅ ADDED
+import ChangePassword from "../pages/ChangePassword";
+
+// PUBLIC ROUTE (PREVENT LOGIN WHEN ALREADY AUTHENTICATED)
+function PublicRoute({ children }) {
+  const token = localStorage.getItem("token");
+
+  if (token) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
 
 export default function AppRoutes() {
   return (
@@ -71,9 +82,16 @@ export default function AppRoutes() {
         <Route path="/" element={<Navigate to="/login" replace />} />
 
         {/* AUTH */}
-        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <LoginPage />
+            </PublicRoute>
+          }
+        />
 
-        {/* 🔐 CHANGE PASSWORD (ALL LOGGED-IN USERS) */}
+        {/* CHANGE PASSWORD */}
         <Route element={<ProtectedRoute />}>
           <Route path="/change-password" element={<ChangePassword />} />
         </Route>
@@ -88,12 +106,10 @@ export default function AppRoutes() {
             <Route path="/dashboard/admin/students" element={<AdminStudents />} />
             <Route path="/dashboard/admin/teachers" element={<AdminTeachers />} />
             <Route path="/dashboard/admin/classes" element={<Classes />} />
-
             <Route
               path="/dashboard/admin/classes/:classId/students"
               element={<AdminClassStudents />}
             />
-
             <Route path="/dashboard/admin/grades" element={<Grades />} />
             <Route path="/dashboard/admin/exams" element={<Exams />} />
             <Route path="/dashboard/admin/fees" element={<Fees />} />
