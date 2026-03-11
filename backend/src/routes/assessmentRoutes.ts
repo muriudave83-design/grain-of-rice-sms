@@ -288,7 +288,7 @@ router.post(
 
 /**
  * ============================================================
- * SUBMIT
+ * SUBMIT (PRIMARY ROUTE)
  * ============================================================
  */
 router.patch(
@@ -306,6 +306,12 @@ router.patch(
       return res.status(404).json({ message: "Assessment not found" });
     }
 
+    if (assessment.status !== "DRAFT") {
+      return res.status(400).json({
+        message: "Assessment already submitted"
+      });
+    }
+
     const assignment = await prisma.teacherSubject.findFirst({
       where: {
         teacherId: req.user!.id,
@@ -320,6 +326,16 @@ router.patch(
       });
     }
 
+    const scores = await prisma.assessmentScore.count({
+      where: { assessmentId: id }
+    });
+
+    if (scores === 0) {
+      return res.status(400).json({
+        message: "No scores entered"
+      });
+    }
+
     await prisma.assessment.update({
       where: { id },
       data: { status: "SUBMITTED" }
@@ -331,7 +347,7 @@ router.patch(
       termId: assessment.termId
     });
 
-    res.json({ message: "Locked" });
+    res.json({ message: "Assessment locked" });
   }
 );
 
@@ -346,24 +362,40 @@ router.post(
   requireRole([Role.TEACHER]),
   async (req: any, res) => {
     try {
-      const assessmentId = Number(req.params.id);
-      const teacherId = req.user.id;
+      const id = Number(req.params.id);
 
-      const assessment = await prisma.assessment.findFirst({
-        where: {
-          id: assessmentId,
-          teacherId: teacherId
-        }
+      const assessment = await prisma.assessment.findUnique({
+        where: { id }
       });
 
       if (!assessment) {
+        return res.status(404).json({
+          message: "Assessment not found"
+        });
+      }
+
+      if (assessment.status !== "DRAFT") {
+        return res.status(400).json({
+          message: "Assessment already submitted"
+        });
+      }
+
+      const assignment = await prisma.teacherSubject.findFirst({
+        where: {
+          teacherId: req.user.id,
+          subjectId: assessment.subjectId,
+          classId: assessment.classId
+        }
+      });
+
+      if (!assignment) {
         return res.status(403).json({
           message: "You cannot submit this assessment"
         });
       }
 
-      const scores = await prisma.score.count({
-        where: { assessmentId }
+      const scores = await prisma.assessmentScore.count({
+        where: { assessmentId: id }
       });
 
       if (scores === 0) {
@@ -373,8 +405,14 @@ router.post(
       }
 
       const updated = await prisma.assessment.update({
-        where: { id: assessmentId },
+        where: { id },
         data: { status: "SUBMITTED" }
+      });
+
+      await computeGradesForSubject({
+        classId: assessment.classId,
+        subjectId: assessment.subjectId,
+        termId: assessment.termId
       });
 
       res.json(updated);
