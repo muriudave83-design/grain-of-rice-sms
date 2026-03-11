@@ -5,6 +5,8 @@ import { authorizeStudentAccess } from "../middlewares/ownershipMiddleware";
 
 import { createAttendanceSession } from "../controllers/attendance/createAttendanceSession.controller";
 import { submitAttendanceSession } from "../controllers/attendance/submitAttendanceSession.controller";
+import { getAttendanceSession } from "../controllers/attendance/getAttendanceSession.controller";
+import { saveAttendanceRecords } from "../controllers/attendance/saveAttendanceRecords.controller";
 import { getAttendanceByClass } from "../controllers/attendance/getAttendanceByClass.controller";
 import { getParentAttendanceSummary } from "../controllers/attendance/getParentAttendanceSummary.controller";
 import { getParentAttendance } from "../controllers/attendance.controller";
@@ -29,6 +31,26 @@ router.post(
   authenticate,
   requireRole(["TEACHER"]),
   submitAttendanceSession
+);
+
+// ------------------------------------------------------
+// GET session details + students
+// ------------------------------------------------------
+router.get(
+  "/sessions/:id",
+  authenticate,
+  requireRole(["TEACHER", "ADMIN"]),
+  getAttendanceSession
+);
+
+// ------------------------------------------------------
+// SAVE attendance records
+// ------------------------------------------------------
+router.post(
+  "/sessions/:id/records",
+  authenticate,
+  requireRole(["TEACHER"]),
+  saveAttendanceRecords
 );
 
 // ------------------------------------------------------
