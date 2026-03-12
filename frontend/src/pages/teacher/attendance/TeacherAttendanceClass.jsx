@@ -7,6 +7,7 @@ export default function TeacherAttendanceClass() {
   const [sessions, setSessions] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [friendlyMessage, setFriendlyMessage] = useState("");
 
   useEffect(() => {
     api
@@ -38,7 +39,14 @@ export default function TeacherAttendanceClass() {
       const res = await api.post("/attendance/sessions", { classId });
       window.location.href = `/teacher/attendance/session/${res.data.id}`;
     } catch (err) {
-      alert("Error starting new session");
+      if (err.response?.status === 409) {
+        // Friendly message when today's session already exists
+        setFriendlyMessage(
+          "Attendance for today already exists. You can view or continue the session until tomorrow."
+        );
+      } else {
+        alert("Error starting new session");
+      }
     }
   };
 
@@ -56,6 +64,12 @@ export default function TeacherAttendanceClass() {
           Start New Session
         </button>
       </div>
+
+      {friendlyMessage && (
+        <p className="mt-2 text-yellow-700 bg-yellow-100 p-2 rounded border-l-4 border-yellow-500">
+          {friendlyMessage}
+        </p>
+      )}
 
       {sessions.length === 0 ? (
         <p className="mt-4 text-gray-600">No attendance sessions yet.</p>

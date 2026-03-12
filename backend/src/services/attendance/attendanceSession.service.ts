@@ -60,7 +60,8 @@ export class AttendanceSessionService {
         if (existing) {
           throw {
             status: 409,
-            message: "Attendance already created for this class today",
+            message:
+              "Attendance for today already exists. You can view or continue the session until tomorrow.",
           };
         }
 
@@ -78,7 +79,8 @@ export class AttendanceSessionService {
       if (error.code === "P2002") {
         throw {
           status: 409,
-          message: "Attendance already exists for this class today",
+          message:
+            "Attendance for today already exists. You can view or continue the session until tomorrow.",
         };
       }
 
