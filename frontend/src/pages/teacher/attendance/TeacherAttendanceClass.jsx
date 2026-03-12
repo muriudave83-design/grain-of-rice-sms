@@ -1,7 +1,7 @@
   import { useEffect, useState } from "react";
   import { useParams, Link } from "react-router-dom";
-  import { Badge } from "@/components/ui/badge";
-  import { Button } from "@/components/ui/button";
+  import { Badge } from "../../../components/ui/badge";
+  import { Button } from "../../../components/ui/button";
   import api from "@/services/apiClient";
   
   export default function TeacherAttendanceClass() {
