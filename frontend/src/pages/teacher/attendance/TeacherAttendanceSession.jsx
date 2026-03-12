@@ -1,15 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import api from "@/services/apiClient";
+import api from "../../../services/apiClient";
 
 export default function TeacherAttendanceSession() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
 
   const [session, setSession] = useState(null);
-  const [loading, setLoading] = useState(true); // ✅ improvement line
+  const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState([]);
   const [records, setRecords] = useState({});
   const [error, setError] = useState(null);
@@ -36,11 +34,11 @@ export default function TeacherAttendanceSession() {
         setRecords(initial);
         setLastSavedRecords(initial);
 
-        setLoading(false); // ✅ improvement line
+        setLoading(false);
       })
       .catch((err) => {
         setError(err.response?.status);
-        setLoading(false); // ✅ improvement line
+        setLoading(false);
       });
   }, [sessionId]);
 
@@ -75,7 +73,7 @@ export default function TeacherAttendanceSession() {
     return () => clearInterval(interval);
   }, [records, lastSavedRecords, session, sessionId]);
 
-  if (loading) return <p>Loading attendance session...</p>; // ✅ improvement line
+  if (loading) return <p>Loading attendance session...</p>;
   if (error === 404) return <p>Not found</p>;
   if (error === 403) return <p>Forbidden</p>;
 
@@ -89,8 +87,7 @@ export default function TeacherAttendanceSession() {
 
     setRecords((prev) => ({
       ...prev,
-      [studentId]:
-        prev[studentId] === "PRESENT" ? "ABSENT" : "PRESENT",
+      [studentId]: prev[studentId] === "PRESENT" ? "ABSENT" : "PRESENT",
     }));
   }
 
@@ -169,12 +166,12 @@ export default function TeacherAttendanceSession() {
         Teacher / Attendance / Class {session.classId} / Session
       </div>
 
-      <Button
-        variant="outline"
+      <button
         onClick={() => navigate(-1)}
+        className="px-3 py-1 border rounded"
       >
         ← Back to Class
-      </Button>
+      </button>
 
       <div>
         <h2 className="text-xl font-semibold">
@@ -186,9 +183,16 @@ export default function TeacherAttendanceSession() {
         </p>
       </div>
 
-      <Badge className={isDraft ? "bg-yellow-500" : "bg-green-600"}>
+      <span
+        style={{
+          background: isDraft ? "#facc15" : "#16a34a",
+          color: "white",
+          padding: "4px 8px",
+          borderRadius: "6px"
+        }}
+      >
         {session.status}
-      </Badge>
+      </span>
 
       {!isDraft && (
         <div className="text-sm text-gray-600">
@@ -197,9 +201,12 @@ export default function TeacherAttendanceSession() {
       )}
 
       {isDraft && (
-        <Button onClick={markAllPresent}>
+        <button
+          onClick={markAllPresent}
+          className="px-3 py-1 bg-blue-600 text-white rounded"
+        >
           Mark All Present
-        </Button>
+        </button>
       )}
 
       <div className="overflow-x-auto">
@@ -238,15 +245,21 @@ export default function TeacherAttendanceSession() {
       </div>
 
       {isDraft && (
-        <Button onClick={saveAttendance}>
+        <button
+          onClick={saveAttendance}
+          className="px-3 py-1 bg-blue-600 text-white rounded"
+        >
           Save Attendance
-        </Button>
+        </button>
       )}
 
       {isDraft && (
-        <Button variant="destructive" onClick={submitAttendance}>
+        <button
+          onClick={submitAttendance}
+          className="px-3 py-1 bg-red-600 text-white rounded"
+        >
           Submit Attendance
-        </Button>
+        </button>
       )}
 
     </div>
