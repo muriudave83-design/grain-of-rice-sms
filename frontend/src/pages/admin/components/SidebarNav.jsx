@@ -1,82 +1,157 @@
-import React from "react";
+import React, { useState } from "react";
 import { NavLink } from "react-router-dom";
 
 const BASE_PATH = "/dashboard/admin";
 
-const links = [
-  { to: "", label: "Dashboard", end: true },
-
-  // Core setup
-  { to: "users", label: "Users" },
-  { to: "classes", label: "Classes" },
-  { to: "students", label: "Students" },
-
-  // Dedicated Teachers Page
-  { to: "teachers", label: "Teachers" },
-
-  // ===============================
-  // ACADEMIC CORE
-  // ===============================
-  { to: "subjects", label: "Subjects" },
-
-  // ✅ NEW — Assignment Categories
-  { to: "categories", label: "Categories" },
-
-  // Teacher → Subject
-  { to: "teacher-subjects", label: "Teacher Assignments" },
-
-  // Class → Subject
-  { to: "class-subjects", label: "Class Subject Assignment" },
-
-  // Academic
-  { to: "grades", label: "Grades" },
-  { to: "attendance", label: "Attendance" },
-  { to: "exams", label: "Exams" },
-
-  // Finance
-  { to: "fees", label: "Fees" },
-  { to: "payments", label: "Payments" },
-];
-
 export default function SidebarNav() {
+  const [open, setOpen] = useState({
+    management: true,
+    academics: true,
+    attendance: true,
+    finance: false,
+  });
+
+  const toggle = (section) => {
+    setOpen((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
+  const linkClass = ({ isActive }) =>
+    `flex items-center gap-2 px-3 py-2 rounded-md mb-1 text-sm transition ${
+      isActive
+        ? "bg-slate-100 text-slate-900 font-semibold"
+        : "text-slate-600 hover:bg-gray-50"
+    }`;
+
+  const path = (p) => (p ? `${BASE_PATH}/${p}` : BASE_PATH);
+
   return (
-    <aside className="w-64 hidden md:flex flex-col border-r bg-white">
-      {/* Header */}
-      <div className="p-4 border-b">
-        <div className="text-lg font-bold">School SMS</div>
-        <div className="text-xs text-gray-500">
-          Administrator Panel
-        </div>
+    <nav className="p-3 flex-1 overflow-y-auto">
+
+      {/* DASHBOARD */}
+      <NavLink to={BASE_PATH} end className={linkClass}>
+        <span>🏠</span> Dashboard
+      </NavLink>
+
+      {/* MANAGEMENT */}
+      <div className="mt-4">
+        <button
+          onClick={() => toggle("management")}
+          className="w-full text-left text-xs font-bold text-gray-500 uppercase tracking-wide mb-2"
+        >
+          Management
+        </button>
+
+        {open.management && (
+          <div className="ml-2">
+            <NavLink to={path("users")} className={linkClass}>
+              👤 Users
+            </NavLink>
+
+            <NavLink to={path("students")} className={linkClass}>
+              🎓 Students
+            </NavLink>
+
+            <NavLink to={path("teachers")} className={linkClass}>
+              👩‍🏫 Teachers
+            </NavLink>
+
+            <NavLink to={path("classes")} className={linkClass}>
+              🏫 Classes
+            </NavLink>
+          </div>
+        )}
       </div>
 
-      {/* Navigation */}
-      <nav className="p-2 flex-1 overflow-auto">
-        {links.map((ln) => {
-          const path = ln.to ? `${BASE_PATH}/${ln.to}` : BASE_PATH;
+      {/* ACADEMICS */}
+      <div className="mt-4">
+        <button
+          onClick={() => toggle("academics")}
+          className="w-full text-left text-xs font-bold text-gray-500 uppercase tracking-wide mb-2"
+        >
+          Academics
+        </button>
 
-          return (
-            <NavLink
-              key={ln.label}
-              to={path}
-              end={ln.end}
-              className={({ isActive }) =>
-                `block px-3 py-2 rounded mb-1 text-sm transition-colors ${
-                  isActive
-                    ? "bg-slate-100 font-semibold text-slate-900"
-                    : "text-slate-700 hover:bg-gray-50"
-                }`
-              }
-            >
-              {ln.label}
+        {open.academics && (
+          <div className="ml-2">
+            <NavLink to={path("subjects")} className={linkClass}>
+              📚 Subjects
             </NavLink>
-          );
-        })}
-      </nav>
 
-      {/* Footer */}
-      <div className="p-3 border-t text-xs text-gray-500">
+            <NavLink to={path("categories")} className={linkClass}>
+              🗂 Categories
+            </NavLink>
+
+            <NavLink to={path("teacher-subjects")} className={linkClass}>
+              🧑‍🏫 Teacher Assignments
+            </NavLink>
+
+            <NavLink to={path("class-subjects")} className={linkClass}>
+              🏫 Class Subject Assignment
+            </NavLink>
+
+            <NavLink to={path("grades")} className={linkClass}>
+              📝 Grades
+            </NavLink>
+
+            <NavLink to={path("exams")} className={linkClass}>
+              📊 Exams
+            </NavLink>
+          </div>
+        )}
+      </div>
+
+      {/* ATTENDANCE */}
+      <div className="mt-4">
+        <button
+          onClick={() => toggle("attendance")}
+          className="w-full text-left text-xs font-bold text-gray-500 uppercase tracking-wide mb-2"
+        >
+          Attendance
+        </button>
+
+        {open.attendance && (
+          <div className="ml-2">
+            <NavLink to={path("attendance")} className={linkClass}>
+              ✅ Attendance
+            </NavLink>
+
+            <NavLink to={path("attendance-analytics")} className={linkClass}>
+              📈 Attendance Analytics
+            </NavLink>
+          </div>
+        )}
+      </div>
+
+      {/* FINANCE */}
+      <div className="mt-4">
+        <button
+          onClick={() => toggle("finance")}
+          className="w-full text-left text-xs font-bold text-gray-500 uppercase tracking-wide mb-2"
+        >
+          Finance
+        </button>
+
+        {open.finance && (
+          <div className="ml-2">
+            <NavLink to={path("fees")} className={linkClass}>
+              💰 Fees
+            </NavLink>
+
+            <NavLink to={path("payments")} className={linkClass}>
+              💳 Payments
+            </NavLink>
+          </div>
+        )}
+      </div>
+
+      {/* FOOTER */}
+      <div className="mt-6 text-xs text-gray-400">
         v0.1 — Demo
       </div>
-    </aside>
+
+    </nav>
   );
 }
