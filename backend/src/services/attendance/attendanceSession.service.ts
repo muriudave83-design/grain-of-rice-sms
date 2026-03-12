@@ -28,38 +28,62 @@ export class AttendanceSessionService {
     teacherId: number;
     date: Date;
   }) {
-    return prisma.$transaction(async (tx) => {
-      const classExists = await tx.class.findUnique({
-        where: { id: classId },
+    try {
+      return await prisma.$transaction(async (tx) => {
+        const classExists = await tx.class.findUnique({
+          where: { id: classId },
+        });
+
+        if (!classExists) {
+          throw { status: 404, message: "Class not found" };
+        }
+
+        /* ---------------------------------------------------- */
+        /* Prevent multiple attendance sessions per day         */
+        /* ---------------------------------------------------- */
+        const today = new Date(date);
+        today.setHours(0, 0, 0, 0);
+
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const existing = await tx.attendanceSession.findFirst({
+          where: {
+            classId,
+            date: {
+              gte: today,
+              lt: tomorrow,
+            },
+          },
+        });
+
+        if (existing) {
+          throw {
+            status: 409,
+            message: "Attendance already created for this class today",
+          };
+        }
+
+        return await tx.attendanceSession.create({
+          data: {
+            classId,
+            teacherId,
+            date,
+            status: AttendanceSessionStatus.DRAFT,
+          },
+        });
       });
-
-      if (!classExists) {
-        throw { status: 404, message: "Class not found" };
-      }
-
-
-      const existing = await tx.attendanceSession.findUnique({
-        where: {
-          classId_date: { classId, date },
-        },
-      });
-
-      if (existing) {
+    } catch (error: any) {
+      // Handle database unique constraint race condition
+      if (error.code === "P2002") {
         throw {
           status: 409,
-          message: "Attendance already exists for this class and date",
+          message: "Attendance already exists for this class today",
         };
       }
 
-      return tx.attendanceSession.create({
-        data: {
-          classId,
-          teacherId,
-          date,
-          status: AttendanceSessionStatus.DRAFT,
-        },
-      });
-    });
+      throw error;
+    }
   }
 
   // =========================
@@ -98,7 +122,7 @@ export class AttendanceSessionService {
         entityType: "AttendanceSession",
         entityId: String(updated.id),
         actorUserId: String(teacherId),
-        actorRole: "TEACHER", // ✅ REQUIRED FIX
+        actorRole: "TEACHER",
         metadata: {
           classId: updated.classId,
           date: updated.date,
