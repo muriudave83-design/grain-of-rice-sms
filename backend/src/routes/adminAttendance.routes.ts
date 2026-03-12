@@ -282,4 +282,66 @@ router.get("/absent-today", async (req, res) => {
 
 })
 
+/*
+Admin Class Attendance
+GET /admin/attendance/class/:classId
+*/
+
+router.get("/class/:classId", async (req, res) => {
+
+  try {
+
+    const classId = Number(req.params.classId)
+
+    const today = new Date()
+    today.setHours(0,0,0,0)
+
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    const students = await prisma.student.findMany({
+      where: {
+        classId: classId
+      },
+      include: {
+        attendanceEntries: {
+          include: {
+            session: true
+          }
+        }
+      }
+    })
+
+    const result = students.map(student => {
+
+      const entry = student.attendanceEntries.find(e => {
+
+        const sessionDate = new Date(e.session.date)
+
+        return sessionDate >= today && sessionDate < tomorrow
+
+      })
+
+      return {
+        studentId: student.id,
+        studentName: student.firstName + " " + student.lastName,
+        status: entry ? entry.status : "NOT MARKED"
+      }
+
+    })
+
+    res.json(result)
+
+  } catch (error) {
+
+    console.error("Class attendance error:", error)
+
+    res.status(500).json({
+      error: "Failed to fetch class attendance"
+    })
+
+  }
+
+})
+
 export default router
