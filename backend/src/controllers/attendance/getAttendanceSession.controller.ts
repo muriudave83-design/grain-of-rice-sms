@@ -21,7 +21,10 @@ export async function getAttendanceSession(req: Request, res: Response) {
 
     const students = await prisma.student.findMany({
       where: { classId: session.classId },
-      orderBy: { firstName: "asc" },
+      orderBy: [
+        { firstName: "asc" },
+        { lastName: "asc" }
+      ]
     });
 
     return res.json({
