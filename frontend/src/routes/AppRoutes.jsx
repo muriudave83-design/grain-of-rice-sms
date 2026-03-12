@@ -26,6 +26,7 @@ import AdminClassSubjects from "../pages/admin/AdminClassSubjects";
 import AdminAttendanceOverview from "../pages/admin/attendance/AdminAttendanceOverview";
 import AdminAttendanceClass from "../pages/admin/attendance/AdminAttendanceClass";
 import AdminAuditLogs from "../pages/admin/audit/AdminAuditLogs";
+import AttendanceAnalytics from "../pages/admin/AttendanceAnalytics";
 
 // =======================
 // TEACHER PAGES
@@ -171,6 +172,11 @@ export default function AppRoutes() {
             <Route
               path="/dashboard/admin/attendance"
               element={<AdminAttendanceOverview />}
+            />
+
+            <Route
+              path="/dashboard/admin/attendance-analytics"
+              element={<AttendanceAnalytics />}
             />
 
             <Route
