@@ -35,7 +35,6 @@ router.get("/summary", async (req, res) => {
       }
     })
 
-    // unique students
     const presentStudents = new Set<number>()
     const absentStudents = new Set<number>()
 
@@ -72,6 +71,84 @@ router.get("/summary", async (req, res) => {
 
     res.status(500).json({
       error:"Failed to load attendance summary"
+    })
+
+  }
+
+})
+
+/*
+Admin Attendance by Class
+GET /admin/attendance/by-class
+*/
+router.get("/by-class", async (req, res) => {
+
+  try {
+
+    const today = new Date()
+    today.setHours(0,0,0,0)
+
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+
+    const classes = await prisma.class.findMany({
+      include: {
+        students: {
+          include: {
+            attendanceEntries: {
+              include: {
+                session: true
+              }
+            }
+          }
+        }
+      }
+    })
+
+    const result = classes.map(cls => {
+
+      let present = 0
+      let absent = 0
+
+      cls.students.forEach(student => {
+
+        student.attendanceEntries.forEach(entry => {
+
+          const sessionDate = new Date(entry.session.date)
+
+          if(sessionDate >= today && sessionDate < tomorrow){
+
+            if(entry.status === "PRESENT") present++
+            if(entry.status === "ABSENT") absent++
+
+          }
+
+        })
+
+      })
+
+      return {
+        classId: cls.id,
+        className: cls.name,
+        totalStudents: cls.students.length,
+        present,
+        absent,
+        attendanceRate:
+          cls.students.length > 0
+            ? Math.round((present / cls.students.length) * 100)
+            : 0
+      }
+
+    })
+
+    res.json(result)
+
+  } catch (error) {
+
+    console.error(error)
+
+    res.status(500).json({
+      error: "Failed to load attendance by class"
     })
 
   }
