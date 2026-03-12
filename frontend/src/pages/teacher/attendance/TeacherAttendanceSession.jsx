@@ -80,6 +80,17 @@ export default function TeacherAttendanceSession() {
   const isDraft = session.status === "DRAFT";
 
   // --------------------------------------------------
+  // PRESENT / ABSENT COUNTERS
+  // --------------------------------------------------
+  const presentCount = Object.values(records).filter(
+    (r) => r === "PRESENT"
+  ).length;
+
+  const absentCount = Object.values(records).filter(
+    (r) => r === "ABSENT"
+  ).length;
+
+  // --------------------------------------------------
   // TOGGLE STUDENT STATUS
   // --------------------------------------------------
   function toggleStatus(studentId) {
@@ -183,6 +194,7 @@ export default function TeacherAttendanceSession() {
         </p>
       </div>
 
+      {/* STATUS */}
       <span
         style={{
           background: isDraft ? "#facc15" : "#16a34a",
@@ -200,6 +212,11 @@ export default function TeacherAttendanceSession() {
         </div>
       )}
 
+      {/* COUNTERS */}
+      <div className="font-semibold">
+        Present: {presentCount} | Absent: {absentCount} | Total: {students.length}
+      </div>
+
       {isDraft && (
         <button
           onClick={markAllPresent}
@@ -213,14 +230,24 @@ export default function TeacherAttendanceSession() {
         <table className="w-full border border-gray-200">
           <thead className="bg-gray-100">
             <tr>
+              <th className="text-left p-2 border">#</th>
               <th className="text-left p-2 border">Student</th>
               <th className="text-left p-2 border">Status</th>
             </tr>
           </thead>
 
           <tbody>
-            {students.map((s) => (
-              <tr key={s.id}>
+            {students.map((s, index) => (
+              <tr
+                key={s.id}
+                className={
+                  records[s.id] === "ABSENT"
+                    ? "bg-red-50"
+                    : ""
+                }
+              >
+                <td className="p-2 border">{index + 1}</td>
+
                 <td className="p-2 border">
                   {s.firstName} {s.lastName}
                 </td>
