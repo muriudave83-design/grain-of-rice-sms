@@ -45,14 +45,18 @@ export default function AdminAttendanceClass() {
                   {s.studentName}
                 </td>
 
-                <td
-                  className={`px-4 py-2 font-medium ${
-                    s.status === "PRESENT"
-                      ? "text-green-600"
-                      : "text-red-600"
-                  }`}
-                >
-                  {s.status}
+                <td className="px-4 py-2 border">
+                  <span
+                    className={`px-2 py-1 text-xs rounded font-medium ${
+                      s.status === "PRESENT"
+                        ? "bg-green-100 text-green-800"
+                        : s.status === "ABSENT"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    {s.status}
+                  </span>
                 </td>
 
               </tr>
