@@ -49,6 +49,16 @@ export default function TeacherLayout() {
           >
             Gradebook
           </Link>
+
+          {/* Attendance */}
+          <Link
+            to="/teacher/attendance"
+            className={`block px-3 py-2 rounded ${isActive(
+              "/teacher/attendance"
+            )}`}
+          >
+            Attendance
+          </Link>
         </nav>
       </aside>
 

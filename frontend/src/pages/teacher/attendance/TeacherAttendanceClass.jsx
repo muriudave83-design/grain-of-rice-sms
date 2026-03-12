@@ -23,7 +23,7 @@
             api.post("/attendance/sessions", { classId })
               .then(res =>
                 window.location.href =
-                  `/dashboard/teacher/attendance/session/${res.data.id}`
+                    `/teacher/attendance/session/${res.data.id}`
               )
           }
         >

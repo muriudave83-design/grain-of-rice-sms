@@ -36,6 +36,8 @@ import ScoresEntry from "../pages/teacher/assessments/ScoresEntry";
 import AssessmentReview from "../pages/teacher/assessments/AssessmentReview";
 import EditAssessmentRedirect from "../pages/teacher/assessments/Edit";
 import TeacherGradebook from "../pages/teacher/TeacherGradebook";
+import TeacherAttendanceClass from "../pages/teacher/attendance/TeacherAttendanceClass";
+import TeacherAttendanceSession from "../pages/teacher/attendance/TeacherAttendanceSession";
 
 // =======================
 // PARENT PAGES
@@ -225,6 +227,24 @@ export default function AppRoutes() {
             <Route
               path="/teacher/gradebook"
               element={<TeacherGradebook />}
+            />
+
+            {/* Attendance Redirect */}
+            <Route
+              path="/teacher/attendance"
+              element={<Navigate to="/teacher/attendance/class/1" replace />}
+            />
+
+            {/* Attendance by Class */}
+            <Route
+              path="/teacher/attendance/class/:classId"
+              element={<TeacherAttendanceClass />}
+            />
+
+            {/* Attendance Session */}
+            <Route
+              path="/teacher/attendance/session/:sessionId"
+              element={<TeacherAttendanceSession />}
             />
 
           </Route>
