@@ -3,63 +3,102 @@ import { useParams, Link } from "react-router-dom";
 import api from "../../../services/apiClient";
 
 export default function TeacherAttendanceClass() {
-
   const { classId } = useParams();
   const [sessions, setSessions] = useState([]);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get(`/attendance/classes/${classId}`)
-      .then(res => setSessions(res.data))
-      .catch(err => setError(err.response?.status));
+    api
+      .get(`/attendance/classes/${classId}`)
+      .then((res) => {
+        // Remove duplicate sessions by date (keep latest)
+        const unique = [];
+        const seenDates = new Set();
+        res.data
+          .sort((a, b) => new Date(b.date) - new Date(a.date))
+          .forEach((s) => {
+            const d = new Date(s.date).toDateString();
+            if (!seenDates.has(d)) {
+              seenDates.add(d);
+              unique.push(s);
+            }
+          });
+        setSessions(unique);
+        setLoading(false);
+      })
+      .catch((err) => {
+        setError(err.response?.status);
+        setLoading(false);
+      });
   }, [classId]);
 
+  const startNewSession = async () => {
+    try {
+      const res = await api.post("/attendance/sessions", { classId });
+      window.location.href = `/teacher/attendance/session/${res.data.id}`;
+    } catch (err) {
+      alert("Error starting new session");
+    }
+  };
+
+  if (loading) return <p>Loading attendance sessions...</p>;
   if (error === 403) return <p>Forbidden</p>;
 
-  if (!sessions.length) {
-    return (
-      <button
-        onClick={() =>
-          api.post("/attendance/sessions", { classId })
-            .then(res =>
-              window.location.href =
-                `/teacher/attendance/session/${res.data.id}`
-            )
-        }
-      >
-        Take Attendance
-      </button>
-    );
-  }
-
   return (
-    <div>
+    <div className="space-y-6 p-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Attendance Sessions — Class {classId}</h2>
+        <button
+          onClick={startNewSession}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Start New Session
+        </button>
+      </div>
 
-      <h2>Attendance Sessions</h2>
+      {sessions.length === 0 ? (
+        <p className="mt-4 text-gray-600">No attendance sessions yet.</p>
+      ) : (
+        <div className="overflow-x-auto mt-4">
+          <table className="min-w-full border border-gray-200 rounded">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-4 py-2 text-left">Date</th>
+                <th className="px-4 py-2 text-left">Status</th>
+                <th className="px-4 py-2 text-left">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sessions.map((s) => {
+                const dateStr = new Date(s.date).toDateString();
+                const statusClass =
+                  s.status === "SUBMITTED"
+                    ? "bg-green-500 text-white"
+                    : "bg-yellow-500 text-white";
 
-      {sessions.map(s => (
-
-        <div key={s.id} style={{marginBottom:"10px"}}>
-
-          <span>{new Date(s.date).toDateString()}</span>
-
-          <span style={{marginLeft:"10px"}}>
-            {s.status}
-          </span>
-
-          <Link
-            style={{marginLeft:"10px"}}
-            to={`/teacher/attendance/session/${s.id}`}
-          >
-            <button>
-              {s.status === "DRAFT" ? "Continue" : "View"}
-            </button>
-          </Link>
-
+                return (
+                  <tr key={s.id} className="border-t hover:bg-gray-50">
+                    <td className="px-4 py-2">{dateStr}</td>
+                    <td className="px-4 py-2">
+                      <span className={`px-2 py-1 rounded text-sm ${statusClass}`}>
+                        {s.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <Link to={`/teacher/attendance/session/${s.id}`}>
+                        <button className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+                          {s.status === "DRAFT" ? "Continue" : "View"}
+                        </button>
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-
-      ))}
-
+      )}
     </div>
   );
 }
