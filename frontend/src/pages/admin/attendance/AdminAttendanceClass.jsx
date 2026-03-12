@@ -1,47 +1,70 @@
-import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
 
 export default function AdminAttendanceClass() {
-  const { classId } = useParams();
-  const [sessions, setSessions] = useState([]);
 
-  /**
-   * TEMP DEMO SAFE
-   * ----------------
-   * Attendance API wiring is postponed.
-   * We intentionally neutralize data loading
-   * so the app boots cleanly for the demo.
-   */
+  const { classId } = useParams();
+  const [students, setStudents] = useState([]);
+
   useEffect(() => {
-    // No API call for now — prevents build/runtime failure
-    setSessions([]);
+
+    fetch(`${import.meta.env.VITE_API_URL}/admin/attendance/class/${classId}`)
+      .then((res) => res.json())
+      .then((data) => setStudents(data))
+      .catch((err) => console.error("Failed to load class attendance", err));
+
   }, [classId]);
 
-  if (!sessions.length) {
-    return <p className="text-gray-500">No attendance records.</p>;
-  }
-
   return (
-    <div className="space-y-2">
-      {sessions.map((s) => (
-        <div
-          key={s.id}
-          className="flex justify-between items-center border rounded p-2"
-        >
-          <span>{new Date(s.date).toDateString()}</span>
+    <div className="space-y-6">
 
-          {/* Plain Tailwind status label — no UI libs */}
-          <span
-            className={`px-2 py-1 text-xs rounded font-medium ${
-              s.status === "DRAFT"
-                ? "bg-yellow-100 text-yellow-800"
-                : "bg-green-100 text-green-800"
-            }`}
-          >
-            {s.status}
-          </span>
-        </div>
-      ))}
+      <h2 className="text-lg font-semibold">
+        Class Attendance
+      </h2>
+
+      <div className="overflow-x-auto border rounded">
+
+        <table className="w-full text-sm">
+
+          <thead className="bg-gray-50">
+
+            <tr className="text-left">
+              <th className="px-4 py-2">Student</th>
+              <th className="px-4 py-2">Status</th>
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            {students.map((s) => (
+
+              <tr key={s.studentId} className="border-t">
+
+                <td className="px-4 py-2">
+                  {s.studentName}
+                </td>
+
+                <td
+                  className={`px-4 py-2 font-medium ${
+                    s.status === "PRESENT"
+                      ? "text-green-600"
+                      : "text-red-600"
+                  }`}
+                >
+                  {s.status}
+                </td>
+
+              </tr>
+
+            ))}
+
+          </tbody>
+
+        </table>
+
+      </div>
+
     </div>
   );
 }

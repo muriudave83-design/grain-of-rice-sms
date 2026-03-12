@@ -39,7 +39,13 @@ export default function AdminAttendanceOverview() {
 
             {classes.map((cls) => (
 
-              <tr key={cls.classId} className="border-t">
+              <tr
+                key={cls.classId}
+                className="border-t cursor-pointer hover:bg-gray-50"
+                onClick={() =>
+                  window.location.href = `/dashboard/admin/attendance/${cls.classId}`
+                }
+              >
 
                 <td className="px-4 py-2 font-medium">
                   {cls.className}
