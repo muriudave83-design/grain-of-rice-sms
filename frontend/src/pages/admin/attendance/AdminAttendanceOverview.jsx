@@ -1,27 +1,72 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 
 export default function AdminAttendanceOverview() {
-  const [classId, setClassId] = useState("");
+
+  const [classes, setClasses] = useState([]);
+
+  useEffect(() => {
+
+    fetch(`${import.meta.env.VITE_API_URL}/admin/attendance/by-class`)
+      .then((res) => res.json())
+      .then((data) => setClasses(data))
+      .catch((err) => console.error("Failed to load attendance", err));
+
+  }, []);
 
   return (
-    <div className="space-y-4 max-w-md">
-      {/* Plain input — no UI library */}
-      <input
-        type="text"
-        placeholder="Filter by class ID"
-        value={classId}
-        onChange={(e) => setClassId(e.target.value)}
-        className="w-full border rounded px-3 py-2"
-      />
+    <div className="space-y-6">
 
-      {/* Plain link styled as button */}
-      <Link
-        to={`/dashboard/admin/attendance/class/${classId}`}
-        className="inline-block px-4 py-2 text-sm font-medium rounded bg-blue-600 text-white hover:bg-blue-700"
-      >
-        View Attendance
-      </Link>
+      <h2 className="text-lg font-semibold">
+        Attendance Overview
+      </h2>
+
+      <div className="overflow-x-auto border rounded">
+
+        <table className="w-full text-sm">
+
+          <thead className="bg-gray-50">
+
+            <tr className="text-left">
+              <th className="px-4 py-2">Class</th>
+              <th className="px-4 py-2">Total Students</th>
+              <th className="px-4 py-2">Present</th>
+              <th className="px-4 py-2">Absent</th>
+            </tr>
+
+          </thead>
+
+          <tbody>
+
+            {classes.map((cls) => (
+
+              <tr key={cls.classId} className="border-t">
+
+                <td className="px-4 py-2 font-medium">
+                  {cls.className}
+                </td>
+
+                <td className="px-4 py-2">
+                  {cls.totalStudents}
+                </td>
+
+                <td className="px-4 py-2 text-green-600">
+                  {cls.present}
+                </td>
+
+                <td className="px-4 py-2 text-red-600">
+                  {cls.absent}
+                </td>
+
+              </tr>
+
+            ))}
+
+          </tbody>
+
+        </table>
+
+      </div>
+
     </div>
   );
 }
