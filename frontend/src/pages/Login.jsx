@@ -36,29 +36,39 @@ export default function Login() {
       const res = await axios.post(
         url,
         { email, password },
-        { withCredentials: true, headers: { "Content-Type": "application/json" } }
+        {
+          withCredentials: true,
+          headers: { "Content-Type": "application/json" },
+        }
       );
 
       console.log("✅ LOGIN RESPONSE:", res.data);
 
-      const { token, role, mustChangePassword, ...rest } = res.data;
+      const { token, role, mustChangePassword, user } = res.data;
 
       console.log("👉 ROLE:", role);
       console.log("🔐 mustChangePassword:", mustChangePassword);
+      console.log("👤 USER:", user);
 
       // Persist token
       localStorage.setItem("token", token);
 
-      // Store user in auth context (without assuming data.user exists)
-      login({ role, ...rest, forcePasswordChange: mustChangePassword });
+      // ✅ Correctly store the user in AuthContext
+      login({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: role,
+        forcePasswordChange: mustChangePassword,
+      });
 
-      // PASSWORD ENFORCEMENT
+      // 🔐 PASSWORD ENFORCEMENT
       if (mustChangePassword) {
         navigate("/change-password", { replace: true });
         return;
       }
 
-      // ROLE-BASED REDIRECT
+      // ✅ ROLE-BASED REDIRECT
       switch (role) {
         case "ADMIN":
           navigate("/dashboard/admin", { replace: true });
@@ -75,10 +85,13 @@ export default function Login() {
         default:
           navigate("/", { replace: true });
       }
-
     } catch (err) {
       console.error("❌ LOGIN ERROR:", err);
-      setError(err?.response?.data?.message || err?.message || "Login failed");
+      setError(
+        err?.response?.data?.message ||
+        err?.message ||
+        "Login failed"
+      );
     } finally {
       setLoading(false);
     }
@@ -86,10 +99,19 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow w-full max-w-sm">
-        <h1 className="text-xl font-semibold mb-4 text-center">Login</h1>
+      <form
+        onSubmit={handleSubmit}
+        className="bg-white p-6 rounded shadow w-full max-w-sm"
+      >
+        <h1 className="text-xl font-semibold mb-4 text-center">
+          Login
+        </h1>
 
-        {error && <div className="mb-3 text-sm text-red-600">{error}</div>}
+        {error && (
+          <div className="mb-3 text-sm text-red-600">
+            {error}
+          </div>
+        )}
 
         <div className="mb-3">
           <label className="block text-sm mb-1">Email</label>
