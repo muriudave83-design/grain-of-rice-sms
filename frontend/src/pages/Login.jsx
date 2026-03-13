@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
-import { getHomeRouteForRole } from "../utils/roleRedirect";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -29,10 +28,7 @@ export default function Login() {
 
     try {
       const API_URL = import.meta.env.VITE_API_URL;
-
-      if (!API_URL) {
-        throw new Error("VITE_API_URL is not defined");
-      }
+      if (!API_URL) throw new Error("VITE_API_URL is not defined");
 
       const url = `${API_URL}/auth/login`;
       console.log("🚀 Calling API:", url);
@@ -40,12 +36,7 @@ export default function Login() {
       const res = await axios.post(
         url,
         { email, password },
-        {
-          withCredentials: true,
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+        { withCredentials: true, headers: { "Content-Type": "application/json" } }
       );
 
       console.log("✅ LOGIN RESPONSE:", res.data);
@@ -59,44 +50,35 @@ export default function Login() {
       localStorage.setItem("token", token);
 
       // Store user in auth context INCLUDING password flag
-      login({
-        ...user,
-        forcePasswordChange: mustChangePassword,
-      });
+      login({ ...user, forcePasswordChange: mustChangePassword });
 
-      /**
-       * 🔐 PASSWORD ENFORCEMENT
-       * If backend requires password change,
-       * user MUST go to change-password page.
-       */
+      // PASSWORD ENFORCEMENT
       if (mustChangePassword) {
         navigate("/change-password", { replace: true });
         return;
       }
 
-      /**
-       * ✅ EXISTING REDIRECT LOGIC (UNCHANGED)
-       */
-      const fromLocation = location.state?.from;
-      const home = getHomeRouteForRole(user.role);
-
-      if (user.role === "PARENT") {
-        navigate("/parent", { replace: true });
-      } else if (fromLocation?.pathname) {
-        const redirectTo =
-          fromLocation.pathname + (fromLocation.search || "");
-        navigate(redirectTo, { replace: true });
-      } else {
-        navigate(home, { replace: true });
+      // ROLE-BASED REDIRECT
+      switch (user.role) {
+        case "ADMIN":
+          navigate("/dashboard/admin", { replace: true });
+          break;
+        case "TEACHER":
+          navigate("/dashboard/teacher", { replace: true });
+          break;
+        case "PARENT":
+          navigate("/dashboard/parent", { replace: true });
+          break;
+        case "STUDENT":
+          navigate("/dashboard/student", { replace: true });
+          break;
+        default:
+          navigate("/", { replace: true });
       }
 
     } catch (err) {
       console.error("❌ LOGIN ERROR:", err);
-      setError(
-        err?.response?.data?.message ||
-        err?.message ||
-        "Login failed"
-      );
+      setError(err?.response?.data?.message || err?.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -104,19 +86,10 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-6 rounded shadow w-full max-w-sm"
-      >
-        <h1 className="text-xl font-semibold mb-4 text-center">
-          Login
-        </h1>
+      <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow w-full max-w-sm">
+        <h1 className="text-xl font-semibold mb-4 text-center">Login</h1>
 
-        {error && (
-          <div className="mb-3 text-sm text-red-600">
-            {error}
-          </div>
-        )}
+        {error && <div className="mb-3 text-sm text-red-600">{error}</div>}
 
         <div className="mb-3">
           <label className="block text-sm mb-1">Email</label>
