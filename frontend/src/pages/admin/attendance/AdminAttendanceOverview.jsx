@@ -31,6 +31,7 @@ export default function AdminAttendanceOverview() {
               <th className="px-4 py-2">Total Students</th>
               <th className="px-4 py-2">Present</th>
               <th className="px-4 py-2">Absent</th>
+              <th className="px-4 py-2">Attendance %</th>
             </tr>
 
           </thead>
@@ -61,6 +62,10 @@ export default function AdminAttendanceOverview() {
 
                 <td className="px-4 py-2 text-red-600">
                   {cls.absent}
+                </td>
+
+                <td className="px-4 py-2">
+                  {cls.attendanceRate}%
                 </td>
 
               </tr>
