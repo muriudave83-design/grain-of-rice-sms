@@ -107,10 +107,12 @@ router.get("/by-class", async (req, res) => {
 
     const result = classes.map(cls => {
 
+      const students = cls.students
+
       let present = 0
       let absent = 0
 
-      cls.students.forEach(student => {
+      students.forEach(student => {
 
         student.attendanceEntries.forEach(entry => {
 
@@ -130,13 +132,13 @@ router.get("/by-class", async (req, res) => {
       return {
         classId: cls.id,
         className: cls.name,
-        totalStudents: cls.students.length,
+        totalStudents: students.length,
         present,
         absent,
         attendanceRate:
-          cls.students.length > 0
-            ? Math.round((present / cls.students.length) * 100)
-            : 0
+          students.length === 0
+            ? 0
+            : Math.round((present / students.length) * 100)
       }
 
     })
