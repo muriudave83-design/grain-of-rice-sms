@@ -48,29 +48,10 @@ export default function ChangePassword() {
         { withCredentials: true }
       );
 
-      // ✅ Role-based redirect after password change
-      const role = user?.role;
+      localStorage.removeItem("token");
+      navigate("/login", { replace: true });
+      return;
 
-      switch (role) {
-        case "ADMIN":
-          navigate("/admin", { replace: true });
-          break;
-
-        case "TEACHER":
-          navigate("/teacher", { replace: true });
-          break;
-
-        case "PARENT":
-          navigate("/parent", { replace: true });
-          break;
-
-        case "STUDENT":
-          navigate("/student", { replace: true });
-          break;
-
-        default:
-          navigate("/", { replace: true });
-      }
     } catch (err: any) {
       setError(err.response?.data?.message || "Password change failed.");
     } finally {
