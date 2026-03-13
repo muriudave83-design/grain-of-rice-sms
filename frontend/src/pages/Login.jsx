@@ -41,16 +41,16 @@ export default function Login() {
 
       console.log("✅ LOGIN RESPONSE:", res.data);
 
-      const { user, token, mustChangePassword } = res.data;
+      const { token, role, mustChangePassword, ...rest } = res.data;
 
-      console.log("👉 ROLE:", user.role);
+      console.log("👉 ROLE:", role);
       console.log("🔐 mustChangePassword:", mustChangePassword);
 
       // Persist token
       localStorage.setItem("token", token);
 
-      // Store user in auth context INCLUDING password flag
-      login({ ...user, forcePasswordChange: mustChangePassword });
+      // Store user in auth context (without assuming data.user exists)
+      login({ role, ...rest, forcePasswordChange: mustChangePassword });
 
       // PASSWORD ENFORCEMENT
       if (mustChangePassword) {
@@ -59,7 +59,7 @@ export default function Login() {
       }
 
       // ROLE-BASED REDIRECT
-      switch (user.role) {
+      switch (role) {
         case "ADMIN":
           navigate("/dashboard/admin", { replace: true });
           break;
