@@ -68,20 +68,24 @@ export default function Login() {
         return;
       }
 
-      // ✅ ROLE-BASED REDIRECT
+      // ✅ ROLE-BASED REDIRECT (paths fixed)
       switch (role) {
         case "ADMIN":
-          navigate("/dashboard/admin", { replace: true });
+          navigate("/admin", { replace: true });
           break;
+
         case "TEACHER":
-          navigate("/dashboard/teacher", { replace: true });
+          navigate("/teacher", { replace: true }); // <-- fixed
           break;
+
         case "PARENT":
-          navigate("/dashboard/parent", { replace: true });
+          navigate("/parent", { replace: true });
           break;
+
         case "STUDENT":
-          navigate("/dashboard/student", { replace: true });
+          navigate("/student", { replace: true });
           break;
+
         default:
           navigate("/", { replace: true });
       }
@@ -89,8 +93,8 @@ export default function Login() {
       console.error("❌ LOGIN ERROR:", err);
       setError(
         err?.response?.data?.message ||
-        err?.message ||
-        "Login failed"
+          err?.message ||
+          "Login failed"
       );
     } finally {
       setLoading(false);
