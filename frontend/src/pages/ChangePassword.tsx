@@ -1,9 +1,11 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { useAuth } from "../context/AuthContext";
 
 export default function ChangePassword() {
   const navigate = useNavigate();
+  const { user } = useAuth() as { user: { role: string } | null };
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -46,11 +48,31 @@ export default function ChangePassword() {
         { withCredentials: true }
       );
 
-      navigate("/dashboard");
+      // ✅ Role-based redirect after password change
+      const role = user?.role;
+
+      switch (role) {
+        case "ADMIN":
+          navigate("/admin", { replace: true });
+          break;
+
+        case "TEACHER":
+          navigate("/teacher", { replace: true });
+          break;
+
+        case "PARENT":
+          navigate("/parent", { replace: true });
+          break;
+
+        case "STUDENT":
+          navigate("/student", { replace: true });
+          break;
+
+        default:
+          navigate("/", { replace: true });
+      }
     } catch (err: any) {
-      setError(
-        err.response?.data?.message || "Password change failed."
-      );
+      setError(err.response?.data?.message || "Password change failed.");
     } finally {
       setLoading(false);
     }
