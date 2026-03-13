@@ -129,16 +129,20 @@ router.get("/by-class", async (req, res) => {
 
       })
 
+      const totalStudents = students.length
+      const notMarked = totalStudents - (present + absent)
+
       return {
         classId: cls.id,
         className: cls.name,
-        totalStudents: students.length,
+        totalStudents,
         present,
         absent,
+        notMarked,
         attendanceRate:
-          students.length === 0
-            ? 0
-            : Math.round((present / students.length) * 100)
+          totalStudents === 0 || notMarked === totalStudents
+            ? null
+            : Math.round((present / totalStudents) * 100),
       }
 
     })
