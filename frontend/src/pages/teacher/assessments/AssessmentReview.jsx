@@ -64,7 +64,7 @@ export default function AssessmentReview() {
 
     if (
       !window.confirm(
-        "This will submit and LOCK the assessment. Grades cannot be changed. Continue?"
+        "Submit scores for this assessment? You can still edit scores later if corrections are needed."
       )
     ) {
       return;
@@ -160,11 +160,20 @@ export default function AssessmentReview() {
       {isSubmitted ? (
         <div className="bg-green-50 border border-green-200 p-4 rounded">
           <p className="font-semibold text-green-700">
-            🔒 Scores submitted and locked
+            ✅ Scores submitted successfully
           </p>
           <p className="text-green-700 text-sm">
-            These scores are final and cannot be changed.
+            Teachers can still edit scores if corrections are needed.
           </p>
+
+          <button
+            onClick={() =>
+              navigate(`/teacher/assessments/${assessmentId}/scores`)
+            }
+            className="mt-3 border px-4 py-1 rounded hover:bg-gray-50"
+          >
+            Edit Scores
+          </button>
         </div>
       ) : (
         <>
