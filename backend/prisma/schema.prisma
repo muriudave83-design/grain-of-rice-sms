@@ -7,6 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum AssessmentType {
+  HOMEWORK
+  QUIZ
+  TEST
+  PROJECT
+  EXAM
+}
+
 model User {
   id                 Int                 @id @default(autoincrement())
   name               String
@@ -143,7 +151,7 @@ model Assessment {
   classId     Int
   termId      Int
   date        DateTime
-  type        String
+  type        AssessmentType
   weight      Float
   maxScore    Float
   isPublished Boolean             @default(false)
@@ -155,6 +163,9 @@ model Assessment {
   subject     Subject             @relation(fields: [subjectId], references: [id])
   term        Term                @relation(fields: [termId], references: [id])
   scores      AssessmentScore[]
+
+  @@index([classId, subjectId])
+  @@index([termId])
 }
 
 model AssessmentScore {
@@ -167,6 +178,7 @@ model AssessmentScore {
   student      Student    @relation(fields: [studentId], references: [id])
 
   @@unique([assessmentId, studentId])
+  @@index([studentId])
 }
 
 model Grade {

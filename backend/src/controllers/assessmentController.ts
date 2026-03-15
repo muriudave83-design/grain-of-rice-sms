@@ -12,16 +12,10 @@ export const createAssessment = async (req: Request, res: Response) => {
     console.log("BODY:", req.body);
     console.log("USER:", req.user);
 
-    /**
-     * 🔐 Bulletproof authentication
-     */
     if (!req.user || !req.user.id) {
       return res.status(401).json({ error: "Unauthorized teacher" });
     }
 
-    /**
-     * 🔢 Normalize IDs safely
-     */
     const teacherId = Number(req.user.id);
     const subjectId = Number(req.body.subjectId);
     const classId = Number(req.body.classId);
@@ -34,9 +28,6 @@ export const createAssessment = async (req: Request, res: Response) => {
     const weight = Number(req.body.weight ?? 0);
     const date = req.body.date ? new Date(req.body.date) : new Date();
 
-    /**
-     * Required validation
-     */
     if (
       !subjectId ||
       !classId ||
@@ -57,20 +48,8 @@ export const createAssessment = async (req: Request, res: Response) => {
       });
     }
 
-    console.log("ASSESSMENT REQUEST:", {
-      teacherId,
-      subjectId,
-      classId,
-    });
-
-    /**
-     * 🚀 ENTERPRISE-SAFE ATOMIC CREATION
-     */
     const assessment = await prisma.$transaction(async (tx) => {
 
-      /**
-       * 🔐 Teacher assignment validation
-       */
       const assignment = await tx.teacherSubject.findFirst({
         where: {
           teacherId,
@@ -85,9 +64,6 @@ export const createAssessment = async (req: Request, res: Response) => {
         );
       }
 
-      /**
-       * ⚖️ Weight validation
-       */
       const existing = await tx.assessment.aggregate({
         where: {
           subjectId,
@@ -103,9 +79,6 @@ export const createAssessment = async (req: Request, res: Response) => {
         throw new Error("Weight limit exceeded");
       }
 
-      /**
-       * ✅ Create assessment
-       */
       return tx.assessment.create({
         data: {
           subjectId,
@@ -122,10 +95,10 @@ export const createAssessment = async (req: Request, res: Response) => {
       });
     });
 
-    console.log("ASSESSMENT CREATED:", assessment.id);
-
     return res.json(assessment);
+
   } catch (err: any) {
+
     console.error("CREATE ASSESSMENT ERROR:", err);
 
     if (err.message === "Weight limit exceeded") {
@@ -143,48 +116,115 @@ export const createAssessment = async (req: Request, res: Response) => {
 };
 
 /**
- * Record a student's score (ONLY if assessment is DRAFT)
+ * Record or update a student's score
+ * PROFESSIONAL SECURE VERSION
  */
 export const setStudentScore = async (req: Request, res: Response) => {
   try {
-    const { assessmentId, studentId, score } = req.body;
 
-    const assessment = await prisma.assessment.findUnique({
-      where: { id: assessmentId },
-    });
-
-    if (!assessment) {
-      return res.status(404).json({ error: "Assessment not found" });
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Unauthorized teacher" });
     }
 
-    if (assessment.status !== AssessmentStatus.DRAFT) {
-      return res.status(409).json({
-        error: "Assessment is submitted and cannot be modified",
+    const teacherId = Number(req.user.id);
+    const assessmentId = Number(req.body.assessmentId);
+    const studentId = Number(req.body.studentId);
+    const score = Number(req.body.score);
+
+    const result = await prisma.$transaction(async (tx) => {
+
+      const assessment = await tx.assessment.findUnique({
+        where: { id: assessmentId },
       });
-    }
 
-    const record = await prisma.assessmentScore.upsert({
-      where: {
-        assessmentId_studentId: { assessmentId, studentId },
-      },
-      update: { score },
-      create: { assessmentId, studentId, score },
+      if (!assessment) {
+        throw new Error("Assessment not found");
+      }
+
+      /**
+       * SECURITY: ensure teacher owns this class + subject
+       */
+      const assignment = await tx.teacherSubject.findFirst({
+        where: {
+          teacherId,
+          subjectId: assessment.subjectId,
+          classId: assessment.classId,
+        },
+      });
+
+      if (!assignment) {
+        throw new Error("Not authorized to modify this assessment");
+      }
+
+      /**
+       * VALIDATE SCORE RANGE
+       */
+      if (score < 0) {
+        throw new Error("Score cannot be negative");
+      }
+
+      if (score > assessment.maxScore) {
+        throw new Error("Score exceeds maximum allowed");
+      }
+
+      /**
+       * UPSERT SCORE
+       */
+      const record = await tx.assessmentScore.upsert({
+        where: {
+          assessmentId_studentId: {
+            assessmentId,
+            studentId,
+          },
+        },
+        update: { score },
+        create: {
+          assessmentId,
+          studentId,
+          score,
+        },
+      });
+
+      /**
+       * RECALCULATE FINAL GRADE
+       */
+      await recalculateFinalGrade(studentId, assessmentId, tx);
+
+      return record;
     });
 
-    await recalculateFinalGrade(studentId, assessmentId);
+    res.json(result);
 
-    res.json(record);
-  } catch (err) {
+  } catch (err: any) {
+
     console.error(err);
+
+    if (err.message === "Assessment not found") {
+      return res.status(404).json({ error: err.message });
+    }
+
+    if (err.message === "Not authorized to modify this assessment") {
+      return res.status(403).json({ error: err.message });
+    }
+
+    if (err.message === "Score cannot be negative") {
+      return res.status(400).json({ error: err.message });
+    }
+
+    if (err.message === "Score exceeds maximum allowed") {
+      return res.status(400).json({ error: err.message });
+    }
+
     res.status(500).json({ error: "Failed to set score" });
   }
 };
 
 /**
- * Submit assessment (LOCKS IT)
+ * Submit assessment
  */
 export const submitAssessment = async (req: Request, res: Response) => {
   try {
+
     const assessmentId = Number(req.params.id);
     const teacherId = Number(req.user!.id);
 
@@ -205,12 +245,6 @@ export const submitAssessment = async (req: Request, res: Response) => {
     });
 
     if (!assignment) {
-      console.error("TEACHER SUBMIT BLOCKED", {
-        teacherId,
-        subjectId: assessment.subjectId,
-        classId: assessment.classId,
-      });
-
       return res.status(403).json({
         message:
           "You are not assigned to submit assessments for this class and subject.",
@@ -236,6 +270,7 @@ export const submitAssessment = async (req: Request, res: Response) => {
     );
 
     return res.json({ message: "Assessment submitted successfully" });
+
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to submit assessment" });
@@ -247,9 +282,11 @@ export const submitAssessment = async (req: Request, res: Response) => {
  */
 const recalculateFinalGrade = async (
   studentId: number,
-  assessmentId: number
+  assessmentId: number,
+  tx: any = prisma
 ) => {
-  const assessment = await prisma.assessment.findUnique({
+
+  const assessment = await tx.assessment.findUnique({
     where: { id: assessmentId },
   });
 
@@ -258,7 +295,7 @@ const recalculateFinalGrade = async (
   const subjectId = assessment.subjectId;
   const termId = assessment.termId;
 
-  const scores = await prisma.assessmentScore.findMany({
+  const scores = await tx.assessmentScore.findMany({
     where: {
       studentId,
       assessment: {
@@ -272,13 +309,14 @@ const recalculateFinalGrade = async (
   let finalScore = 0;
 
   for (const record of scores) {
+
     if (!record.assessment.maxScore) continue;
 
     const percent = record.score / record.assessment.maxScore;
     finalScore += percent * record.assessment.weight;
   }
 
-  await prisma.grade.upsert({
+  await tx.grade.upsert({
     where: {
       studentId_subjectId_termId: {
         studentId,
@@ -304,10 +342,11 @@ const recalculateFinalGrade = async (
  * Teacher gradebook
  */
 export const getGradebook = async (req: Request, res: Response) => {
-  const { subjectId } = req.params;
+
+  const subjectId = Number(req.params.subjectId);
 
   const assessments = await prisma.assessment.findMany({
-    where: { subjectId: Number(subjectId) },
+    where: { subjectId },
     include: {
       scores: { include: { student: true } },
     },
@@ -321,15 +360,16 @@ export const getGradebook = async (req: Request, res: Response) => {
  * Parent gradebook
  */
 export const getParentGradebook = async (req: Request, res: Response) => {
-  const { studentId } = req.params;
+
+  const studentId = Number(req.params.studentId);
 
   const assessments = await prisma.assessment.findMany({
     where: {
-      scores: { some: { studentId: Number(studentId) } },
+      scores: { some: { studentId } },
       status: AssessmentStatus.SUBMITTED,
     },
     include: {
-      scores: { where: { studentId: Number(studentId) } },
+      scores: { where: { studentId } },
     },
   });
 
@@ -340,7 +380,9 @@ export const getParentGradebook = async (req: Request, res: Response) => {
  * Missing assignments
  */
 export const getMissingAssignments = async (req: Request, res: Response) => {
-  const { studentId } = req.params;
-  const missing = await getMissingAssignmentsForStudent(Number(studentId));
+
+  const studentId = Number(req.params.studentId);
+  const missing = await getMissingAssignmentsForStudent(studentId);
+
   res.json(missing);
 };
