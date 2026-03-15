@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
 import { AssessmentStatus } from "@prisma/client";
 import { getMissingAssignmentsForStudent } from "../utils/missingAssignments";
+import { generateReportCards } from "../utils/reportCardGenerator";
 
 /**
  * Create an assessment (DRAFT only)
@@ -202,7 +203,10 @@ export const submitAssessment = async (req: Request, res: Response) => {
         status: AssessmentStatus.SUBMITTED,
       },
     });
-
+    await generateReportCards(
+      assessment.termId,
+      assessment.classId
+    );
     return res.json({ message: "Assessment submitted successfully" });
   } catch (err) {
     console.error(err);
