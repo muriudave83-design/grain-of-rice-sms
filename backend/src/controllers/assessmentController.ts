@@ -30,13 +30,13 @@ export const createAssessment = async (req: Request, res: Response) => {
 
     // Required validation (date optional)
     if (
-      !subjectId ||
-      !classId ||
-      !termId ||
+      !Number(subjectId) ||
+      !Number(classId) ||
+      !Number(termId) ||
       !title ||
       !type ||
-      !maxScore ||
-      !categoryId
+      !Number(maxScore) ||
+      !Number(categoryId)
     ) {
       return res.status(400).json({
         error: "Missing required fields",
@@ -50,22 +50,37 @@ export const createAssessment = async (req: Request, res: Response) => {
     }
 
     /**
+     * 🔎 DEBUG — SEE WHAT FRONTEND SENDS
+     */
+    console.log("ASSESSMENT REQUEST:", {
+      teacherId: req.user.id,
+      subjectId,
+      classId,
+    });
+
+    /**
      * 🔐 TEACHER PERMISSION CHECK
      */
-
     const assignment = await prisma.teacherSubject.findFirst({
       where: {
-        teacherId: req.user.id,
-        subjectId: subjectId,
-        classId: classId,
+        teacherId: Number(req.user.id),
+        subjectId: Number(subjectId),
+        classId: Number(classId),
       },
     });
 
     console.log("ASSIGNMENT FOUND:", assignment);
 
     if (!assignment) {
+      console.error("TEACHER ASSIGNMENT NOT FOUND", {
+        teacherId: req.user.id,
+        subjectId,
+        classId,
+      });
+
       return res.status(403).json({
-        error: "Forbidden: teacher not assigned to this class and subject",
+        error:
+          "You are not assigned to teach this subject for this class. Contact the administrator.",
       });
     }
 
@@ -112,7 +127,6 @@ export const createAssessment = async (req: Request, res: Response) => {
     console.log("ASSESSMENT CREATED:", assessment.id);
 
     return res.json(assessment);
-
   } catch (err) {
     console.error("CREATE ASSESSMENT ERROR:", err);
     return res.status(500).json({
@@ -165,7 +179,7 @@ export const setStudentScore = async (req: Request, res: Response) => {
 export const submitAssessment = async (req: Request, res: Response) => {
   try {
     const assessmentId = Number(req.params.id);
-    const teacherId = req.user!.id;
+    const teacherId = Number(req.user!.id);
 
     const assessment = await prisma.assessment.findUnique({
       where: { id: assessmentId },
@@ -175,20 +189,25 @@ export const submitAssessment = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Assessment not found" });
     }
 
-    /**
-     * 🔐 TEACHER PERMISSION CHECK
-     */
-
     const assignment = await prisma.teacherSubject.findFirst({
       where: {
-        teacherId,
-        subjectId: assessment.subjectId,
-        classId: assessment.classId,
+        teacherId: Number(teacherId),
+        subjectId: Number(assessment.subjectId),
+        classId: Number(assessment.classId),
       },
     });
 
     if (!assignment) {
-      return res.status(403).json({ message: "Not authorized" });
+      console.error("TEACHER SUBMIT BLOCKED", {
+        teacherId,
+        subjectId: assessment.subjectId,
+        classId: assessment.classId,
+      });
+
+      return res.status(403).json({
+        message:
+          "You are not assigned to submit assessments for this class and subject.",
+      });
     }
 
     if (assessment.status !== AssessmentStatus.DRAFT) {
@@ -203,10 +222,12 @@ export const submitAssessment = async (req: Request, res: Response) => {
         status: AssessmentStatus.SUBMITTED,
       },
     });
+
     await generateReportCards(
       assessment.termId,
       assessment.classId
     );
+
     return res.json({ message: "Assessment submitted successfully" });
   } catch (err) {
     console.error(err);
