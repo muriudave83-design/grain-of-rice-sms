@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "@/services/apiClient";
 
@@ -13,13 +13,15 @@ export default function ScoresEntry() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // refs for ENTER navigation
+  const inputRefs = useRef([]);
+
   useEffect(() => {
     load();
   }, []);
 
   async function load() {
     try {
-      // ✅ FIXED ROUTE
       const res = await api.get(`/assessments/${id}/scores`);
 
       setAssessment(res.data.assessment);
@@ -42,23 +44,17 @@ export default function ScoresEntry() {
   }
 
   async function save() {
-    if (assessment.status === "SUBMITTED") {
-      alert("Assessment is locked.");
-      return;
-    }
-
     const payload = students.map((s) => ({
       studentId: s.id,
       score: Number(scores[s.id] || 0),
     }));
 
     try {
-      // ✅ FIXED ROUTE
       await api.post(`/assessments/${id}/scores`, {
         scores: payload,
       });
 
-      alert("Saved");
+      alert("Scores saved");
     } catch (err) {
       alert("Failed to save scores");
     }
@@ -69,10 +65,19 @@ export default function ScoresEntry() {
 
     try {
       await api.post(`/assessments/${id}/submit`);
-      alert("Locked");
+      alert("Assessment submitted");
       navigate("/teacher/assessments");
     } catch (err) {
       alert("Failed to submit");
+    }
+  }
+
+  function handleEnter(e, index) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+
+      const next = inputRefs.current[index + 1];
+      if (next) next.focus();
     }
   }
 
@@ -86,21 +91,15 @@ export default function ScoresEntry() {
     );
   }
 
-  const locked = assessment.status === "SUBMITTED";
-
   return (
     <div className="p-6 max-w-4xl mx-auto">
+
       <h1 className="text-xl font-bold mb-4">
         Scores — {assessment.title}
       </h1>
 
-      {locked && (
-        <div className="bg-red-50 text-red-700 p-3 mb-4">
-          Assessment is locked — read only
-        </div>
-      )}
-
       <table className="w-full text-sm border">
+
         <thead>
           <tr className="bg-gray-50">
             <th className="p-2 text-left">Student</th>
@@ -111,19 +110,24 @@ export default function ScoresEntry() {
         </thead>
 
         <tbody>
-          {students.map((s) => (
+          {students.map((s, index) => (
             <tr key={s.id} className="border-t">
+
               <td className="p-2">
                 {s.firstName} {s.lastName}
               </td>
 
               <td className="p-2">
+
                 <input
+                  ref={(el) => (inputRefs.current[index] = el)}
                   type="number"
                   className="border p-1 w-full"
-                  disabled={locked}
                   value={scores[s.id] ?? ""}
                   max={assessment.maxScore}
+
+                  onKeyDown={(e) => handleEnter(e, index)}
+
                   onChange={(e) => {
                     let value = Number(e.target.value);
 
@@ -138,29 +142,33 @@ export default function ScoresEntry() {
                     });
                   }}
                 />
+
               </td>
+
             </tr>
           ))}
         </tbody>
+
       </table>
 
-      {!locked && (
-        <div className="mt-4 space-x-3">
-          <button
-            onClick={save}
-            className="px-4 py-2 bg-blue-600 text-white"
-          >
-            Save Draft
-          </button>
+      <div className="mt-4 space-x-3">
 
-          <button
-            onClick={submit}
-            className="px-4 py-2 bg-green-600 text-white"
-          >
-            Submit & Lock
-          </button>
-        </div>
-      )}
+        <button
+          onClick={save}
+          className="px-4 py-2 bg-blue-600 text-white"
+        >
+          Save
+        </button>
+
+        <button
+          onClick={submit}
+          className="px-4 py-2 bg-green-600 text-white"
+        >
+          Submit Assessment
+        </button>
+
+      </div>
+
     </div>
   );
 }
