@@ -19,6 +19,7 @@ console.log("✅ assessmentRoutes LOADED");
  * ============================================================
  * CREATE ASSESSMENT
  * ============================================================
+ * Homework support is handled inside createAssessment controller
  */
 router.post(
   "/",
