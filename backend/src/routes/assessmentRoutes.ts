@@ -8,6 +8,7 @@ import { requireRole } from "../middlewares/rolesMiddleware";
 import { requireTeacherAssignment } from "../middlewares/teacherAssignmentGuard";
 import { Role } from "@prisma/client";
 import { computeGradesForSubject } from "../services/grade.service";
+import { generateReportCardsForClass } from "../services/reportCard.service";
 import { createAssessment } from "../controllers/assessmentController";
 
 const router = Router();
@@ -282,7 +283,7 @@ router.post(
     );
 
     /**
-     * ⭐ Recalculate grades after any score change
+     * Recalculate grades after score change
      */
     await computeGradesForSubject({
       classId: assessment.classId,
@@ -328,13 +329,24 @@ router.patch(
       data: { status: "SUBMITTED" }
     });
 
+    /**
+     * 1️⃣ Compute grades
+     */
     await computeGradesForSubject({
       classId: assessment.classId,
       subjectId: assessment.subjectId,
       termId: assessment.termId
     });
 
-    res.json({ message: "Assessment submitted" });
+    /**
+     * 2️⃣ Generate report cards
+     */
+    await generateReportCardsForClass({
+      classId: assessment.classId,
+      termId: assessment.termId
+    });
+
+    res.json({ message: "Assessment submitted and report cards generated" });
   }
 );
 
@@ -372,9 +384,20 @@ router.post(
       data: { status: "SUBMITTED" }
     });
 
+    /**
+     * 1️⃣ Compute grades
+     */
     await computeGradesForSubject({
       classId: assessment.classId,
       subjectId: assessment.subjectId,
+      termId: assessment.termId
+    });
+
+    /**
+     * 2️⃣ Generate report cards
+     */
+    await generateReportCardsForClass({
+      classId: assessment.classId,
       termId: assessment.termId
     });
 
