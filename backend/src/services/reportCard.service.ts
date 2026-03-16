@@ -10,6 +10,8 @@ export async function generateReportCardsForClass({
   termId,
 }: GenerateReportCardsInput) {
 
+  console.log("🚀 REPORT CARD GENERATION STARTED", { classId, termId });
+
   return prisma.$transaction(async (tx) => {
 
     /**
@@ -20,7 +22,10 @@ export async function generateReportCardsForClass({
       select: { id: true },
     });
 
+    console.log("👩‍🎓 STUDENTS IN CLASS:", students.length);
+
     if (students.length === 0) {
+      console.log("⚠️ No students found for class");
       return { generated: 0 };
     }
 
@@ -36,6 +41,8 @@ export async function generateReportCardsForClass({
       },
     });
 
+    console.log("📊 GRADES FOUND:", grades.length);
+
     if (grades.length === 0) {
       console.log("⚠️ No grades found for report card generation");
       return { generated: 0 };
@@ -47,9 +54,11 @@ export async function generateReportCardsForClass({
     const gradesByStudent = new Map<number, typeof grades>();
 
     for (const g of grades) {
+
       if (!gradesByStudent.has(g.studentId)) {
         gradesByStudent.set(g.studentId, []);
       }
+
       gradesByStudent.get(g.studentId)!.push(g);
     }
 
@@ -63,6 +72,7 @@ export async function generateReportCardsForClass({
       const studentGrades = gradesByStudent.get(student.id);
 
       if (!studentGrades || studentGrades.length === 0) {
+        console.log(`⚠️ Student ${student.id} has no grades`);
         continue;
       }
 
@@ -79,6 +89,7 @@ export async function generateReportCardsForClass({
       });
 
       if (existing && existing.status === "PUBLISHED") {
+        console.log(`⚠️ Report card already published for student ${student.id}`);
         continue;
       }
 
@@ -125,7 +136,7 @@ export async function generateReportCardsForClass({
       });
 
       /**
-       * Batch insert subject entries
+       * Insert subject entries
        */
       await tx.reportCardSubjectEntry.createMany({
         data: studentGrades.map((g) => ({
@@ -136,10 +147,12 @@ export async function generateReportCardsForClass({
         })),
       });
 
+      console.log(`✅ Report card generated for student ${student.id}`);
+
       generatedCount++;
     }
 
-    console.log(`✅ Generated ${generatedCount} report cards`);
+    console.log(`🎯 FINAL REPORT CARDS GENERATED: ${generatedCount}`);
 
     return { generated: generatedCount };
 
