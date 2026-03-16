@@ -7,6 +7,7 @@ import { requireRole } from "../middlewares/rolesMiddleware";
 import { Role } from "@prisma/client";
 
 import { generateReportCardsForClass } from "../services/reportCard.service";
+import { computeGradesForSubject } from "../services/grade.service";
 
 const router = Router();
 
@@ -20,93 +21,97 @@ router.get(
   authenticate,
   requireRole([Role.TEACHER]),
   async (req, res) => {
+    try {
+      console.log("🔥 SCORES ROUTE HIT");
+      console.log("PARAM ID =", req.params.id);
+      console.log("USER =", req.user);
 
-    console.log("🔥 SCORES ROUTE HIT");
-    console.log("PARAM ID =", req.params.id);
-    console.log("USER =", req.user);
+      const id = Number(req.params.id);
+      const user = req.user!;
 
-    const id = Number(req.params.id);
-    const user = req.user!;
-
-    const assessment = await prisma.assessment.findUnique({
-      where: { id },
-      include: {
-        subject: true,
-        scores: true,
-      },
-    });
-
-    if (!assessment) {
-      return res.status(404).json({ message: "Assessment not found" });
-    }
-
-    if (!assessment.classId) {
-      return res.status(400).json({
-        message: "Assessment is not linked to a class",
+      const assessment = await prisma.assessment.findUnique({
+        where: { id },
+        include: {
+          subject: true,
+          scores: true,
+        },
       });
-    }
 
-    /**
-     * OWNERSHIP CHECK
-     */
-    if (assessment.subject.teacherId !== user.id) {
-      return res.status(403).json({
-        message: "You are not allowed to access this assessment.",
+      if (!assessment) {
+        return res.status(404).json({ message: "Assessment not found" });
+      }
+
+      if (!assessment.classId) {
+        return res.status(400).json({
+          message: "Assessment is not linked to a class",
+        });
+      }
+
+      /**
+       * OWNERSHIP CHECK
+       */
+      if (assessment.subject.teacherId !== user.id) {
+        return res.status(403).json({
+          message: "You are not allowed to access this assessment.",
+        });
+      }
+
+      /**
+       * CLASS ↔ SUBJECT LINK CHECK
+       */
+      const link = await prisma.classSubject.findFirst({
+        where: {
+          classId: assessment.classId,
+          subjectId: assessment.subjectId,
+        },
       });
-    }
 
-    /**
-     * CLASS ↔ SUBJECT LINK CHECK
-     */
-    const link = await prisma.classSubject.findFirst({
-      where: {
-        classId: assessment.classId,
-        subjectId: assessment.subjectId,
-      },
-    });
+      if (!link) {
+        return res.status(403).json({
+          message: "You are not allowed to access this assessment.",
+        });
+      }
 
-    if (!link) {
-      return res.status(403).json({
-        message: "You are not allowed to access this assessment.",
-      });
-    }
-
-    /**
-     * LOAD STUDENTS VIA ENROLLMENT
-     */
-    const enrollments = await prisma.enrollment.findMany({
-      where: {
-        subjectId: assessment.subjectId,
-      },
-      include: {
-        student: {
-          select: {
-            id: true,
-            admissionNo: true,
-            firstName: true,
-            lastName: true,
+      /**
+       * LOAD STUDENTS VIA ENROLLMENT
+       */
+      const enrollments = await prisma.enrollment.findMany({
+        where: {
+          subjectId: assessment.subjectId,
+        },
+        include: {
+          student: {
+            select: {
+              id: true,
+              admissionNo: true,
+              firstName: true,
+              lastName: true,
+            },
           },
         },
-      },
-      orderBy: {
-        student: { firstName: "asc" },
-      },
-    });
+        orderBy: {
+          student: { firstName: "asc" },
+        },
+      });
 
-    const students = enrollments.map((e: any) => e.student);
+      const students = enrollments.map((e: any) => e.student);
 
-    console.log("STUDENTS FOUND =", students.length);
+      console.log("STUDENTS FOUND =", students.length);
 
-    res.json({
-      assessment: {
-        id: assessment.id,
-        title: assessment.title,
-        maxScore: assessment.maxScore,
-        status: assessment.status,
-      },
-      students,
-      scores: assessment.scores,
-    });
+      res.json({
+        assessment: {
+          id: assessment.id,
+          title: assessment.title,
+          maxScore: assessment.maxScore,
+          status: assessment.status,
+        },
+        students,
+        scores: assessment.scores,
+      });
+    } catch (error) {
+      console.error("GET SCORES ERROR", error);
+      res.status(500).json({ message: "Failed to load scores" });
+    }
   }
 );
 
@@ -120,70 +125,86 @@ router.post(
   authenticate,
   requireRole([Role.TEACHER]),
   async (req, res) => {
-    const id = Number(req.params.id);
-    const user = req.user!;
-    const { scores } = req.body;
+    try {
+      const id = Number(req.params.id);
+      const user = req.user!;
+      const { scores } = req.body;
 
-    const assessment = await prisma.assessment.findUnique({
-      where: { id },
-      include: { subject: true },
-    });
+      if (!Array.isArray(scores)) {
+        return res.status(400).json({
+          message: "Invalid scores payload",
+        });
+      }
 
-    if (!assessment) {
-      return res.status(404).json({ message: "Not found" });
-    }
-
-    if (assessment.subject.teacherId !== user.id) {
-      return res.status(403).json({
-        message: "You are not allowed to access this assessment.",
+      const assessment = await prisma.assessment.findUnique({
+        where: { id },
+        include: { subject: true },
       });
-    }
 
-    const link = await prisma.classSubject.findFirst({
-      where: {
-        classId: assessment.classId,
-        subjectId: assessment.subjectId,
-      },
-    });
+      if (!assessment) {
+        return res.status(404).json({ message: "Not found" });
+      }
 
-    if (!link) {
-      return res.status(403).json({
-        message: "You are not allowed to access this assessment.",
-      });
-    }
+      if (assessment.subject.teacherId !== user.id) {
+        return res.status(403).json({
+          message: "You are not allowed to access this assessment.",
+        });
+      }
 
-    if (assessment.status === "SUBMITTED") {
-      return res.status(400).json({
-        message: "Assessment already submitted — locked",
-      });
-    }
-
-    for (const s of scores) {
-      await prisma.assessmentScore.upsert({
+      const link = await prisma.classSubject.findFirst({
         where: {
-          assessmentId_studentId: {
-            assessmentId: id,
-            studentId: Number(s.studentId),
-          },
-        },
-        update: {
-          score: Number(s.score),
-        },
-        create: {
-          assessmentId: id,
-          studentId: Number(s.studentId),
-          score: Number(s.score),
+          classId: assessment.classId,
+          subjectId: assessment.subjectId,
         },
       });
-    }
 
-    res.json({ message: "Scores saved" });
+      if (!link) {
+        return res.status(403).json({
+          message: "You are not allowed to access this assessment.",
+        });
+      }
+
+      if (assessment.status === "SUBMITTED") {
+        return res.status(400).json({
+          message: "Assessment already submitted — locked",
+        });
+      }
+
+      /**
+       * SAVE SCORES
+       */
+      await Promise.all(
+        scores.map((s: any) =>
+          prisma.assessmentScore.upsert({
+            where: {
+              assessmentId_studentId: {
+                assessmentId: id,
+                studentId: Number(s.studentId),
+              },
+            },
+            update: {
+              score: Number(s.score),
+            },
+            create: {
+              assessmentId: id,
+              studentId: Number(s.studentId),
+              score: Number(s.score),
+            },
+          })
+        )
+      );
+
+      res.json({ message: "Scores saved" });
+    } catch (error) {
+      console.error("SAVE SCORES ERROR", error);
+      res.status(500).json({ message: "Failed to save scores" });
+    }
   }
 );
 
 /**
  * ============================================================
- * SUBMIT (LOCK + GENERATE REPORT CARDS)
+ * SUBMIT (LOCK + COMPUTE GRADES + GENERATE REPORT CARDS)
  * ============================================================
  */
 router.post(
@@ -191,67 +212,78 @@ router.post(
   authenticate,
   requireRole([Role.TEACHER]),
   async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const user = req.user!;
 
-    const id = Number(req.params.id);
-    const user = req.user!;
-
-    const assessment = await prisma.assessment.findUnique({
-      where: { id },
-      include: { subject: true },
-    });
-
-    if (!assessment) {
-      return res.status(404).json({ message: "Not found" });
-    }
-
-    if (assessment.subject.teacherId !== user.id) {
-      return res.status(403).json({
-        message: "You are not allowed to access this assessment.",
+      const assessment = await prisma.assessment.findUnique({
+        where: { id },
+        include: { subject: true },
       });
-    }
 
-    const link = await prisma.classSubject.findFirst({
-      where: {
-        classId: assessment.classId,
-        subjectId: assessment.subjectId,
-      },
-    });
+      if (!assessment) {
+        return res.status(404).json({ message: "Not found" });
+      }
 
-    if (!link) {
-      return res.status(403).json({
-        message: "You are not allowed to access this assessment.",
+      if (assessment.subject.teacherId !== user.id) {
+        return res.status(403).json({
+          message: "You are not allowed to access this assessment.",
+        });
+      }
+
+      const link = await prisma.classSubject.findFirst({
+        where: {
+          classId: assessment.classId,
+          subjectId: assessment.subjectId,
+        },
       });
-    }
 
-    if (assessment.status === "SUBMITTED") {
-      return res.status(400).json({
-        message: "Assessment already submitted",
-      });
-    }
+      if (!link) {
+        return res.status(403).json({
+          message: "You are not allowed to access this assessment.",
+        });
+      }
 
-    /**
-     * TRANSACTION
-     */
-    await prisma.$transaction(async (tx: any) => {
+      if (assessment.status === "SUBMITTED") {
+        return res.status(400).json({
+          message: "Assessment already submitted",
+        });
+      }
 
-      const updatedAssessment = await tx.assessment.update({
+      /**
+       * LOCK ASSESSMENT
+       */
+      const updatedAssessment = await prisma.assessment.update({
         where: { id },
         data: { status: "SUBMITTED" },
       });
 
       /**
-       * TRIGGER REPORT CARD REGENERATION
+       * COMPUTE GRADES FOR SUBJECT
+       */
+      await computeGradesForSubject({
+        classId: updatedAssessment.classId,
+        subjectId: updatedAssessment.subjectId,
+        termId: updatedAssessment.termId,
+      });
+
+      /**
+       * GENERATE REPORT CARDS
        */
       await generateReportCardsForClass({
         classId: updatedAssessment.classId,
         termId: updatedAssessment.termId,
       });
 
-    });
-
-    res.json({
-      message: "Assessment submitted and report cards regenerated",
-    });
+      res.json({
+        message: "Assessment submitted, grades computed, and report cards regenerated",
+      });
+    } catch (error) {
+      console.error("SUBMIT ERROR", error);
+      res.status(500).json({
+        message: "Failed to submit assessment",
+      });
+    }
   }
 );
 
