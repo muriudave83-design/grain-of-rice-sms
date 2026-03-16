@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import api from "@/services/apiClient";
 
 export default function ScoresEntry() {
+
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -13,7 +14,6 @@ export default function ScoresEntry() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // refs for ENTER navigation
   const inputRefs = useRef([]);
 
   useEffect(() => {
@@ -22,6 +22,7 @@ export default function ScoresEntry() {
 
   async function load() {
     try {
+
       const res = await api.get(`/assessments/${id}/scores`);
 
       setAssessment(res.data.assessment);
@@ -33,57 +34,121 @@ export default function ScoresEntry() {
       });
 
       setScores(map);
+
     } catch (err) {
+
       setError(
         err.response?.data?.message ||
-          "You are not allowed to access this assessment."
+        "You are not allowed to access this assessment."
       );
+
     } finally {
       setLoading(false);
     }
   }
 
   async function save() {
+
     const payload = students.map((s) => ({
       studentId: s.id,
       score: Number(scores[s.id] || 0),
     }));
 
     try {
+
       await api.post(`/assessments/${id}/scores`, {
         scores: payload,
       });
 
-      alert("Scores saved");
-    } catch (err) {
-      alert("Failed to save scores");
+    } catch {
+      console.log("Autosave failed");
     }
+  }
+
+  // ========================
+  // AUTO SAVE EVERY 5 SECONDS
+  // ========================
+  useEffect(() => {
+
+    const interval = setInterval(() => {
+      if (assessment) save();
+    }, 5000);
+
+    return () => clearInterval(interval);
+
+  }, [scores, assessment]);
+
+  // ========================
+  // KEYBOARD NAVIGATION
+  // ========================
+  function handleKeyDown(e, index) {
+
+    if (e.key === "Enter" || e.key === "ArrowDown") {
+      e.preventDefault();
+      inputRefs.current[index + 1]?.focus();
+    }
+
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      inputRefs.current[index - 1]?.focus();
+    }
+  }
+
+  // ========================
+  // PASTE FROM EXCEL
+  // ========================
+  function handlePaste(e, index) {
+
+    const text = e.clipboardData.getData("text");
+
+    const values = text.split(/\s+/);
+
+    const updated = { ...scores };
+
+    values.forEach((v, i) => {
+
+      const student = students[index + i];
+      if (!student) return;
+
+      let value = Number(v);
+
+      if (value < 0) value = 0;
+      if (value > assessment.maxScore) {
+        value = assessment.maxScore;
+      }
+
+      updated[student.id] = value;
+
+    });
+
+    setScores(updated);
+
+    e.preventDefault();
   }
 
   async function submit() {
-    if (!window.confirm("Submit and lock? This cannot be edited.")) return;
+
+    if (!window.confirm("Submit assessment?")) return;
 
     try {
+
       await api.post(`/assessments/${id}/submit`);
+
       alert("Assessment submitted");
-      navigate("/teacher/assessments");
-    } catch (err) {
+
+      navigate(`/teacher/assessments/${id}/review`);
+
+    } catch {
+
       alert("Failed to submit");
-    }
-  }
 
-  function handleEnter(e, index) {
-    if (e.key === "Enter") {
-      e.preventDefault();
-
-      const next = inputRefs.current[index + 1];
-      if (next) next.focus();
     }
   }
 
   if (loading) return <p>Loading...</p>;
 
   if (error) {
+
     return (
       <div className="p-6 text-red-700 bg-red-50">
         {error}
@@ -92,6 +157,7 @@ export default function ScoresEntry() {
   }
 
   return (
+
     <div className="p-6 max-w-4xl mx-auto">
 
       <h1 className="text-xl font-bold mb-4">
@@ -101,16 +167,25 @@ export default function ScoresEntry() {
       <table className="w-full text-sm border">
 
         <thead>
+
           <tr className="bg-gray-50">
-            <th className="p-2 text-left">Student</th>
+
+            <th className="p-2 text-left">
+              Student
+            </th>
+
             <th className="p-2 w-32">
               Score / {assessment.maxScore}
             </th>
+
           </tr>
+
         </thead>
 
         <tbody>
+
           {students.map((s, index) => (
+
             <tr key={s.id} className="border-t">
 
               <td className="p-2">
@@ -126,12 +201,20 @@ export default function ScoresEntry() {
                   value={scores[s.id] ?? ""}
                   max={assessment.maxScore}
 
-                  onKeyDown={(e) => handleEnter(e, index)}
+                  onKeyDown={(e) =>
+                    handleKeyDown(e, index)
+                  }
+
+                  onPaste={(e) =>
+                    handlePaste(e, index)
+                  }
 
                   onChange={(e) => {
+
                     let value = Number(e.target.value);
 
                     if (value < 0) value = 0;
+
                     if (value > assessment.maxScore) {
                       value = assessment.maxScore;
                     }
@@ -140,13 +223,16 @@ export default function ScoresEntry() {
                       ...scores,
                       [s.id]: value,
                     });
+
                   }}
                 />
 
               </td>
 
             </tr>
+
           ))}
+
         </tbody>
 
       </table>
@@ -164,7 +250,7 @@ export default function ScoresEntry() {
           onClick={submit}
           className="px-4 py-2 bg-green-600 text-white"
         >
-          Submit Assessment
+          Submit
         </button>
 
       </div>

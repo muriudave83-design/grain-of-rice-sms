@@ -6,6 +6,8 @@ import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
 import { Role } from "@prisma/client";
 
+import { generateReportCardsForClass } from "../services/reportCard.service";
+
 const router = Router();
 
 /**
@@ -18,11 +20,10 @@ router.get(
   authenticate,
   requireRole([Role.TEACHER]),
   async (req, res) => {
-    // ✅ REQUIRED DEBUG LOGS
+
     console.log("🔥 SCORES ROUTE HIT");
     console.log("PARAM ID =", req.params.id);
     console.log("USER =", req.user);
-    console.log("🔥 /assessments/:id/scores ROUTE HIT");
 
     const id = Number(req.params.id);
     const user = req.user!;
@@ -45,18 +46,18 @@ router.get(
       });
     }
 
-    // ------------------------------------------------------------
-    // OWNERSHIP CHECK
-    // ------------------------------------------------------------
+    /**
+     * OWNERSHIP CHECK
+     */
     if (assessment.subject.teacherId !== user.id) {
       return res.status(403).json({
         message: "You are not allowed to access this assessment.",
       });
     }
 
-    // ------------------------------------------------------------
-    // CLASS ↔ SUBJECT LINK CHECK
-    // ------------------------------------------------------------
+    /**
+     * CLASS ↔ SUBJECT LINK CHECK
+     */
     const link = await prisma.classSubject.findFirst({
       where: {
         classId: assessment.classId,
@@ -70,10 +71,9 @@ router.get(
       });
     }
 
-    // ============================================================
-    // LOAD STUDENTS VIA ENROLLMENT (TIGHT SELECT) ✅
-    // ============================================================
-
+    /**
+     * LOAD STUDENTS VIA ENROLLMENT
+     */
     const enrollments = await prisma.enrollment.findMany({
       where: {
         subjectId: assessment.subjectId,
@@ -96,8 +96,6 @@ router.get(
     const students = enrollments.map((e: any) => e.student);
 
     console.log("STUDENTS FOUND =", students.length);
-
-    // ============================================================
 
     res.json({
       assessment: {
@@ -168,7 +166,9 @@ router.post(
             studentId: Number(s.studentId),
           },
         },
-        update: { score: Number(s.score) },
+        update: {
+          score: Number(s.score),
+        },
         create: {
           assessmentId: id,
           studentId: Number(s.studentId),
@@ -183,7 +183,7 @@ router.post(
 
 /**
  * ============================================================
- * SUBMIT (LOCK)
+ * SUBMIT (LOCK + GENERATE REPORT CARDS)
  * ============================================================
  */
 router.post(
@@ -191,6 +191,7 @@ router.post(
   authenticate,
   requireRole([Role.TEACHER]),
   async (req, res) => {
+
     const id = Number(req.params.id);
     const user = req.user!;
 
@@ -222,12 +223,35 @@ router.post(
       });
     }
 
-    await prisma.assessment.update({
-      where: { id },
-      data: { status: "SUBMITTED" },
+    if (assessment.status === "SUBMITTED") {
+      return res.status(400).json({
+        message: "Assessment already submitted",
+      });
+    }
+
+    /**
+     * TRANSACTION
+     */
+    await prisma.$transaction(async (tx: any) => {
+
+      const updatedAssessment = await tx.assessment.update({
+        where: { id },
+        data: { status: "SUBMITTED" },
+      });
+
+      /**
+       * TRIGGER REPORT CARD REGENERATION
+       */
+      await generateReportCardsForClass({
+        classId: updatedAssessment.classId,
+        termId: updatedAssessment.termId,
+      });
+
     });
 
-    res.json({ message: "Assessment submitted and locked" });
+    res.json({
+      message: "Assessment submitted and report cards regenerated",
+    });
   }
 );
 
