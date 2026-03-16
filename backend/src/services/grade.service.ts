@@ -82,7 +82,7 @@ export async function computeGradesForSubject({
     const assessmentMap = new Map(
       assessments.map((a) => [
         a.id,
-        { maxScore: a.maxScore, weight: a.weight },
+        { maxScore: a.maxScore, weight: a.weight || 1 }
       ])
     );
 
