@@ -143,13 +143,13 @@ model Assessment {
   classId     Int
   termId      Int
   date        DateTime
-  type        AssessmentType
   weight      Float
   maxScore    Float
   isPublished Boolean             @default(false)
   createdAt   DateTime            @default(now())
   status      AssessmentStatus    @default(DRAFT)
   categoryId  Int?
+  type        AssessmentType
   category    AssignmentCategory? @relation(fields: [categoryId], references: [id])
   class       Class               @relation(fields: [classId], references: [id])
   subject     Subject             @relation(fields: [subjectId], references: [id])

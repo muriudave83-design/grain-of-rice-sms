@@ -36,13 +36,13 @@ export const createAssessment = async (req: Request, res: Response) => {
     /**
      * ENUM VALIDATION
      */
-    if (!Object.values(AssessmentType).includes(typeRaw)) {
+    if (!Object.values(AssessmentType).includes(typeRaw as AssessmentType)) {
       return res.status(400).json({
         error: "Invalid assessment type"
       });
     }
 
-    const type: AssessmentType = typeRaw;
+    const type: AssessmentType = typeRaw as AssessmentType;
 
     /**
      * REQUIRED FIELD VALIDATION
@@ -233,15 +233,11 @@ export const setStudentScore = async (req: Request, res: Response) => {
 
     console.error(err);
 
-    if (
-      err.message === "Assessment not found"
-    ) {
+    if (err.message === "Assessment not found") {
       return res.status(404).json({ error: err.message });
     }
 
-    if (
-      err.message === "Not authorized to modify this assessment"
-    ) {
+    if (err.message === "Not authorized to modify this assessment") {
       return res.status(403).json({ error: err.message });
     }
 
