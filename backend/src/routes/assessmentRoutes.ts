@@ -19,7 +19,6 @@ console.log("✅ assessmentRoutes LOADED");
  * ============================================================
  * CREATE ASSESSMENT
  * ============================================================
- * Homework support is handled inside createAssessment controller
  */
 router.post(
   "/",
@@ -103,18 +102,12 @@ router.get(
   requireRole([Role.TEACHER, Role.ADMIN]),
   async (req, res) => {
     const user = req.user!;
-    const {
-      type,
-      classId,
-      subjectId,
-      termId,
-      status
-    } = req.query;
+    const { type, classId, subjectId, termId, status } = req.query;
 
     let where: any = {};
 
     /**
-     * Restrict teachers to their assignments
+     * Restrict teachers to their own assessments
      */
     if (user.role === Role.TEACHER) {
       const assignments = await prisma.teacherSubject.findMany({
@@ -126,10 +119,11 @@ router.get(
         return res.json([]);
       }
 
-        where = {
-          ...where,
-          createdById: user.id
-        };
+      where = {
+        ...where,
+        createdById: user.id
+      };
+    }
 
     /**
      * Dynamic filters
@@ -245,7 +239,7 @@ router.get(
 
 /**
  * ============================================================
- * SAVE SCORES (TRANSACTION + GRADE RECALCULATION)
+ * SAVE SCORES
  * ============================================================
  */
 router.post(
@@ -365,7 +359,7 @@ router.patch(
 
 /**
  * ============================================================
- * SUBMIT (POST) – FRONTEND COMPATIBILITY
+ * SUBMIT (POST)
  * ============================================================
  */
 router.post(
