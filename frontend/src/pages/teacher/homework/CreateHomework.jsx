@@ -38,10 +38,11 @@ export default function CreateHomework() {
     try {
       setLoading(true);
 
-      await axios.post("/api/assessments", {
-        ...form,
-        type: "HOMEWORK",
-      });
+    await axios.post("/api/assessments", {
+    ...form,
+    categoryId: 1,
+    type: "HOMEWORK",
+    });
 
       alert("Homework created successfully");
 
