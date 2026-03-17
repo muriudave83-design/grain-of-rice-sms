@@ -119,11 +119,10 @@ router.get(
         return res.json([]);
       }
 
-      where = {
-        ...where,
-        createdById: user.id
-      };
-    }
+      where.OR = assignments.map((a: any) => ({
+        subjectId: a.subjectId,
+        classId: a.classId
+      }));
 
     /**
      * Dynamic filters
