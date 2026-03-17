@@ -41,9 +41,6 @@ import TeacherAttendanceClass from "../pages/teacher/attendance/TeacherAttendanc
 import TeacherAttendanceSession from "../pages/teacher/attendance/TeacherAttendanceSession";
 import CreateHomework from "../pages/teacher/homework/CreateHomework";
 
-// ✅ NEW IMPORT
-import CreateHomework from "../pages/teacher/homework/CreateHomework";
-
 // =======================
 // PARENT PAGES
 // =======================
