@@ -40,6 +40,9 @@ import TeacherGradebook from "../pages/teacher/TeacherGradebook";
 import TeacherAttendanceClass from "../pages/teacher/attendance/TeacherAttendanceClass";
 import TeacherAttendanceSession from "../pages/teacher/attendance/TeacherAttendanceSession";
 
+// ✅ NEW IMPORT
+import CreateHomework from "../pages/teacher/homework/CreateHomework";
+
 // =======================
 // PARENT PAGES
 // =======================
@@ -133,11 +136,8 @@ export default function AppRoutes() {
             <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />
 
             <Route path="/dashboard/admin" element={<Dashboard />} />
-
             <Route path="/dashboard/admin/students" element={<AdminStudents />} />
-
             <Route path="/dashboard/admin/teachers" element={<AdminTeachers />} />
-
             <Route path="/dashboard/admin/classes" element={<Classes />} />
 
             <Route
@@ -146,17 +146,11 @@ export default function AppRoutes() {
             />
 
             <Route path="/dashboard/admin/grades" element={<Grades />} />
-
             <Route path="/dashboard/admin/exams" element={<Exams />} />
-
             <Route path="/dashboard/admin/fees" element={<Fees />} />
-
             <Route path="/dashboard/admin/payments" element={<Payments />} />
-
             <Route path="/dashboard/admin/users" element={<UsersPage />} />
-
             <Route path="/dashboard/admin/subjects" element={<AdminSubjects />} />
-
             <Route path="/dashboard/admin/categories" element={<AdminCategories />} />
 
             <Route
@@ -228,6 +222,12 @@ export default function AppRoutes() {
             <Route
               path="/teacher/assessments/:id/review"
               element={<AssessmentReview />}
+            />
+
+            {/* ✅ NEW HOMEWORK ROUTE */}
+            <Route
+              path="/teacher/homework/create"
+              element={<CreateHomework />}
             />
 
             <Route
@@ -313,16 +313,12 @@ export default function AppRoutes() {
             <ProtectedRoute allowedRoles={["ADMIN", "TEACHER", "PARENT"]} />
           }
         >
-
           <Route path="/notifications" element={<Notifications />} />
-
         </Route>
 
 
         {/* FALLBACK */}
-
         <Route path="*" element={<Navigate to="/login" replace />} />
-
 
       </Routes>
 
