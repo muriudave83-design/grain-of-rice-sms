@@ -111,6 +111,10 @@ router.get(
         select: { subjectId: true, classId: true }
       });
 
+      if (assignments.length === 0) {
+        return res.json([]);
+      }
+
       where = {
         OR: assignments.map((a: any) => ({
           subjectId: a.subjectId,
