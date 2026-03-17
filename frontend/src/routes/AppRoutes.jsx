@@ -39,6 +39,7 @@ import EditAssessmentRedirect from "../pages/teacher/assessments/Edit";
 import TeacherGradebook from "../pages/teacher/TeacherGradebook";
 import TeacherAttendanceClass from "../pages/teacher/attendance/TeacherAttendanceClass";
 import TeacherAttendanceSession from "../pages/teacher/attendance/TeacherAttendanceSession";
+import CreateHomework from "../pages/teacher/homework/CreateHomework";
 
 // ✅ NEW IMPORT
 import CreateHomework from "../pages/teacher/homework/CreateHomework";
@@ -207,6 +208,11 @@ export default function AppRoutes() {
             <Route
               path="/teacher/assessments/create"
               element={<CreateAssessment />}
+            />
+
+            <Route
+              path="/teacher/homework/create"
+              element={<CreateHomework />}
             />
 
             <Route
