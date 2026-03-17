@@ -4,12 +4,12 @@ import api from "@/services/apiClient";
 export default function AddComment({ reportCardId, initialComment, onSaved }) {
   const [comment, setComment] = useState(initialComment || "");
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
 
   async function handleSave() {
     setError(null);
-    setSuccess(false);
+    setSaved(false);
 
     if (!comment.trim()) {
       setError("Comment cannot be empty.");
@@ -23,11 +23,18 @@ export default function AddComment({ reportCardId, initialComment, onSaved }) {
 
     try {
       setSaving(true);
+
       const res = await api.patch(`/report-cards/${reportCardId}/comments`, {
         comment,
       });
-      setSuccess(true);
+
+      setSaved(true);
+
+      // clear success state after 2 seconds
+      setTimeout(() => setSaved(false), 2000);
+
       onSaved?.(res.data);
+
     } catch (err) {
       if (err.response?.status === 403) {
         setError("You are not authorized to edit this report card.");
@@ -53,14 +60,19 @@ export default function AddComment({ reportCardId, initialComment, onSaved }) {
       />
 
       {error && <p className="text-red-600 mt-2">{error}</p>}
-      {success && <p className="text-green-600 mt-2">Comment saved.</p>}
+
+      {saved && (
+        <p className="text-green-600 mt-2">
+          Comment saved successfully
+        </p>
+      )}
 
       <button
         onClick={handleSave}
         disabled={saving}
         className="mt-3 px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50"
       >
-        {saving ? "Saving…" : "Save Comment"}
+        {saving ? "Saving..." : saved ? "Saved ✓" : "Save Comment"}
       </button>
     </div>
   );

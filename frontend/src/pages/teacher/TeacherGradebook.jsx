@@ -2,9 +2,34 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 
+/*
+--------------------------------------------------
+Tiny Save Hook (same as ScoresEntry)
+Safe: local to this file
+--------------------------------------------------
+*/
+function useSaveStatus() {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  function startSaving() {
+    setSaving(true);
+    setSaved(false);
+  }
+
+  function finishSaving() {
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  return { saving, saved, startSaving, finishSaving };
+}
+
 function EditableRow({ student, assessments, onSaved }) {
   const [scores, setScores] = useState({ ...student.scores });
-  const [saving, setSaving] = useState(false);
+
+  const { saving, saved, startSaving, finishSaving } = useSaveStatus();
 
   const handleChange = (assessmentId, value) => {
     setScores({
@@ -14,7 +39,8 @@ function EditableRow({ student, assessments, onSaved }) {
   };
 
   const saveRow = async () => {
-    setSaving(true);
+    startSaving();
+
     try {
       for (const assessment of assessments) {
         const value = scores[assessment.id];
@@ -28,11 +54,10 @@ function EditableRow({ student, assessments, onSaved }) {
         });
       }
 
+      finishSaving();
       onSaved();
     } catch (err) {
       alert("Failed to save scores");
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -90,7 +115,7 @@ function EditableRow({ student, assessments, onSaved }) {
           disabled={saving}
           className="bg-blue-600 text-white px-3 py-1 rounded"
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? "Saving..." : saved ? "Saved ✓" : "Save"}
         </button>
       </td>
     </tr>
@@ -183,10 +208,15 @@ export default function TeacherGradebook() {
   return (
     <div className="p-6">
 
+      {/* Breadcrumb */}
+      <div className="text-sm text-gray-600 mb-2">
+        Teacher / Gradebook
+      </div>
+
       {/* Back Button */}
       <button
         onClick={() => navigate("/teacher")}
-        className="mb-4 text-blue-600 underline"
+        className="mb-4 px-3 py-1 border rounded"
       >
         ← Back to Dashboard
       </button>
@@ -233,12 +263,15 @@ export default function TeacherGradebook() {
             <thead className="bg-gray-100">
               <tr>
                 <th className="p-3">Student</th>
+
                 {gradebook.assessments.map((a) => (
                   <th key={a.id} className="p-3">
                     {a.title}
                   </th>
                 ))}
+
                 <th className="p-3 text-center">Average</th>
+
                 <th className="p-3">Actions</th>
               </tr>
             </thead>

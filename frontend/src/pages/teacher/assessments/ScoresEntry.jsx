@@ -2,8 +2,31 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "@/services/apiClient";
 
-export default function ScoresEntry() {
+/*
+--------------------------------------------------
+Tiny Save Hook (safe – local to this file)
+Can later be reused in Gradebook / Attendance
+--------------------------------------------------
+*/
+function useSaveStatus() {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
+  function startSaving() {
+    setSaving(true);
+    setSaved(false);
+  }
+
+  function finishSaving() {
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  return { saving, saved, startSaving, finishSaving };
+}
+
+export default function ScoresEntry() {
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -16,13 +39,14 @@ export default function ScoresEntry() {
 
   const inputRefs = useRef([]);
 
+  const { saving, saved, startSaving, finishSaving } = useSaveStatus();
+
   useEffect(() => {
     load();
   }, []);
 
   async function load() {
     try {
-
       const res = await api.get(`/assessments/${id}/scores`);
 
       setAssessment(res.data.assessment);
@@ -34,55 +58,54 @@ export default function ScoresEntry() {
       });
 
       setScores(map);
-
     } catch (err) {
-
       setError(
         err.response?.data?.message ||
-        "You are not allowed to access this assessment."
+          "You are not allowed to access this assessment."
       );
-
     } finally {
       setLoading(false);
     }
   }
 
   async function save() {
-
     const payload = students.map((s) => ({
       studentId: s.id,
       score: Number(scores[s.id] || 0),
     }));
 
     try {
+      startSaving();
 
       await api.post(`/assessments/${id}/scores`, {
         scores: payload,
       });
 
+      finishSaving();
     } catch {
-      console.log("Autosave failed");
+      alert("Failed to save scores");
     }
   }
 
-  // ========================
-  // AUTO SAVE EVERY 5 SECONDS
-  // ========================
+  /*
+  =======================
+  AUTO SAVE EVERY 5 SECONDS
+  =======================
+  */
   useEffect(() => {
-
     const interval = setInterval(() => {
       if (assessment) save();
     }, 5000);
 
     return () => clearInterval(interval);
-
   }, [scores, assessment]);
 
-  // ========================
-  // KEYBOARD NAVIGATION
-  // ========================
+  /*
+  =======================
+  KEYBOARD NAVIGATION
+  =======================
+  */
   function handleKeyDown(e, index) {
-
     if (e.key === "Enter" || e.key === "ArrowDown") {
       e.preventDefault();
       inputRefs.current[index + 1]?.focus();
@@ -94,19 +117,18 @@ export default function ScoresEntry() {
     }
   }
 
-  // ========================
-  // PASTE FROM EXCEL
-  // ========================
+  /*
+  =======================
+  PASTE FROM EXCEL
+  =======================
+  */
   function handlePaste(e, index) {
-
     const text = e.clipboardData.getData("text");
-
     const values = text.split(/\s+/);
 
     const updated = { ...scores };
 
     values.forEach((v, i) => {
-
       const student = students[index + i];
       if (!student) return;
 
@@ -118,99 +140,84 @@ export default function ScoresEntry() {
       }
 
       updated[student.id] = value;
-
     });
 
     setScores(updated);
-
     e.preventDefault();
   }
 
   async function submit() {
-
     if (!window.confirm("Submit assessment?")) return;
 
     try {
-
       await api.post(`/assessments/${id}/submit`);
 
       alert("Assessment submitted");
 
       navigate(`/teacher/assessments/${id}/review`);
-
     } catch {
-
       alert("Failed to submit");
-
     }
   }
 
   if (loading) return <p>Loading...</p>;
 
   if (error) {
-
-    return (
-      <div className="p-6 text-red-700 bg-red-50">
-        {error}
-      </div>
-    );
+    return <div className="p-6 text-red-700 bg-red-50">{error}</div>;
   }
 
   return (
-
     <div className="p-6 max-w-4xl mx-auto">
 
-      <h1 className="text-xl font-bold mb-4">
+      {/* Breadcrumb */}
+      <div className="text-sm text-gray-600 mb-2">
+        Teacher / Assessments / Scores
+      </div>
+
+      {/* Back Button */}
+      <button
+        onClick={() => navigate("/teacher/assessments")}
+        className="mb-4 px-3 py-1 border rounded"
+      >
+        ← Back to Assessments
+      </button>
+
+      <h1 className="text-xl font-bold mb-2">
         Scores — {assessment.title}
       </h1>
 
+      <p className="text-sm text-gray-500 mb-4">
+        Changes autosave every 5 seconds.
+      </p>
+
       <table className="w-full text-sm border">
-
         <thead>
-
           <tr className="bg-gray-50">
-
-            <th className="p-2 text-left">
-              Student
-            </th>
+            <th className="p-2 text-left">Student</th>
 
             <th className="p-2 w-32">
               Score / {assessment.maxScore}
             </th>
-
           </tr>
-
         </thead>
 
         <tbody>
-
           {students.map((s, index) => (
-
             <tr key={s.id} className="border-t">
-
               <td className="p-2">
                 {s.firstName} {s.lastName}
               </td>
 
               <td className="p-2">
-
                 <input
                   ref={(el) => (inputRefs.current[index] = el)}
                   type="number"
                   className="border p-1 w-full"
                   value={scores[s.id] ?? ""}
                   max={assessment.maxScore}
-
-                  onKeyDown={(e) =>
-                    handleKeyDown(e, index)
-                  }
-
-                  onPaste={(e) =>
-                    handlePaste(e, index)
-                  }
-
+                  onKeyDown={(e) => handleKeyDown(e, index)}
+                  onPaste={(e) => handlePaste(e, index)}
                   onChange={(e) => {
-
                     let value = Number(e.target.value);
 
                     if (value < 0) value = 0;
@@ -223,27 +230,21 @@ export default function ScoresEntry() {
                       ...scores,
                       [s.id]: value,
                     });
-
                   }}
                 />
-
               </td>
-
             </tr>
-
           ))}
-
         </tbody>
-
       </table>
 
       <div className="mt-4 space-x-3">
-
         <button
           onClick={save}
+          disabled={saving}
           className="px-4 py-2 bg-blue-600 text-white"
         >
-          Save
+          {saving ? "Saving..." : saved ? "Saved ✓" : "Save"}
         </button>
 
         <button
@@ -252,9 +253,7 @@ export default function ScoresEntry() {
         >
           Submit
         </button>
-
       </div>
-
     </div>
   );
 }

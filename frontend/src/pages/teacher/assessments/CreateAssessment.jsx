@@ -22,9 +22,7 @@ export default function CreateAssessment() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // ─────────────────────────────────────────────
   // LOAD ASSIGNMENTS + CATEGORIES
-  // ─────────────────────────────────────────────
   useEffect(() => {
     async function loadAssignments() {
       try {
@@ -40,7 +38,7 @@ export default function CreateAssessment() {
         setAssignments([]);
         setError(
           err.response?.data?.message ||
-            "Failed to load teaching assignments."
+          "Failed to load teaching assignments."
         );
       }
     }
@@ -58,10 +56,7 @@ export default function CreateAssessment() {
     fetchCategories();
   }, []);
 
-  // ─────────────────────────────────────────────
   // FORM HANDLERS
-  // ─────────────────────────────────────────────
-
   function handleChange(e) {
     const { name, value } = e.target;
     setForm((prev) => ({
@@ -105,26 +100,29 @@ export default function CreateAssessment() {
       });
 
       navigate("/teacher/assessments");
+
     } catch (err) {
       setError(
         err.response?.data?.message ||
-          "You are not allowed to create this assessment."
+        "You are not allowed to create this assessment."
       );
     } finally {
       setLoading(false);
     }
   }
 
-  // ─────────────────────────────────────────────
-  // UI
-  // ─────────────────────────────────────────────
   return (
     <div className="max-w-3xl mx-auto p-6">
 
-      {/* BACK BUTTON */}
+      {/* Breadcrumb */}
+      <div className="text-sm text-gray-600 mb-2">
+        Teacher / Assessments / Create
+      </div>
+
+      {/* Back Button */}
       <button
         onClick={() => navigate("/teacher/assessments")}
-        className="mb-4 text-sm text-blue-600 hover:text-blue-800"
+        className="mb-4 px-3 py-1 border rounded"
       >
         ← Back to Assessments
       </button>
@@ -141,7 +139,6 @@ export default function CreateAssessment() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
 
-        {/* ASSIGNMENT */}
         <div>
           <label className="block text-sm mb-1 font-medium">
             Teaching Assignment
@@ -163,7 +160,6 @@ export default function CreateAssessment() {
           </select>
         </div>
 
-        {/* CATEGORY */}
         <div>
           <label className="block text-sm mb-1 font-medium">
             Category
@@ -186,7 +182,6 @@ export default function CreateAssessment() {
           </select>
         </div>
 
-        {/* TITLE */}
         <div>
           <label className="block text-sm mb-1 font-medium">
             Assessment Title
@@ -202,7 +197,6 @@ export default function CreateAssessment() {
           />
         </div>
 
-        {/* MAX SCORE */}
         <div>
           <label className="block text-sm mb-1 font-medium">
             Total Marks
@@ -220,7 +214,6 @@ export default function CreateAssessment() {
           />
         </div>
 
-        {/* TERM */}
         <div>
           <label className="block text-sm mb-1 font-medium">
             Term
@@ -238,7 +231,6 @@ export default function CreateAssessment() {
           />
         </div>
 
-        {/* DATE */}
         <div>
           <label className="block text-sm mb-1 font-medium">
             Date (optional)

@@ -2,6 +2,29 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../../services/apiClient";
 
+/*
+--------------------------------------------------
+Tiny Save Hook (same pattern as other pages)
+--------------------------------------------------
+*/
+function useSaveStatus() {
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  function startSaving() {
+    setSaving(true);
+    setSaved(false);
+  }
+
+  function finishSaving() {
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  return { saving, saved, startSaving, finishSaving };
+}
+
 export default function TeacherAttendanceSession() {
   const { sessionId } = useParams();
   const navigate = useNavigate();
@@ -13,8 +36,10 @@ export default function TeacherAttendanceSession() {
   const [error, setError] = useState(null);
   const [lastSavedRecords, setLastSavedRecords] = useState({});
 
+  const { saving, saved, startSaving, finishSaving } = useSaveStatus();
+
   // --------------------------------------------------
-  // LOAD SESSION + STUDENTS (SINGLE API CALL)
+  // LOAD SESSION + STUDENTS
   // --------------------------------------------------
   useEffect(() => {
     api
@@ -121,6 +146,8 @@ export default function TeacherAttendanceSession() {
   // MANUAL SAVE
   // --------------------------------------------------
   async function saveAttendance() {
+    startSaving();
+
     try {
       const payload = {
         records: Object.entries(records).map(([studentId, status]) => ({
@@ -133,7 +160,7 @@ export default function TeacherAttendanceSession() {
 
       setLastSavedRecords(records);
 
-      alert("Attendance saved");
+      finishSaving();
     } catch (err) {
       alert("Error saving attendance");
     }
@@ -194,7 +221,6 @@ export default function TeacherAttendanceSession() {
         </p>
       </div>
 
-      {/* STATUS */}
       <span
         style={{
           background: isDraft ? "#facc15" : "#16a34a",
@@ -212,7 +238,6 @@ export default function TeacherAttendanceSession() {
         </div>
       )}
 
-      {/* COUNTERS */}
       <div className="font-semibold">
         Present: {presentCount} | Absent: {absentCount} | Total: {students.length}
       </div>
@@ -272,21 +297,24 @@ export default function TeacherAttendanceSession() {
       </div>
 
       {isDraft && (
-        <button
-          onClick={saveAttendance}
-          className="px-3 py-1 bg-blue-600 text-white rounded"
-        >
-          Save Attendance
-        </button>
-      )}
+        <div className="flex gap-3">
 
-      {isDraft && (
-        <button
-          onClick={submitAttendance}
-          className="px-3 py-1 bg-red-600 text-white rounded"
-        >
-          Submit Attendance
-        </button>
+          <button
+            onClick={saveAttendance}
+            disabled={saving}
+            className="px-3 py-1 bg-blue-600 text-white rounded"
+          >
+            {saving ? "Saving..." : saved ? "Saved ✓" : "Save Attendance"}
+          </button>
+
+          <button
+            onClick={submitAttendance}
+            className="px-3 py-1 bg-red-600 text-white rounded"
+          >
+            Submit Attendance
+          </button>
+
+        </div>
       )}
 
     </div>

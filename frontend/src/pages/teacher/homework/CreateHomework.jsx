@@ -39,17 +39,11 @@ export default function CreateHomework() {
     try {
       setLoading(true);
 
-      const token = localStorage.getItem("token");
-
-      const url = `${API_URL}/assessments`;
-
-      console.log("🚀 Creating homework:", url);
-
-        await API.post("/assessments", {
+      await API.post("/assessments", {
         ...form,
         categoryId: 1,
         type: "HOMEWORK",
-        });
+      });
 
       alert("Homework created successfully");
 
@@ -65,6 +59,20 @@ export default function CreateHomework() {
 
   return (
     <div className="p-6 max-w-xl">
+
+      {/* Breadcrumb */}
+      <div className="text-sm text-gray-600 mb-2">
+        Teacher / Homework / Create
+      </div>
+
+      {/* Back Button */}
+      <button
+        onClick={() => navigate("/teacher/assessments")}
+        className="mb-4 px-3 py-1 border rounded"
+      >
+        ← Back to Assessments
+      </button>
+
       <h2 className="text-2xl font-semibold mb-4">
         Create Homework
       </h2>

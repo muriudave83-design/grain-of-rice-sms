@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "@/services/apiClient";
 
 export default function TeacherAssessments() {
+  const navigate = useNavigate();
+
   const [assessments, setAssessments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -87,11 +89,24 @@ export default function TeacherAssessments() {
 
   return (
     <div className="p-6 space-y-6">
+
+      {/* Breadcrumb */}
+      <div className="text-sm text-gray-600">
+        Teacher / Assessments
+      </div>
+
+      {/* Back Button */}
+      <button
+        onClick={() => navigate("/teacher")}
+        className="px-3 py-1 border rounded"
+      >
+        ← Back to Dashboard
+      </button>
+
       {/* Header */}
       <div className="flex justify-between items-center">
         <h1 className="text-xl font-semibold">My Assessments</h1>
 
-        {/* Action Buttons */}
         <div className="flex gap-2">
           <Link
             to="/teacher/assessments/create"
