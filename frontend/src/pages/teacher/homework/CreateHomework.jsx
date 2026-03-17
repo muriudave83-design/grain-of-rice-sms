@@ -118,7 +118,7 @@ export default function CreateHomework() {
         <input
           name="weight"
           type="number"
-          step="0.1"
+          step="0.01"
           placeholder="Weight"
           onChange={handleChange}
           className="w-full border p-2 rounded"
