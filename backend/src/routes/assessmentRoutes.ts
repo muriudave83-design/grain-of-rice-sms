@@ -107,7 +107,7 @@ router.get(
     let where: any = {};
 
     /**
-     * Restrict teachers to their own assessments
+     * Restrict teachers to their assigned subject/class combinations
      */
     if (user.role === Role.TEACHER) {
       const assignments = await prisma.teacherSubject.findMany({
@@ -123,6 +123,7 @@ router.get(
         subjectId: a.subjectId,
         classId: a.classId
       }));
+    }
 
     /**
      * Dynamic filters
@@ -153,7 +154,6 @@ router.get(
   authenticate,
   requireRole([Role.TEACHER, Role.ADMIN]),
   async (req, res) => {
-
     const id = Number(req.params.id);
 
     if (Number.isNaN(id)) {
@@ -199,7 +199,6 @@ router.get(
   authenticate,
   requireRole([Role.TEACHER]),
   async (req, res) => {
-
     const assessmentId = Number(req.params.id);
 
     const assessment = await prisma.assessment.findUnique({
@@ -246,7 +245,6 @@ router.post(
   authenticate,
   requireRole([Role.TEACHER]),
   async (req, res) => {
-
     const id = Number(req.params.id);
 
     const assessment = await prisma.assessment.findUnique({
@@ -275,7 +273,6 @@ router.post(
 
     await prisma.$transaction(
       scores.map((s: any) => {
-
         if (s.score < 0 || s.score > assessment.maxScore) {
           throw new Error(`Invalid score for student ${s.studentId}`);
         }
@@ -317,7 +314,6 @@ router.patch(
   authenticate,
   requireRole([Role.TEACHER]),
   async (req, res) => {
-
     const id = Number(req.params.id);
 
     const assessment = await prisma.assessment.findUnique({
@@ -366,7 +362,6 @@ router.post(
   authenticate,
   requireRole([Role.TEACHER]),
   async (req, res) => {
-
     const id = Number(req.params.id);
 
     const assessment = await prisma.assessment.findUnique({
@@ -415,7 +410,6 @@ router.delete(
   authenticate,
   requireRole([Role.TEACHER, Role.ADMIN]),
   async (req, res) => {
-
     const id = Number(req.params.id);
 
     const assessment = await prisma.assessment.findUnique({
