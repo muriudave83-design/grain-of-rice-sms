@@ -1,5 +1,5 @@
 import { useState } from "react";
-import API from "../../api/apiClient";
+import API from "../../../api/apiClient";
 import { useNavigate } from "react-router-dom";
 
 export default function CreateHomework() {
@@ -50,7 +50,7 @@ export default function CreateHomework() {
         categoryId: 1,
         type: "HOMEWORK",
         });
-        
+
       alert("Homework created successfully");
 
       navigate("/teacher/assessments");
