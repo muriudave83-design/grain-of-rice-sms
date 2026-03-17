@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 export default function CreateHomework() {
   const navigate = useNavigate();
 
+  const API_URL = import.meta.env.VITE_API_URL;
+
   const [form, setForm] = useState({
     title: "",
     classId: "",
@@ -29,7 +31,6 @@ export default function CreateHomework() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Basic validation
     if (!form.title || !form.classId || !form.subjectId || !form.termId) {
       alert("Please fill all required fields");
       return;
@@ -38,17 +39,33 @@ export default function CreateHomework() {
     try {
       setLoading(true);
 
-    await axios.post("/api/assessments", {
-    ...form,
-    categoryId: 1,
-    type: "HOMEWORK",
-    });
+      const token = localStorage.getItem("token");
+
+      const url = `${API_URL}/assessments`;
+
+      console.log("🚀 Creating homework:", url);
+
+      await axios.post(
+        url,
+        {
+          ...form,
+          categoryId: 1,
+          type: "HOMEWORK",
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       alert("Homework created successfully");
 
       navigate("/teacher/assessments");
+
     } catch (err) {
-      console.error(err);
+      console.error("❌ Create homework error:", err);
       alert("Error creating homework");
     } finally {
       setLoading(false);
@@ -62,7 +79,6 @@ export default function CreateHomework() {
       </h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Title */}
         <input
           name="title"
           placeholder="Homework Title"
@@ -70,7 +86,6 @@ export default function CreateHomework() {
           className="w-full border p-2 rounded"
         />
 
-        {/* Class */}
         <input
           name="classId"
           placeholder="Class ID"
@@ -78,7 +93,6 @@ export default function CreateHomework() {
           className="w-full border p-2 rounded"
         />
 
-        {/* Subject */}
         <input
           name="subjectId"
           placeholder="Subject ID"
@@ -86,7 +100,6 @@ export default function CreateHomework() {
           className="w-full border p-2 rounded"
         />
 
-        {/* Term */}
         <input
           name="termId"
           placeholder="Term ID"
@@ -94,26 +107,23 @@ export default function CreateHomework() {
           className="w-full border p-2 rounded"
         />
 
-        {/* Max Score */}
         <input
           name="maxScore"
           type="number"
-          placeholder="Max Score (e.g. 10)"
+          placeholder="Max Score"
           onChange={handleChange}
           className="w-full border p-2 rounded"
         />
 
-        {/* Weight */}
         <input
           name="weight"
           type="number"
           step="0.1"
-          placeholder="Weight (e.g. 0.1)"
+          placeholder="Weight"
           onChange={handleChange}
           className="w-full border p-2 rounded"
         />
 
-        {/* Submit */}
         <button
           type="submit"
           disabled={loading}
