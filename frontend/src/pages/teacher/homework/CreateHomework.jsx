@@ -1,5 +1,5 @@
 import { useState } from "react";
-import axios from "axios";
+import API from "../../api/apiClient";
 import { useNavigate } from "react-router-dom";
 
 export default function CreateHomework() {
@@ -45,21 +45,12 @@ export default function CreateHomework() {
 
       console.log("🚀 Creating homework:", url);
 
-      await axios.post(
-        url,
-        {
-          ...form,
-          categoryId: 1,
-          type: "HOMEWORK",
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
+        await API.post("/assessments", {
+        ...form,
+        categoryId: 1,
+        type: "HOMEWORK",
+        });
+        
       alert("Homework created successfully");
 
       navigate("/teacher/assessments");
