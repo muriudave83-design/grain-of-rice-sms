@@ -103,8 +103,19 @@ router.get(
   requireRole([Role.TEACHER, Role.ADMIN]),
   async (req, res) => {
     const user = req.user!;
+    const {
+      type,
+      classId,
+      subjectId,
+      termId,
+      status
+    } = req.query;
+
     let where: any = {};
 
+    /**
+     * Restrict teachers to their assignments
+     */
     if (user.role === Role.TEACHER) {
       const assignments = await prisma.teacherSubject.findMany({
         where: { teacherId: user.id },
@@ -115,13 +126,19 @@ router.get(
         return res.json([]);
       }
 
-      where = {
-        OR: assignments.map((a: any) => ({
-          subjectId: a.subjectId,
-          classId: a.classId
-        }))
-      };
-    }
+        where = {
+          ...where,
+          createdById: user.id
+        };
+
+    /**
+     * Dynamic filters
+     */
+    if (type) where.type = type;
+    if (classId) where.classId = Number(classId);
+    if (subjectId) where.subjectId = Number(subjectId);
+    if (termId) where.termId = Number(termId);
+    if (status) where.status = status;
 
     const data = await prisma.assessment.findMany({
       where,
@@ -287,9 +304,6 @@ router.post(
       })
     );
 
-    /**
-     * Recalculate grades after score change
-     */
     await computeGradesForSubject({
       classId: assessment.classId,
       subjectId: assessment.subjectId,
@@ -334,18 +348,12 @@ router.patch(
       data: { status: "SUBMITTED" }
     });
 
-    /**
-     * 1️⃣ Compute grades
-     */
     await computeGradesForSubject({
       classId: assessment.classId,
       subjectId: assessment.subjectId,
       termId: assessment.termId
     });
 
-    /**
-     * 2️⃣ Generate report cards
-     */
     await generateReportCardsForClass({
       classId: assessment.classId,
       termId: assessment.termId
@@ -389,18 +397,12 @@ router.post(
       data: { status: "SUBMITTED" }
     });
 
-    /**
-     * 1️⃣ Compute grades
-     */
     await computeGradesForSubject({
       classId: assessment.classId,
       subjectId: assessment.subjectId,
       termId: assessment.termId
     });
 
-    /**
-     * 2️⃣ Generate report cards
-     */
     await generateReportCardsForClass({
       classId: assessment.classId,
       termId: assessment.termId
