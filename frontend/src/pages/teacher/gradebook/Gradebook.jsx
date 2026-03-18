@@ -7,11 +7,9 @@ export default function Gradebook() {
 
   useEffect(() => {
     axios
-      .get(
-        "https://sms-backend-1w30.onrender.com/api/gradebook?classId=1&subjectId=1&termId=1"
-      )
+      .get("/api/gradebook?classId=1&subjectId=1&termId=1")
       .then((res) => {
-        console.log("GRADEBOOK DATA:", res.data);
+        console.log("GRADEBOOK:", res.data);
         setData(res.data);
       })
       .catch((err) => {
@@ -20,10 +18,26 @@ export default function Gradebook() {
       });
   }, []);
 
+  const handleScoreChange = async (studentId, assessmentId, value) => {
+    // 🚫 Prevent empty / invalid values
+    if (value === "" || isNaN(value)) return;
+
+    try {
+      await axios.post("/api/gradebook/score", {
+        studentId,
+        assessmentId,
+        score: Number(value),
+      });
+    } catch (err) {
+      console.error("Failed to save score", err);
+    }
+  };
+
   if (error) return <div className="p-4 text-red-600">{error}</div>;
   if (!data) return <div className="p-4">Loading gradebook...</div>;
 
-  const { students = [], assessments = [] } = data;
+  const students = data.students || [];
+  const assessments = data.assessments || [];
 
   return (
     <div className="p-4 overflow-x-auto">
@@ -48,14 +62,28 @@ export default function Gradebook() {
         <tbody>
           {students.map((student) => (
             <tr key={student.id}>
-              <td className="border p-2">{student.name}</td>
+              <td className="border p-2">
+                {student.name ||
+                  `${student.firstName || ""} ${student.lastName || ""}`}
+              </td>
 
               {assessments.map((a) => {
-                const score = student.scores?.[a.id];
+                const score = student.scores?.[a.id] ?? "";
 
                 return (
                   <td key={a.id} className="border p-2 text-center">
-                    {score ?? "-"}
+                    <input
+                      type="number"
+                      defaultValue={score}
+                      className="w-16 text-center border rounded"
+                      onBlur={(e) =>
+                        handleScoreChange(
+                          student.id,
+                          a.id,
+                          e.target.value
+                        )
+                      }
+                    />
                   </td>
                 );
               })}
@@ -67,12 +95,18 @@ export default function Gradebook() {
               </td>
 
               <td className="border p-2 text-center">
-                {student.missingCount}
+                {student.missingCount ?? "-"}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+
+      {students.length === 0 && (
+        <div className="mt-4 text-gray-500">
+          No students found for this class.
+        </div>
+      )}
     </div>
   );
 }
