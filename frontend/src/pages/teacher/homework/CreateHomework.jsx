@@ -137,7 +137,10 @@ export default function CreateHomework() {
             className="w-full border p-2 rounded"
             disabled={!form.classId}
           >
-            <option value="">Select Subject</option>
+            <option value="">
+              {form.classId ? "Select Subject" : "Select class first"}
+            </option>
+
             {subjects.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
