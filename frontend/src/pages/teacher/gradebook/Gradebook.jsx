@@ -3,15 +3,27 @@ import axios from "axios";
 
 export default function Gradebook() {
   const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     axios
-      .get("/api/gradebook?classId=1&subjectId=1&termId=1")
-      .then((res) => setData(res.data))
-      .catch((err) => console.error(err));
+      .get(
+        "https://sms-backend-1w30.onrender.com/api/gradebook?classId=1&subjectId=1&termId=1"
+      )
+      .then((res) => {
+        console.log("GRADEBOOK DATA:", res.data);
+        setData(res.data);
+      })
+      .catch((err) => {
+        console.error(err);
+        setError("Failed to load gradebook");
+      });
   }, []);
 
+  if (error) return <div className="p-4 text-red-600">{error}</div>;
   if (!data) return <div className="p-4">Loading gradebook...</div>;
+
+  const { students = [], assessments = [] } = data;
 
   return (
     <div className="p-4 overflow-x-auto">
@@ -22,32 +34,41 @@ export default function Gradebook() {
           <tr>
             <th className="border p-2">Student</th>
 
-            {data.assessments.map((a) => (
+            {assessments.map((a) => (
               <th key={a.id} className="border p-2">
                 {a.title}
               </th>
             ))}
+
+            <th className="border p-2">Avg</th>
+            <th className="border p-2">Missing</th>
           </tr>
         </thead>
 
         <tbody>
-          {data.students.map((student) => (
+          {students.map((student) => (
             <tr key={student.id}>
               <td className="border p-2">{student.name}</td>
 
-              {data.assessments.map((a) => {
-                const score = data.scores.find(
-                  (s) =>
-                    s.studentId === student.id &&
-                    s.assessmentId === a.id
-                );
+              {assessments.map((a) => {
+                const score = student.scores?.[a.id];
 
                 return (
                   <td key={a.id} className="border p-2 text-center">
-                    {score?.score ?? "-"}
+                    {score ?? "-"}
                   </td>
                 );
               })}
+
+              <td className="border p-2 text-center">
+                {student.average != null
+                  ? (student.average * 100).toFixed(0) + "%"
+                  : "-"}
+              </td>
+
+              <td className="border p-2 text-center">
+                {student.missingCount}
+              </td>
             </tr>
           ))}
         </tbody>
