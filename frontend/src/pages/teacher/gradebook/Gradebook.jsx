@@ -11,11 +11,19 @@ export default function Gradebook() {
   const inputRefs = useRef({});
   const debounceTimers = useRef({});
 
+  const fetchGradebook = async () => {
+    try {
+      const res = await axios.get(
+        "/api/gradebook?classId=1&subjectId=1&termId=1"
+      );
+      setData(res.data);
+    } catch {
+      setError("Failed to load gradebook");
+    }
+  };
+
   useEffect(() => {
-    axios
-      .get("/api/gradebook?classId=1&subjectId=1&termId=1")
-      .then((res) => setData(res.data))
-      .catch(() => setError("Failed to load gradebook"));
+    fetchGradebook();
   }, []);
 
   const getKey = (sId, aId) => `${sId}-${aId}`;
@@ -36,32 +44,6 @@ export default function Gradebook() {
     return "";
   };
 
-  const recalcStudent = (student, assessments, updatedScores) => {
-    const validScores = assessments
-      .map((a) => {
-        const score = updatedScores[a.id];
-        if (score == null || !a.maxScore) return null;
-        return score / a.maxScore;
-      })
-      .filter((v) => v != null);
-
-    const avg =
-      validScores.length > 0
-        ? validScores.reduce((a, b) => a + b, 0) /
-          validScores.length
-        : null;
-
-    const missingCount =
-      assessments.length - validScores.length;
-
-    return {
-      ...student,
-      scores: updatedScores,
-      average: avg,
-      missingCount,
-    };
-  };
-
   const saveScore = async (studentId, assessmentId, score) => {
     const key = getKey(studentId, assessmentId);
     setSaving((prev) => ({ ...prev, [key]: true }));
@@ -77,6 +59,9 @@ export default function Gradebook() {
         ...prev,
         [key]: score,
       }));
+
+      // ✅ REFETCH authoritative backend data
+      fetchGradebook();
     } catch (err) {
       console.error("Save failed (offline?)", err);
     } finally {
@@ -88,6 +73,7 @@ export default function Gradebook() {
     const newScore =
       value === "" || value === null ? null : Number(value);
 
+    // ✅ Optimistic UI update (ONLY scores, no averages)
     setData((prev) => {
       if (!prev) return prev;
 
@@ -102,12 +88,13 @@ export default function Gradebook() {
       const updatedStudents = prev.students.map((student) => {
         if (student.id !== studentId) return student;
 
-        const updatedScores = {
-          ...student.scores,
-          [assessmentId]: safeScore,
+        return {
+          ...student,
+          scores: {
+            ...student.scores,
+            [assessmentId]: safeScore,
+          },
         };
-
-        return recalcStudent(student, prev.assessments, updatedScores);
       });
 
       return { ...prev, students: updatedStudents };
