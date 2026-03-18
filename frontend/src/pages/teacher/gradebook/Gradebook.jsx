@@ -33,10 +33,17 @@ export default function Gradebook() {
           [assessmentId]: newScore,
         };
 
-        // 🔥 Recalculate average
-        const validScores = Object.values(updatedScores).filter(
-          (s) => s !== null && s !== undefined
-        );
+        // 🔥 Recalculate normalized average
+        const validScores = prev.assessments
+          .map((a) => {
+            const score = updatedScores[a.id];
+
+            if (score == null || !a.maxScore) return null;
+
+            // ✅ Normalize score
+            return score / a.maxScore;
+          })
+          .filter((v) => v != null);
 
         const avg =
           validScores.length > 0
@@ -101,7 +108,8 @@ export default function Gradebook() {
             <tr key={student.id}>
               <td className="border p-2">
                 {student.name ||
-                  `${student.firstName || ""} ${student.lastName || ""}`}
+                  `${student.firstName || ""} ${student.lastName || ""}`
+                }
               </td>
 
               {assessments.map((a) => {
@@ -111,7 +119,7 @@ export default function Gradebook() {
                   <td key={a.id} className="border p-2 text-center">
                     <input
                       type="number"
-                      value={score} // ✅ controlled input
+                      value={score}
                       className="w-16 text-center border rounded"
                       onChange={(e) =>
                         handleScoreChange(
