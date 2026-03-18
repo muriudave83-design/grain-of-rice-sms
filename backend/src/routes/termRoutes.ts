@@ -13,7 +13,7 @@ const router = Router();
 router.get(
   "/",
   authenticate,
-  requireRole(["ADMIN"]),
+  requireRole(["ADMIN", "TEACHER"]),
   getTerms
 );
 
