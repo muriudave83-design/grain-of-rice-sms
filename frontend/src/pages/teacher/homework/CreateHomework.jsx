@@ -11,7 +11,7 @@ export default function CreateHomework() {
     subjectId: "",
     termId: "",
     maxScore: 10,
-    weight: 0.1,
+    weight: 10,
   });
 
   const [assignments, setAssignments] = useState([]);
@@ -74,6 +74,7 @@ export default function CreateHomework() {
 
       await API.post("/assessments", {
         ...form,
+        weight: form.weight / 100,
         categoryId: 1,
         type: "HOMEWORK",
       });
@@ -107,6 +108,7 @@ export default function CreateHomework() {
         <p className="text-gray-500">Loading form data...</p>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
+
           <input
             name="title"
             placeholder="Homework Title"
@@ -157,24 +159,33 @@ export default function CreateHomework() {
             ))}
           </select>
 
-          <input
-            name="maxScore"
-            type="number"
-            placeholder="Max Score"
-            value={form.maxScore}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          />
+          <div>
+            <label className="block text-sm mb-1">Max Score</label>
+            <input
+              name="maxScore"
+              type="number"
+              value={form.maxScore}
+              onChange={handleChange}
+              className="w-full border p-2 rounded"
+            />
+            <p className="text-xs text-gray-500">
+              Maximum number of points students can earn
+            </p>
+          </div>
 
-          <input
-            name="weight"
-            type="number"
-            step="0.01"
-            placeholder="Weight"
-            value={form.weight}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          />
+          <div>
+            <label className="block text-sm mb-1">Weight (%)</label>
+            <input
+              name="weight"
+              type="number"
+              value={form.weight}
+              onChange={handleChange}
+              className="w-full border p-2 rounded"
+            />
+            <p className="text-xs text-gray-500">
+              Percentage contribution to the term grade
+            </p>
+          </div>
 
           <button
             type="submit"
@@ -183,6 +194,7 @@ export default function CreateHomework() {
           >
             {loading ? "Creating..." : "Create Homework"}
           </button>
+
         </form>
       )}
     </div>
