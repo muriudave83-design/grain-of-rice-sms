@@ -1,20 +1,22 @@
 import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
+import { AssessmentStatus } from "@prisma/client";
 
 export const getGradebookGrid = async (req: Request, res: Response) => {
   try {
     const classId = Number(req.query.classId);
     const subjectId = Number(req.query.subjectId);
+    const termId = Number(req.query.termId);
 
-    if (!classId || !subjectId) {
+    if (!classId || !subjectId || !termId) {
       return res.status(400).json({
-        message: "classId and subjectId required",
+        message: "classId, subjectId and termId are required",
       });
     }
 
-    // 1️⃣ Assessments for class + subject (includes categoryId)
+    // 1️⃣ Assessments for class + subject + term
     const assessments = await prisma.assessment.findMany({
-      where: { classId, subjectId },
+      where: { classId, subjectId, termId },
       orderBy: { id: "asc" },
       select: {
         id: true,
@@ -77,21 +79,27 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
       scoreMap[s.studentId][String(s.assessmentId)] = s.score;
     }
 
-    // 7️⃣ Build rows (E2 — Weighted category grading using raw scores)
+    // Filter only published assessments for missing count
+    const activeAssessments = assessments.filter(
+      (a) => a.status === AssessmentStatus.SUBMITTED
+    );
+
+    // 7️⃣ Build rows
     const studentRows = students.map((student) => {
       const studentScores = scoreMap[student.id] || {};
       const categoryBuckets: Record<number, number[]> = {};
 
-      // group scores per category
+      // group normalized scores per category
       for (const assessment of assessments) {
         const score = studentScores[String(assessment.id)];
 
         if (
           score != null &&
-          assessment.categoryId
+          assessment.categoryId &&
+          assessment.maxScore > 0
         ) {
-          // ✅ Use raw score (no normalization)
-          const value = score;
+          // ✅ Normalize score (important fix)
+          const value = score / assessment.maxScore;
 
           if (!categoryBuckets[assessment.categoryId]) {
             categoryBuckets[assessment.categoryId] = [];
@@ -108,7 +116,10 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
       for (const categoryId of Object.keys(categoryBuckets)) {
         const parsedCategoryId = parseInt(categoryId, 10);
         const values = categoryBuckets[parsedCategoryId];
-        const weight = categoryWeightMap[parsedCategoryId] ?? 1;
+        const weight = (categoryWeightMap[parsedCategoryId] ?? 0) / 100;
+
+        // skip invalid categories
+        if (!weight) continue;
 
         const categoryAverage =
           values.reduce((a, b) => a + b, 0) / values.length;
@@ -122,15 +133,12 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
           ? Number((weightedTotal / totalWeightUsed).toFixed(2))
           : null;
 
-      // 🔎 DEBUG LOGS
-      console.log("WEIGHT MAP:", categoryWeightMap);
-      console.log("CATEGORY BUCKETS:", categoryBuckets);
-      console.log("WEIGHTED TOTAL:", weightedTotal);
-      console.log("TOTAL WEIGHT USED:", totalWeightUsed);
-      console.log("FINAL AVERAGE:", average);
-
+      // better missing count (only published)
       const missingCount =
-        assessments.length - Object.keys(studentScores).length;
+        activeAssessments.length -
+        activeAssessments.filter(
+          (a) => studentScores[String(a.id)] != null
+        ).length;
 
       return {
         id: student.id,

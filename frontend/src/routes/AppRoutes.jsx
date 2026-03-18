@@ -36,6 +36,7 @@ import CreateAssessment from "../pages/teacher/assessments/CreateAssessment";
 import ScoresEntry from "../pages/teacher/assessments/ScoresEntry";
 import AssessmentReview from "../pages/teacher/assessments/AssessmentReview";
 import EditAssessmentRedirect from "../pages/teacher/assessments/Edit";
+import Gradebook from "../pages/teacher/gradebook/Gradebook";
 import TeacherGradebook from "../pages/teacher/TeacherGradebook";
 import TeacherAttendanceClass from "../pages/teacher/attendance/TeacherAttendanceClass";
 import TeacherAttendanceSession from "../pages/teacher/attendance/TeacherAttendanceSession";
@@ -225,6 +226,12 @@ export default function AppRoutes() {
             <Route
               path="/teacher/assessments/:id/review"
               element={<AssessmentReview />}
+            />
+
+            {/* ✅ GRADEBOOK (NEW CORE SYSTEM) */}
+            <Route
+              path="/teacher/gradebook"
+              element={<Gradebook />}
             />
 
             {/* ✅ NEW HOMEWORK ROUTE */}
