@@ -18,20 +18,37 @@ export default function Gradebook() {
       });
   }, []);
 
-  const handleScoreChange = async (studentId, assessmentId, value) => {
-    // 🚫 Prevent empty / invalid values
-    if (value === "" || isNaN(value)) return;
+    const handleScoreChange = async (studentId, assessmentId, value) => {
+    const newScore = Number(value);
+
+    // 🔥 1. Optimistic UI update
+    setData((prev) => {
+        const updatedStudents = prev.students.map((student) => {
+        if (student.id !== studentId) return student;
+
+        return {
+            ...student,
+            scores: {
+            ...student.scores,
+            [assessmentId]: newScore,
+            },
+        };
+        });
+
+        return { ...prev, students: updatedStudents };
+    });
 
     try {
-      await axios.post("/api/gradebook/score", {
+        // 🔥 2. Save to backend
+        await axios.post("/api/gradebook/score", {
         studentId,
         assessmentId,
-        score: Number(value),
-      });
+        score: newScore,
+        });
     } catch (err) {
-      console.error("Failed to save score", err);
+        console.error("Failed to save score", err);
     }
-  };
+    };
 
   if (error) return <div className="p-4 text-red-600">{error}</div>;
   if (!data) return <div className="p-4">Loading gradebook...</div>;
