@@ -157,6 +157,18 @@ export default function Gradebook() {
     <div className="p-4 overflow-x-auto">
       <h2>Gradebook</h2>
 
+      {/* ✅ NEW: Grading Weights Display */}
+      {data?.categories && data.categories.length > 0 && (
+        <div style={{ marginBottom: "10px" }}>
+          <strong>Grading Weights:</strong>{" "}
+          {data.categories.map((c) => (
+            <span key={c.id} style={{ marginRight: "10px" }}>
+              {c.name ? `${c.name}:` : `Category ${c.id}:`} {c.weight}%
+            </span>
+          ))}
+        </div>
+      )}
+
       <table className="border w-full">
         <thead>
           <tr>
