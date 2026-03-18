@@ -14,49 +14,51 @@ export default function CreateHomework() {
     weight: 0.1,
   });
 
-  const [classes, setClasses] = useState([]);
-  const [subjects, setSubjects] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [terms, setTerms] = useState([]);
 
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
 
-  // 🔥 Load dropdown data
-      useEffect(() => {
-      async function loadDropdowns() {
-        try {
-          const [assignRes, termRes] = await Promise.all([
-            API.get("/teacher/assignments"),
-            API.get("/terms"),
-          ]);
+  // Load dropdown data
+  useEffect(() => {
+    async function loadDropdowns() {
+      try {
+        const [assignRes, termRes] = await Promise.all([
+          API.get("/teacher/assignments"),
+          API.get("/terms"),
+        ]);
 
-          const assignments = assignRes.data;
-
-          const classes = assignments.map(a => a.class);
-          const subjects = assignments.map(a => a.subject);
-
-          setClasses(classes);
-          setSubjects(subjects);
-          setTerms(termRes.data);
-
-        } catch (err) {
-          console.error("❌ Failed to load dropdown data", err);
-        } finally {
-          setLoadingData(false);
-        }
+        setAssignments(assignRes.data);
+        setTerms(termRes.data);
+      } catch (err) {
+        console.error("Failed to load dropdown data", err);
+      } finally {
+        setLoadingData(false);
       }
+    }
 
-      loadDropdowns();
-    }, []);
+    loadDropdowns();
+  }, []);
+
+  // Unique classes derived from assignments
+  const classes = [
+    ...new Map(assignments.map((a) => [a.class.id, a.class])).values(),
+  ];
+
+  // Subjects filtered by selected class
+  const subjects = assignments
+    .filter((a) => a.class.id == form.classId)
+    .map((a) => a.subject);
 
   const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]:
-        e.target.type === "number"
-          ? Number(e.target.value)
-          : e.target.value,
-    });
+    const { name, value, type } = e.target;
+
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "number" ? Number(value) : value,
+      ...(name === "classId" && { subjectId: "" }),
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -77,11 +79,9 @@ export default function CreateHomework() {
       });
 
       alert("Homework created successfully");
-
       navigate("/teacher/assessments");
-
     } catch (err) {
-      console.error("❌ Create homework error:", err);
+      console.error("Create homework error:", err);
       alert("Error creating homework");
     } finally {
       setLoading(false);
@@ -90,13 +90,10 @@ export default function CreateHomework() {
 
   return (
     <div className="p-6 max-w-xl">
-
-      {/* Breadcrumb */}
       <div className="text-sm text-gray-600 mb-2">
         Teacher / Homework / Create
       </div>
 
-      {/* Back Button */}
       <button
         onClick={() => navigate("/teacher/assessments")}
         className="mb-4 px-3 py-1 border rounded"
@@ -104,16 +101,12 @@ export default function CreateHomework() {
         ← Back to Assessments
       </button>
 
-      <h2 className="text-2xl font-semibold mb-4">
-        Create Homework
-      </h2>
+      <h2 className="text-2xl font-semibold mb-4">Create Homework</h2>
 
       {loadingData ? (
         <p className="text-gray-500">Loading form data...</p>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
-
-          {/* Title */}
           <input
             name="title"
             placeholder="Homework Title"
@@ -121,7 +114,6 @@ export default function CreateHomework() {
             className="w-full border p-2 rounded"
           />
 
-          {/* Class Dropdown */}
           <select
             name="classId"
             value={form.classId}
@@ -136,12 +128,12 @@ export default function CreateHomework() {
             ))}
           </select>
 
-          {/* Subject Dropdown */}
           <select
             name="subjectId"
             value={form.subjectId}
             onChange={handleChange}
             className="w-full border p-2 rounded"
+            disabled={!form.classId}
           >
             <option value="">Select Subject</option>
             {subjects.map((s) => (
@@ -151,7 +143,6 @@ export default function CreateHomework() {
             ))}
           </select>
 
-          {/* Term Dropdown */}
           <select
             name="termId"
             value={form.termId}
@@ -166,7 +157,6 @@ export default function CreateHomework() {
             ))}
           </select>
 
-          {/* Max Score */}
           <input
             name="maxScore"
             type="number"
@@ -176,7 +166,6 @@ export default function CreateHomework() {
             className="w-full border p-2 rounded"
           />
 
-          {/* Weight */}
           <input
             name="weight"
             type="number"
@@ -187,7 +176,6 @@ export default function CreateHomework() {
             className="w-full border p-2 rounded"
           />
 
-          {/* Submit */}
           <button
             type="submit"
             disabled={loading}
@@ -195,7 +183,6 @@ export default function CreateHomework() {
           >
             {loading ? "Creating..." : "Create Homework"}
           </button>
-
         </form>
       )}
     </div>
