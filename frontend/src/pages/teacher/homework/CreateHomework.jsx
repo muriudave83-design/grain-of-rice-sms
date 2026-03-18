@@ -22,27 +22,32 @@ export default function CreateHomework() {
   const [loadingData, setLoadingData] = useState(true);
 
   // 🔥 Load dropdown data
-  useEffect(() => {
-    async function loadDropdowns() {
-      try {
-        const [classRes, subjectRes, termRes] = await Promise.all([
-          API.get("/classes"),
-          API.get("/subjects"),
-          API.get("/terms"),
-        ]);
+      useEffect(() => {
+      async function loadDropdowns() {
+        try {
+          const [assignRes, termRes] = await Promise.all([
+            API.get("/teacher/assignments"),
+            API.get("/terms"),
+          ]);
 
-        setClasses(classRes.data);
-        setSubjects(subjectRes.data);
-        setTerms(termRes.data);
-      } catch (err) {
-        console.error("❌ Failed to load dropdown data", err);
-      } finally {
-        setLoadingData(false);
+          const assignments = assignRes.data;
+
+          const classes = assignments.map(a => a.class);
+          const subjects = assignments.map(a => a.subject);
+
+          setClasses(classes);
+          setSubjects(subjects);
+          setTerms(termRes.data);
+
+        } catch (err) {
+          console.error("❌ Failed to load dropdown data", err);
+        } finally {
+          setLoadingData(false);
+        }
       }
-    }
 
-    loadDropdowns();
-  }, []);
+      loadDropdowns();
+    }, []);
 
   const handleChange = (e) => {
     setForm({
