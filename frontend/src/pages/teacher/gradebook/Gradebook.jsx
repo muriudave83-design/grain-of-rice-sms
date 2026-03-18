@@ -4,7 +4,6 @@ import axios from "../../../api/axios";
 export default function Gradebook() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState("ALL");
   const [saving, setSaving] = useState({});
   const [previousScores, setPreviousScores] = useState({});
 
@@ -60,7 +59,7 @@ export default function Gradebook() {
         [key]: score,
       }));
 
-      // ✅ REFETCH authoritative backend data
+      // ✅ Always trust backend
       fetchGradebook();
     } catch (err) {
       console.error("Save failed (offline?)", err);
@@ -73,7 +72,6 @@ export default function Gradebook() {
     const newScore =
       value === "" || value === null ? null : Number(value);
 
-    // ✅ Optimistic UI update (ONLY scores, no averages)
     setData((prev) => {
       if (!prev) return prev;
 
@@ -100,7 +98,6 @@ export default function Gradebook() {
       return { ...prev, students: updatedStudents };
     });
 
-    // 🔥 Debounce save
     const key = getKey(studentId, assessmentId);
 
     if (debounceTimers.current[key]) {
@@ -150,11 +147,6 @@ export default function Gradebook() {
   const students = data.students || [];
   const assessments = data.assessments || [];
 
-  const filteredAssessments =
-    filter === "ALL"
-      ? assessments
-      : assessments.filter((a) => a.type === filter);
-
   const classAvg =
     students.length > 0
       ? students.reduce((sum, s) => sum + (s.average || 0), 0) /
@@ -165,15 +157,6 @@ export default function Gradebook() {
     <div className="p-4 overflow-x-auto">
       <h2>Gradebook</h2>
 
-      <div style={{ marginBottom: 10 }}>
-        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-          <option value="ALL">All</option>
-          <option value="HOMEWORK">Homework</option>
-          <option value="TEST">Test</option>
-          <option value="QUIZ">Quiz</option>
-        </select>
-      </div>
-
       <table className="border w-full">
         <thead>
           <tr>
@@ -181,7 +164,7 @@ export default function Gradebook() {
               Student
             </th>
 
-            {filteredAssessments.map((a) => (
+            {assessments.map((a) => (
               <th key={a.id}>{a.title}</th>
             ))}
 
@@ -197,7 +180,7 @@ export default function Gradebook() {
                 {student.name}
               </td>
 
-              {filteredAssessments.map((a, colIndex) => {
+              {assessments.map((a, colIndex) => {
                 const key = getKey(student.id, a.id);
                 const score = student.scores?.[a.id] ?? "";
 
@@ -258,7 +241,7 @@ export default function Gradebook() {
 
           <tr>
             <td style={{ fontWeight: "bold" }}>Class Avg</td>
-            <td colSpan={filteredAssessments.length}></td>
+            <td colSpan={assessments.length}></td>
             <td>
               {classAvg != null
                 ? (classAvg * 100).toFixed(0) + "%"
