@@ -32,6 +32,7 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
       select: {
         id: true,
         weight: true,
+        name: true, 
       },
     });
 
@@ -154,7 +155,7 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
       students: studentRows,
       categories, // 👈 ADD THIS LINE
     });
-    
+
   } catch (err) {
     console.error("Failed to build gradebook grid:", err);
     res.status(500).json({
