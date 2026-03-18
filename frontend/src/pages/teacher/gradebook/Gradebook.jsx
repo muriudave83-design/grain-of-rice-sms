@@ -18,37 +18,57 @@ export default function Gradebook() {
       });
   }, []);
 
-    const handleScoreChange = async (studentId, assessmentId, value) => {
-    const newScore = Number(value);
+  const handleScoreChange = async (studentId, assessmentId, value) => {
+    const newScore =
+      value === "" || value === null ? null : Number(value);
 
-    // 🔥 1. Optimistic UI update
     setData((prev) => {
-        const updatedStudents = prev.students.map((student) => {
+      if (!prev) return prev;
+
+      const updatedStudents = prev.students.map((student) => {
         if (student.id !== studentId) return student;
 
-        return {
-            ...student,
-            scores: {
-            ...student.scores,
-            [assessmentId]: newScore,
-            },
+        const updatedScores = {
+          ...student.scores,
+          [assessmentId]: newScore,
         };
-        });
 
-        return { ...prev, students: updatedStudents };
+        // 🔥 Recalculate average
+        const validScores = Object.values(updatedScores).filter(
+          (s) => s !== null && s !== undefined
+        );
+
+        const avg =
+          validScores.length > 0
+            ? validScores.reduce((a, b) => a + b, 0) /
+              validScores.length
+            : null;
+
+        // 🔥 Recalculate missing
+        const missingCount =
+          prev.assessments.length - validScores.length;
+
+        return {
+          ...student,
+          scores: updatedScores,
+          average: avg,
+          missingCount,
+        };
+      });
+
+      return { ...prev, students: updatedStudents };
     });
 
     try {
-        // 🔥 2. Save to backend
-        await axios.post("/api/gradebook/score", {
+      await axios.post("/api/gradebook/score", {
         studentId,
         assessmentId,
         score: newScore,
-        });
+      });
     } catch (err) {
-        console.error("Failed to save score", err);
+      console.error("Failed to save score", err);
     }
-    };
+  };
 
   if (error) return <div className="p-4 text-red-600">{error}</div>;
   if (!data) return <div className="p-4">Loading gradebook...</div>;
@@ -91,9 +111,9 @@ export default function Gradebook() {
                   <td key={a.id} className="border p-2 text-center">
                     <input
                       type="number"
-                      defaultValue={score}
+                      value={score} // ✅ controlled input
                       className="w-16 text-center border rounded"
-                      onBlur={(e) =>
+                      onChange={(e) =>
                         handleScoreChange(
                           student.id,
                           a.id,
