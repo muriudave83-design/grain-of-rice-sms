@@ -1,11 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import API from "../../../api/apiClient";
 import { useNavigate } from "react-router-dom";
 
 export default function CreateHomework() {
   const navigate = useNavigate();
-
-  const API_URL = import.meta.env.VITE_API_URL;
 
   const [form, setForm] = useState({
     title: "",
@@ -16,7 +14,35 @@ export default function CreateHomework() {
     weight: 0.1,
   });
 
+  const [classes, setClasses] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [terms, setTerms] = useState([]);
+
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
+
+  // 🔥 Load dropdown data
+  useEffect(() => {
+    async function loadDropdowns() {
+      try {
+        const [classRes, subjectRes, termRes] = await Promise.all([
+          API.get("/classes"),
+          API.get("/subjects"),
+          API.get("/terms"),
+        ]);
+
+        setClasses(classRes.data);
+        setSubjects(subjectRes.data);
+        setTerms(termRes.data);
+      } catch (err) {
+        console.error("❌ Failed to load dropdown data", err);
+      } finally {
+        setLoadingData(false);
+      }
+    }
+
+    loadDropdowns();
+  }, []);
 
   const handleChange = (e) => {
     setForm({
@@ -77,60 +103,96 @@ export default function CreateHomework() {
         Create Homework
       </h2>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          name="title"
-          placeholder="Homework Title"
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-        />
+      {loadingData ? (
+        <p className="text-gray-500">Loading form data...</p>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
 
-        <input
-          name="classId"
-          placeholder="Class ID"
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-        />
+          {/* Title */}
+          <input
+            name="title"
+            placeholder="Homework Title"
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          />
 
-        <input
-          name="subjectId"
-          placeholder="Subject ID"
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-        />
+          {/* Class Dropdown */}
+          <select
+            name="classId"
+            value={form.classId}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          >
+            <option value="">Select Class</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
 
-        <input
-          name="termId"
-          placeholder="Term ID"
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-        />
+          {/* Subject Dropdown */}
+          <select
+            name="subjectId"
+            value={form.subjectId}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          >
+            <option value="">Select Subject</option>
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
 
-        <input
-          name="maxScore"
-          type="number"
-          placeholder="Max Score"
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-        />
+          {/* Term Dropdown */}
+          <select
+            name="termId"
+            value={form.termId}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          >
+            <option value="">Select Term</option>
+            {terms.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
 
-        <input
-          name="weight"
-          type="number"
-          step="0.01"
-          placeholder="Weight"
-          onChange={handleChange}
-          className="w-full border p-2 rounded"
-        />
+          {/* Max Score */}
+          <input
+            name="maxScore"
+            type="number"
+            placeholder="Max Score"
+            value={form.maxScore}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          />
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded w-full"
-        >
-          {loading ? "Creating..." : "Create Homework"}
-        </button>
-      </form>
+          {/* Weight */}
+          <input
+            name="weight"
+            type="number"
+            step="0.01"
+            placeholder="Weight"
+            value={form.weight}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          />
+
+          {/* Submit */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-blue-600 text-white px-4 py-2 rounded w-full"
+          >
+            {loading ? "Creating..." : "Create Homework"}
+          </button>
+
+        </form>
+      )}
     </div>
   );
 }
