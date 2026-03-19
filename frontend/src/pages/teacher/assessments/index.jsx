@@ -121,14 +121,6 @@ export default function TeacherAssessments() {
           >
             Create Homework
           </Link>
-
-          {/* ✅ NEW REPORT CARDS BUTTON */}
-          <Link
-            to={`/teacher/report-cards/1/term1`}
-            className="px-4 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
-          >
-            Report Cards
-          </Link>
         </div>
       </div>
 
@@ -201,6 +193,14 @@ export default function TeacherAssessments() {
                         className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
                       >
                         Review
+                      </Link>
+
+                      {/* ✅ NEW DYNAMIC REPORT CARDS LINK */}
+                      <Link
+                        to={`/teacher/report-cards/${a.class?.id || 0}/term1`}
+                        className="px-2 py-1 text-xs rounded bg-purple-100 text-purple-700 hover:bg-purple-200"
+                      >
+                        Report Cards
                       </Link>
 
                       {a.status === "DRAFT" && (
