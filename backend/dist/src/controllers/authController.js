@@ -16,8 +16,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
 const registerUser = async (req, res) => {
     try {
         const { name, password, role } = req.body;
-        // ✅ Normalize email to lowercase
-        const email = req.body.email?.toLowerCase();
+        const email = req.body.email?.toLowerCase()?.trim();
         if (!email) {
             return res.status(400).json({ message: "Email is required" });
         }
@@ -26,13 +25,22 @@ const registerUser = async (req, res) => {
                 message: "Admin accounts cannot be created via public registration",
             });
         }
-        const exists = await prisma.user.findUnique({ where: { email } });
+        const exists = await prisma.user.findUnique({
+            where: { email },
+        });
         if (exists) {
-            return res.status(400).json({ message: "Email already registered" });
+            return res.status(400).json({
+                message: "Email already registered",
+            });
         }
-        const hashed = await (0, password_1.hashPassword)(password);
+        const hashedPassword = await (0, password_1.hashPassword)(password);
         const user = await prisma.user.create({
-            data: { name, email, password: hashed, role },
+            data: {
+                name,
+                email,
+                password: hashedPassword,
+                role,
+            },
         });
         res.status(201).json({
             message: "User registered successfully",
@@ -46,7 +54,10 @@ const registerUser = async (req, res) => {
     }
     catch (err) {
         console.error("🔥 REGISTER ERROR:", err);
-        res.status(500).json({ message: "Server error", error: err.message });
+        res.status(500).json({
+            message: "Server error",
+            error: err.message,
+        });
     }
 };
 exports.registerUser = registerUser;
@@ -57,20 +68,23 @@ const loginUser = async (req, res) => {
     try {
         if (!req.body || Object.keys(req.body).length === 0) {
             return res.status(400).json({
-                message: "Empty request body — is Content-Type application/json?",
+                message: "Empty request body — ensure Content-Type is application/json",
             });
         }
-        // ✅ Normalize email to lowercase
-        const email = req.body.email?.toLowerCase();
+        const email = req.body.email?.toLowerCase()?.trim();
         const { password } = req.body;
         if (!email || !password) {
             return res.status(400).json({
                 message: "Email and password are required",
             });
         }
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await prisma.user.findUnique({
+            where: { email },
+        });
         if (!user) {
-            return res.status(400).json({ message: "Invalid email or password" });
+            return res.status(400).json({
+                message: "Invalid email or password",
+            });
         }
         // 🛡️ BLOCK ARCHIVED ACCOUNTS
         if (user.isArchived) {
@@ -84,9 +98,11 @@ const loginUser = async (req, res) => {
                 message: "Account is deactivated.",
             });
         }
-        const valid = await (0, password_1.verifyPassword)(password, user.password);
-        if (!valid) {
-            return res.status(400).json({ message: "Invalid email or password" });
+        const validPassword = await (0, password_1.verifyPassword)(password, user.password);
+        if (!validPassword) {
+            return res.status(400).json({
+                message: "Invalid email or password",
+            });
         }
         const token = jsonwebtoken_1.default.sign({
             id: user.id,
@@ -129,21 +145,25 @@ exports.loginUser = loginUser;
 const changePassword = async (req, res) => {
     try {
         if (!req.user) {
-            return res.status(401).json({ message: "Unauthorized" });
+            return res.status(401).json({
+                message: "Unauthorized",
+            });
         }
         const userId = req.user.id;
         const userRole = req.user.role;
         const { currentPassword, newPassword } = req.body;
         if (!currentPassword || !newPassword) {
             return res.status(400).json({
-                message: "All fields are required.",
+                message: "Current password and new password are required.",
             });
         }
         const user = await prisma.user.findUnique({
             where: { id: userId },
         });
         if (!user) {
-            return res.status(404).json({ message: "User not found." });
+            return res.status(404).json({
+                message: "User not found.",
+            });
         }
         const isValid = await (0, password_1.verifyPassword)(currentPassword, user.password);
         if (!isValid) {
@@ -152,6 +172,7 @@ const changePassword = async (req, res) => {
             });
         }
         const hashedNewPassword = await (0, password_1.hashPassword)(newPassword);
+        // ✅ CRITICAL FIX — clear mustChangePassword
         await prisma.user.update({
             where: { id: userId },
             data: {
@@ -160,7 +181,7 @@ const changePassword = async (req, res) => {
                 updatedAt: new Date(),
             },
         });
-        // ✅ Audit log entry
+        // ✅ Audit Log
         await (0, auditLog_service_1.createAuditLog)({
             action: client_1.AuditAction.PASSWORD_CHANGED,
             entityType: "User",

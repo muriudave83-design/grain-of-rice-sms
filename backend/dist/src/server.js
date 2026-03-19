@@ -29,6 +29,7 @@ const admin_subjects_routes_1 = __importDefault(require("./routes/admin/admin.su
 const admin_students_routes_1 = __importDefault(require("./routes/admin/admin.students.routes"));
 const admin_class_students_routes_1 = __importDefault(require("./routes/admin/admin.class.students.routes"));
 const admin_classSubjects_routes_1 = __importDefault(require("./routes/admin/admin.classSubjects.routes"));
+const adminAttendance_routes_1 = __importDefault(require("./routes/adminAttendance.routes"));
 // ✅ NEW: Teacher ↔ Subject assignments (ADMIN)
 const admin_teacherSubjects_routes_1 = __importDefault(require("./routes/admin/admin.teacherSubjects.routes"));
 // ✅ NEW: Teacher assignments endpoint
@@ -100,6 +101,7 @@ app.use("/api/classes", classes_1.default);
 app.use("/api/gradebook", gradebookRoutes_1.default);
 app.use("/api/dashboard", dashboardRoutes_1.default);
 app.use("/api/assignment-categories", assignmentCategory_routes_1.default);
+app.use("/api/admin/attendance", adminAttendance_routes_1.default);
 // ✅ STANDARDIZED TERMS ROUTE
 app.use("/api/terms", termRoutes_1.default);
 app.use("/api/attendance", attendanceRoutes_1.default);

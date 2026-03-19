@@ -2,18 +2,20 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getGradebookGrid = void 0;
 const client_1 = require("../prisma/client");
+const client_2 = require("@prisma/client");
 const getGradebookGrid = async (req, res) => {
     try {
         const classId = Number(req.query.classId);
         const subjectId = Number(req.query.subjectId);
-        if (!classId || !subjectId) {
+        const termId = Number(req.query.termId);
+        if (!classId || !subjectId || !termId) {
             return res.status(400).json({
-                message: "classId and subjectId required",
+                message: "classId, subjectId and termId are required",
             });
         }
-        // 1️⃣ Assessments for class + subject (includes categoryId)
+        // 1️⃣ Assessments for class + subject + term
         const assessments = await client_1.prisma.assessment.findMany({
-            where: { classId, subjectId },
+            where: { classId, subjectId, termId },
             orderBy: { id: "asc" },
             select: {
                 id: true,
@@ -28,14 +30,10 @@ const getGradebookGrid = async (req, res) => {
             select: {
                 id: true,
                 weight: true,
+                name: true,
             },
         });
-        // 3️⃣ Build category weight lookup map
-        const categoryWeightMap = {};
-        for (const c of categories) {
-            categoryWeightMap[c.id] = c.weight;
-        }
-        // 4️⃣ Students in class
+        // 3️⃣ Students in class
         const students = await client_1.prisma.student.findMany({
             where: { classId },
             orderBy: { firstName: "asc" },
@@ -45,7 +43,7 @@ const getGradebookGrid = async (req, res) => {
                 lastName: true,
             },
         });
-        // 5️⃣ Scores
+        // 4️⃣ Scores
         const assessmentIds = assessments.map((a) => a.id);
         const scores = assessmentIds.length > 0
             ? await client_1.prisma.assessmentScore.findMany({
@@ -59,7 +57,7 @@ const getGradebookGrid = async (req, res) => {
                 },
             })
             : [];
-        // 6️⃣ Build score map
+        // 5️⃣ Build score map
         const scoreMap = {};
         for (const s of scores) {
             if (!scoreMap[s.studentId]) {
@@ -67,55 +65,62 @@ const getGradebookGrid = async (req, res) => {
             }
             scoreMap[s.studentId][String(s.assessmentId)] = s.score;
         }
-        // 7️⃣ Build rows (E2 — Weighted category grading using raw scores)
+        // Filter only published assessments for missing count
+        const activeAssessments = assessments.filter((a) => a.status === client_2.AssessmentStatus.SUBMITTED);
+        // 6️⃣ Build rows
         const studentRows = students.map((student) => {
             const studentScores = scoreMap[student.id] || {};
             const categoryBuckets = {};
-            // group scores per category
+            // group normalized scores per category
             for (const assessment of assessments) {
                 const score = studentScores[String(assessment.id)];
                 if (score != null &&
-                    assessment.categoryId) {
-                    // ✅ Use raw score (no normalization)
-                    const value = score;
+                    assessment.categoryId &&
+                    assessment.maxScore > 0) {
+                    const value = score / assessment.maxScore;
                     if (!categoryBuckets[assessment.categoryId]) {
                         categoryBuckets[assessment.categoryId] = [];
                     }
                     categoryBuckets[assessment.categoryId].push(value);
                 }
             }
-            // compute weighted average
+            // ✅ NEW: compute weighted average (no inflation)
             let weightedTotal = 0;
-            let totalWeightUsed = 0;
-            for (const categoryId of Object.keys(categoryBuckets)) {
-                const parsedCategoryId = parseInt(categoryId, 10);
-                const values = categoryBuckets[parsedCategoryId];
-                const weight = categoryWeightMap[parsedCategoryId] ?? 1;
-                const categoryAverage = values.reduce((a, b) => a + b, 0) / values.length;
+            const missingCategories = [];
+            for (const category of categories) {
+                const categoryId = category.id;
+                const values = categoryBuckets[categoryId] || [];
+                const weight = (category.weight ?? 0) / 100;
+                if (!weight)
+                    continue;
+                let categoryAverage = 0;
+                if (values.length > 0) {
+                    categoryAverage =
+                        values.reduce((a, b) => a + b, 0) / values.length;
+                }
+                else {
+                    // 👇 Track missing category
+                    missingCategories.push(categoryId);
+                }
                 weightedTotal += categoryAverage * weight;
-                totalWeightUsed += weight;
             }
-            const average = totalWeightUsed > 0
-                ? Number((weightedTotal / totalWeightUsed).toFixed(2))
-                : null;
-            // 🔎 DEBUG LOGS
-            console.log("WEIGHT MAP:", categoryWeightMap);
-            console.log("CATEGORY BUCKETS:", categoryBuckets);
-            console.log("WEIGHTED TOTAL:", weightedTotal);
-            console.log("TOTAL WEIGHT USED:", totalWeightUsed);
-            console.log("FINAL AVERAGE:", average);
-            const missingCount = assessments.length - Object.keys(studentScores).length;
+            const average = Number(weightedTotal.toFixed(2));
+            // better missing count (only published)
+            const missingCount = activeAssessments.length -
+                activeAssessments.filter((a) => studentScores[String(a.id)] != null).length;
             return {
                 id: student.id,
                 name: `${student.firstName} ${student.lastName}`,
                 scores: studentScores,
                 average,
                 missingCount,
+                missingCategories, // 👈 NEW
             };
         });
         res.json({
             assessments,
             students: studentRows,
+            categories,
         });
     }
     catch (err) {

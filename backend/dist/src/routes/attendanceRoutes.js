@@ -6,6 +6,8 @@ const rolesMiddleware_1 = require("../middlewares/rolesMiddleware");
 const ownershipMiddleware_1 = require("../middlewares/ownershipMiddleware");
 const createAttendanceSession_controller_1 = require("../controllers/attendance/createAttendanceSession.controller");
 const submitAttendanceSession_controller_1 = require("../controllers/attendance/submitAttendanceSession.controller");
+const getAttendanceSession_controller_1 = require("../controllers/attendance/getAttendanceSession.controller");
+const saveAttendanceRecords_controller_1 = require("../controllers/attendance/saveAttendanceRecords.controller");
 const getAttendanceByClass_controller_1 = require("../controllers/attendance/getAttendanceByClass.controller");
 const getParentAttendanceSummary_controller_1 = require("../controllers/attendance/getParentAttendanceSummary.controller");
 const attendance_controller_1 = require("../controllers/attendance.controller");
@@ -18,6 +20,14 @@ router.post("/sessions", authMiddleware_1.authenticate, (0, rolesMiddleware_1.re
 // SUBMIT attendance session (LOCKS IT)
 // ------------------------------------------------------
 router.post("/sessions/:id/submit", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["TEACHER"]), submitAttendanceSession_controller_1.submitAttendanceSession);
+// ------------------------------------------------------
+// GET session details + students
+// ------------------------------------------------------
+router.get("/sessions/:id", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["TEACHER", "ADMIN"]), getAttendanceSession_controller_1.getAttendanceSession);
+// ------------------------------------------------------
+// SAVE attendance records
+// ------------------------------------------------------
+router.post("/sessions/:id/records", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["TEACHER"]), saveAttendanceRecords_controller_1.saveAttendanceRecords);
 // ------------------------------------------------------
 // GET attendance by class
 // ------------------------------------------------------

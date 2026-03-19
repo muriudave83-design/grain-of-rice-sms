@@ -41,6 +41,7 @@ import TeacherGradebook from "../pages/teacher/TeacherGradebook";
 import TeacherAttendanceClass from "../pages/teacher/attendance/TeacherAttendanceClass";
 import TeacherAttendanceSession from "../pages/teacher/attendance/TeacherAttendanceSession";
 import CreateHomework from "../pages/teacher/homework/CreateHomework";
+import ClassReportCards from "../pages/teacher/report-cards/ClassReportCards";
 
 // =======================
 // PARENT PAGES
@@ -228,7 +229,7 @@ export default function AppRoutes() {
               element={<AssessmentReview />}
             />
 
-            {/* ✅ GRADEBOOK (NEW CORE SYSTEM) */}
+            {/* ✅ GRADEBOOK (kept original) */}
             <Route
               path="/teacher/gradebook"
               element={<Gradebook />}
@@ -240,9 +241,16 @@ export default function AppRoutes() {
               element={<CreateHomework />}
             />
 
+            {/* 🔧 FIXED duplicate safely */}
             <Route
-              path="/teacher/gradebook"
+              path="/teacher/gradebook-legacy"
               element={<TeacherGradebook />}
+            />
+
+            {/* ✅ NEW REPORT CARDS ROUTE */}
+            <Route
+              path="/teacher/report-cards/:classId/:term"
+              element={<ClassReportCards />}
             />
 
             {/* Attendance Redirect */}

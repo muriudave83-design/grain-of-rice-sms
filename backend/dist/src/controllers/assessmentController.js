@@ -4,202 +4,279 @@ exports.getMissingAssignments = exports.getParentGradebook = exports.getGradeboo
 const client_1 = require("../prisma/client");
 const client_2 = require("@prisma/client");
 const missingAssignments_1 = require("../utils/missingAssignments");
+const reportCardGenerator_1 = require("../utils/reportCardGenerator");
 /**
- * Create an assessment (DRAFT only)
+ * =====================================================
+ * CREATE ASSESSMENT (DRAFT ONLY)
+ * =====================================================
  */
 const createAssessment = async (req, res) => {
     try {
         console.log("BODY:", req.body);
         console.log("USER:", req.user);
-        if (!req.user) {
-            return res.status(401).json({ error: "Unauthorized" });
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: "Unauthorized teacher" });
         }
-        // Normalize IDs
+        const teacherId = Number(req.user.id);
         const subjectId = Number(req.body.subjectId);
         const classId = Number(req.body.classId);
         const termId = Number(req.body.termId);
         const categoryId = Number(req.body.categoryId);
         const maxScore = Number(req.body.maxScore);
         const title = req.body.title;
-        const type = req.body.type;
-        const weight = req.body.weight ?? 0;
+        const weight = Number(req.body.weight ?? 0);
         const date = req.body.date ? new Date(req.body.date) : new Date();
-        // Required validation (date optional)
+        const typeRaw = req.body.type;
+        /**
+         * ENUM VALIDATION
+         */
+        if (!Object.values(client_2.AssessmentType).includes(typeRaw)) {
+            return res.status(400).json({
+                error: "Invalid assessment type"
+            });
+        }
+        const type = typeRaw;
+        /**
+         * REQUIRED FIELD VALIDATION
+         */
         if (!subjectId ||
             !classId ||
             !termId ||
             !title ||
-            !type ||
             !maxScore ||
             !categoryId) {
             return res.status(400).json({
-                error: "Missing required fields",
+                error: "Missing required fields"
             });
         }
         if (weight < 0) {
             return res.status(400).json({
-                error: "Weight cannot be negative",
+                error: "Weight cannot be negative"
             });
         }
-        /**
-         * 🔐 TEACHER PERMISSION CHECK
-         */
-        const assignment = await client_1.prisma.teacherSubject.findFirst({
-            where: {
-                teacherId: req.user.id,
-                subjectId: subjectId,
-                classId: classId,
-            },
-        });
-        console.log("ASSIGNMENT FOUND:", assignment);
-        if (!assignment) {
-            return res.status(403).json({
-                error: "Forbidden: teacher not assigned to this class and subject",
+        const assessment = await client_1.prisma.$transaction(async (tx) => {
+            /**
+             * SECURITY
+             * Teacher must be assigned to this class + subject
+             */
+            const assignment = await tx.teacherSubject.findFirst({
+                where: {
+                    teacherId,
+                    subjectId,
+                    classId
+                }
             });
-        }
-        /**
-         * ⚖️ Weight validation
-         */
-        const existing = await client_1.prisma.assessment.aggregate({
-            where: {
-                subjectId: subjectId,
-                termId: termId,
-                classId: classId,
-            },
-            _sum: { weight: true },
-        });
-        const currentWeight = existing._sum.weight ?? 0;
-        if (currentWeight + weight > 1) {
-            return res.status(400).json({
-                error: `Weight limit exceeded. Current: ${currentWeight}, Adding: ${weight}`,
+            if (!assignment) {
+                throw new Error("You are not assigned to teach this subject for this class");
+            }
+            /**
+             * WEIGHT VALIDATION
+             */
+            const existing = await tx.assessment.aggregate({
+                where: {
+                    subjectId,
+                    termId,
+                    classId
+                },
+                _sum: { weight: true }
             });
-        }
-        /**
-         * ✅ Create assessment
-         */
-        const assessment = await client_1.prisma.assessment.create({
-            data: {
-                subjectId,
-                classId,
-                termId,
-                title,
-                type,
-                date,
-                maxScore,
-                weight,
-                status: client_2.AssessmentStatus.DRAFT,
-                categoryId,
-            },
+            const currentWeight = existing._sum.weight ?? 0;
+            if (currentWeight + weight > 1) {
+                throw new Error("Weight limit exceeded");
+            }
+            /**
+             * CREATE ASSESSMENT
+             */
+            return tx.assessment.create({
+                data: {
+                    subjectId,
+                    classId,
+                    termId,
+                    title,
+                    type,
+                    date,
+                    maxScore,
+                    weight,
+                    categoryId,
+                    status: client_2.AssessmentStatus.DRAFT
+                }
+            });
         });
-        console.log("ASSESSMENT CREATED:", assessment.id);
         return res.json(assessment);
     }
     catch (err) {
         console.error("CREATE ASSESSMENT ERROR:", err);
+        if (err.message === "Weight limit exceeded") {
+            return res.status(400).json({ error: err.message });
+        }
+        if (err.message.includes("assigned")) {
+            return res.status(403).json({ error: err.message });
+        }
         return res.status(500).json({
-            error: "Failed to create assessment",
+            error: "Failed to create assessment"
         });
     }
 };
 exports.createAssessment = createAssessment;
 /**
- * Record a student's score (ONLY if assessment is DRAFT)
+ * =====================================================
+ * SET STUDENT SCORE
+ * =====================================================
  */
 const setStudentScore = async (req, res) => {
     try {
-        const { assessmentId, studentId, score } = req.body;
-        const assessment = await client_1.prisma.assessment.findUnique({
-            where: { id: assessmentId },
-        });
-        if (!assessment) {
-            return res.status(404).json({ error: "Assessment not found" });
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ error: "Unauthorized teacher" });
         }
-        if (assessment.status !== client_2.AssessmentStatus.DRAFT) {
-            return res.status(409).json({
-                error: "Assessment is submitted and cannot be modified",
+        const teacherId = Number(req.user.id);
+        const assessmentId = Number(req.body.assessmentId);
+        const studentId = Number(req.body.studentId);
+        const score = Number(req.body.score);
+        const result = await client_1.prisma.$transaction(async (tx) => {
+            const assessment = await tx.assessment.findUnique({
+                where: { id: assessmentId }
             });
-        }
-        const record = await client_1.prisma.assessmentScore.upsert({
-            where: {
-                assessmentId_studentId: { assessmentId, studentId },
-            },
-            update: { score },
-            create: { assessmentId, studentId, score },
+            if (!assessment) {
+                throw new Error("Assessment not found");
+            }
+            /**
+             * SECURITY CHECK
+             */
+            const assignment = await tx.teacherSubject.findFirst({
+                where: {
+                    teacherId,
+                    subjectId: assessment.subjectId,
+                    classId: assessment.classId
+                }
+            });
+            if (!assignment) {
+                throw new Error("Not authorized to modify this assessment");
+            }
+            /**
+             * SCORE VALIDATION
+             */
+            if (score < 0) {
+                throw new Error("Score cannot be negative");
+            }
+            if (score > assessment.maxScore) {
+                throw new Error("Score exceeds maximum allowed");
+            }
+            /**
+             * UPSERT SCORE
+             */
+            const record = await tx.assessmentScore.upsert({
+                where: {
+                    assessmentId_studentId: {
+                        assessmentId,
+                        studentId
+                    }
+                },
+                update: { score },
+                create: {
+                    assessmentId,
+                    studentId,
+                    score
+                }
+            });
+            /**
+             * RECALCULATE FINAL GRADE
+             */
+            await recalculateFinalGrade(studentId, assessmentId, tx);
+            return record;
         });
-        await recalculateFinalGrade(studentId, assessmentId);
-        res.json(record);
+        res.json(result);
     }
     catch (err) {
         console.error(err);
+        if (err.message === "Assessment not found") {
+            return res.status(404).json({ error: err.message });
+        }
+        if (err.message === "Not authorized to modify this assessment") {
+            return res.status(403).json({ error: err.message });
+        }
+        if (err.message === "Score cannot be negative" ||
+            err.message === "Score exceeds maximum allowed") {
+            return res.status(400).json({ error: err.message });
+        }
         res.status(500).json({ error: "Failed to set score" });
     }
 };
 exports.setStudentScore = setStudentScore;
 /**
- * Submit assessment (LOCKS IT)
+ * =====================================================
+ * SUBMIT ASSESSMENT
+ * =====================================================
  */
 const submitAssessment = async (req, res) => {
     try {
         const assessmentId = Number(req.params.id);
-        const teacherId = req.user.id;
+        const teacherId = Number(req.user.id);
         const assessment = await client_1.prisma.assessment.findUnique({
-            where: { id: assessmentId },
+            where: { id: assessmentId }
         });
         if (!assessment) {
-            return res.status(404).json({ message: "Assessment not found" });
+            return res.status(404).json({
+                message: "Assessment not found"
+            });
         }
-        /**
-         * 🔐 TEACHER PERMISSION CHECK
-         */
         const assignment = await client_1.prisma.teacherSubject.findFirst({
             where: {
                 teacherId,
                 subjectId: assessment.subjectId,
-                classId: assessment.classId,
-            },
+                classId: assessment.classId
+            }
         });
         if (!assignment) {
-            return res.status(403).json({ message: "Not authorized" });
+            return res.status(403).json({
+                message: "You are not assigned to submit assessments for this class and subject."
+            });
         }
         if (assessment.status !== client_2.AssessmentStatus.DRAFT) {
-            return res
-                .status(400)
-                .json({ message: "Assessment already submitted" });
+            return res.status(400).json({
+                message: "Assessment already submitted"
+            });
         }
         await client_1.prisma.assessment.update({
             where: { id: assessmentId },
             data: {
-                status: client_2.AssessmentStatus.SUBMITTED,
-            },
+                status: client_2.AssessmentStatus.SUBMITTED
+            }
         });
-        return res.json({ message: "Assessment submitted successfully" });
+        await (0, reportCardGenerator_1.generateReportCards)(assessment.termId, assessment.classId);
+        return res.json({
+            message: "Assessment submitted successfully"
+        });
     }
     catch (err) {
         console.error(err);
-        res.status(500).json({ error: "Failed to submit assessment" });
+        res.status(500).json({
+            error: "Failed to submit assessment"
+        });
     }
 };
 exports.submitAssessment = submitAssessment;
 /**
- * Recalculate final grade
+ * =====================================================
+ * RECALCULATE FINAL GRADE
+ * =====================================================
  */
-const recalculateFinalGrade = async (studentId, assessmentId) => {
-    const assessment = await client_1.prisma.assessment.findUnique({
-        where: { id: assessmentId },
+const recalculateFinalGrade = async (studentId, assessmentId, tx = client_1.prisma) => {
+    const assessment = await tx.assessment.findUnique({
+        where: { id: assessmentId }
     });
     if (!assessment)
         return;
     const subjectId = assessment.subjectId;
     const termId = assessment.termId;
-    const scores = await client_1.prisma.assessmentScore.findMany({
+    const scores = await tx.assessmentScore.findMany({
         where: {
             studentId,
             assessment: {
                 subjectId,
-                termId,
-            },
+                termId
+            }
         },
-        include: { assessment: true },
+        include: { assessment: true }
     });
     let finalScore = 0;
     for (const record of scores) {
@@ -208,65 +285,75 @@ const recalculateFinalGrade = async (studentId, assessmentId) => {
         const percent = record.score / record.assessment.maxScore;
         finalScore += percent * record.assessment.weight;
     }
-    await client_1.prisma.grade.upsert({
+    await tx.grade.upsert({
         where: {
             studentId_subjectId_termId: {
                 studentId,
                 subjectId,
-                termId,
-            },
+                termId
+            }
         },
         update: {
             total: finalScore,
-            average: finalScore,
+            average: finalScore
         },
         create: {
             studentId,
             subjectId,
             termId,
             total: finalScore,
-            average: finalScore,
-        },
+            average: finalScore
+        }
     });
 };
 /**
- * Teacher gradebook
+ * =====================================================
+ * TEACHER GRADEBOOK
+ * =====================================================
  */
 const getGradebook = async (req, res) => {
-    const { subjectId } = req.params;
+    const subjectId = Number(req.params.subjectId);
     const assessments = await client_1.prisma.assessment.findMany({
-        where: { subjectId: Number(subjectId) },
+        where: { subjectId },
         include: {
-            scores: { include: { student: true } },
+            scores: {
+                include: { student: true }
+            }
         },
-        orderBy: { createdAt: "asc" },
+        orderBy: { createdAt: "asc" }
     });
     res.json(assessments);
 };
 exports.getGradebook = getGradebook;
 /**
- * Parent gradebook
+ * =====================================================
+ * PARENT GRADEBOOK
+ * =====================================================
  */
 const getParentGradebook = async (req, res) => {
-    const { studentId } = req.params;
+    const studentId = Number(req.params.studentId);
     const assessments = await client_1.prisma.assessment.findMany({
         where: {
-            scores: { some: { studentId: Number(studentId) } },
-            status: client_2.AssessmentStatus.SUBMITTED,
+            scores: { some: { studentId } },
+            status: client_2.AssessmentStatus.SUBMITTED
         },
         include: {
-            scores: { where: { studentId: Number(studentId) } },
-        },
+            scores: {
+                where: { studentId }
+            }
+        }
     });
     res.json(assessments);
 };
 exports.getParentGradebook = getParentGradebook;
 /**
- * Missing assignments
+ * =====================================================
+ * MISSING ASSIGNMENTS
+ * =====================================================
  */
 const getMissingAssignments = async (req, res) => {
-    const { studentId } = req.params;
-    const missing = await (0, missingAssignments_1.getMissingAssignmentsForStudent)(Number(studentId));
+    const studentId = Number(req.params.studentId);
+    const missing = await (0, missingAssignments_1.getMissingAssignmentsForStudent)(studentId);
     res.json(missing);
 };
 exports.getMissingAssignments = getMissingAssignments;
