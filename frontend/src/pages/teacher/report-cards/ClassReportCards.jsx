@@ -2,6 +2,15 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "@/services/apiClient";
 
+// ✅ STEP 1 — Grade function
+function getGrade(avg) {
+  if (avg >= 80) return "A";
+  if (avg >= 70) return "B";
+  if (avg >= 60) return "C";
+  if (avg >= 50) return "D";
+  return "E";
+}
+
 export default function ClassReportCards() {
   const { classId, term } = useParams();
   const navigate = useNavigate();
@@ -127,6 +136,8 @@ export default function ClassReportCards() {
 
               <th className="text-left py-2 px-2">Total</th>
               <th className="text-left py-2 px-2">Average</th>
+              {/* ✅ STEP 2 — Added Grade column */}
+              <th className="text-left py-2 px-2">Grade</th>
             </tr>
           </thead>
 
@@ -152,8 +163,14 @@ export default function ClassReportCards() {
                 <td className="py-2 px-2 font-semibold">
                   {student.total}
                 </td>
+
                 <td className="py-2 px-2">
                   {student.average}
+                </td>
+
+                {/* ✅ STEP 3 — Added Grade cell */}
+                <td className="py-2 px-2 font-bold">
+                  {getGrade(student.average)}
                 </td>
               </tr>
             ))}
