@@ -47,7 +47,9 @@ export default function ClassReportCards() {
             name: student.name,
             subjects: student.subjects.map((s) => ({
               subject: s.subject,
-              score: s.average, // map average → score
+              score: s.average,
+              average: s.average,               // ✅ ensure average exists
+              grade: getGrade(s.average),       // ✅ compute grade per subject
             })),
             total: student.overallAverage,
             average: student.overallAverage,
@@ -71,7 +73,7 @@ export default function ClassReportCards() {
 
     fetchReport();
 
-}, [classId, term]);
+  }, [classId, term]);
 
   async function handlePublish() {
     const confirmed = window.confirm(
@@ -166,7 +168,6 @@ export default function ClassReportCards() {
 
               <th className="text-left py-2 px-2">Total</th>
               <th className="text-left py-2 px-2">Average</th>
-              {/* ✅ STEP 2 — Added Grade column */}
               <th className="text-left py-2 px-2">Grade</th>
             </tr>
           </thead>
@@ -185,7 +186,16 @@ export default function ClassReportCards() {
 
                   return (
                     <td key={subject} className="py-2 px-2">
-                      {subj ? subj.score : "—"}
+                      {subj ? (
+                        <div>
+                          <div>{subj.average?.toFixed(1)}%</div>
+                          <div className="text-xs text-gray-500">
+                            {subj.grade}
+                          </div>
+                        </div>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                   );
                 })}
@@ -198,7 +208,6 @@ export default function ClassReportCards() {
                   {student.average}
                 </td>
 
-                {/* ✅ STEP 3 — Added Grade cell */}
                 <td className="py-2 px-2 font-bold">
                   {getGrade(student.average)}
                 </td>
