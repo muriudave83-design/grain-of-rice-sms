@@ -166,7 +166,7 @@ router.get("/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requi
  * GET /api/teacher/report-cards/:classId/:term
  * ============================================================
  */
-router.get("/teacher/report-cards/:classId/:term", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.TEACHER]), async (req, res) => {
+router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.TEACHER]), async (req, res) => {
     try {
         const classId = Number(req.params.classId);
         const students = await client_1.prisma.student.findMany({

@@ -24,7 +24,7 @@ export default function ClassReportCards() {
     async function fetchReport() {
       try {
         const res = await api.get(
-          `/teacher/report-cards/${classId}/${term}`
+          `/report-cards/teacher/${classId}/${term}`
         );
         setReport(res.data);
       } catch (err) {

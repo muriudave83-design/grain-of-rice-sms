@@ -208,7 +208,7 @@ router.get(
  * ============================================================
  */
 router.get(
-  "/teacher/report-cards/:classId/:term",
+  "/teacher/:classId/:term",
   authenticate,
   requireRole([Role.TEACHER]),
   async (req, res) => {
