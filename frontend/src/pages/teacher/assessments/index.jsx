@@ -121,6 +121,14 @@ export default function TeacherAssessments() {
           >
             Create Homework
           </Link>
+
+          {/* ✅ NEW REPORT CARDS BUTTON */}
+          <Link
+            to={`/teacher/report-cards/1/term1`}
+            className="px-4 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
+          >
+            Report Cards
+          </Link>
         </div>
       </div>
 

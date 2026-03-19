@@ -26,7 +26,36 @@ export default function ClassReportCards() {
         const res = await api.get(
           `/report-cards/teacher/${classId}/${term}`
         );
-        setReport(res.data);
+
+        // ✅ TRANSFORM BACKEND RESPONSE → MATCH YOUR UI
+        const data = res.data;
+
+        const subjectsSet = new Set();
+        data.forEach((student) => {
+          student.subjects.forEach((s) => {
+            subjectsSet.add(s.subject);
+          });
+        });
+
+        const transformed = {
+          class: { name: `Class ${classId}` },
+          term,
+          status: "draft",
+          subjects: Array.from(subjectsSet),
+          students: data.map((student) => ({
+            id: student.studentId,
+            name: student.name,
+            subjects: student.subjects.map((s) => ({
+              subject: s.subject,
+              score: s.average, // map average → score
+            })),
+            total: student.overallAverage,
+            average: student.overallAverage,
+          })),
+        };
+
+        setReport(transformed);
+
       } catch (err) {
         if (err.response?.status === 404) {
           setError("No submitted assessments found for this class and term.");
@@ -41,7 +70,8 @@ export default function ClassReportCards() {
     }
 
     fetchReport();
-  }, [classId, term]);
+
+}, [classId, term]);
 
   async function handlePublish() {
     const confirmed = window.confirm(
