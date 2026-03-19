@@ -156,7 +156,7 @@ export default function Gradebook() {
     <div className="p-4 overflow-x-auto">
       <h2>Gradebook</h2>
 
-      {/* ✅ FINAL: Always use category name */}
+      {/* ✅ Grading Weights */}
       {data?.categories && data.categories.length > 0 && (
         <div style={{ marginBottom: "10px" }}>
           <strong>Grading Weights:</strong>{" "}
@@ -165,6 +165,15 @@ export default function Gradebook() {
               {c.name}: {c.weight}%
             </span>
           ))}
+        </div>
+      )}
+
+      {/* ✅ NEW: Warning for empty categories */}
+      {data?.categories?.some(
+        (c) => !data.assessments.some((a) => a.categoryId === c.id)
+      ) && (
+        <div style={{ color: "orange", marginBottom: "10px" }}>
+          ⚠️ Some categories have no assessments yet. These count as 0%.
         </div>
       )}
 
@@ -240,10 +249,23 @@ export default function Gradebook() {
                 );
               })}
 
+              {/* ✅ UPDATED AVG CELL */}
               <td>
                 {student.average != null
                   ? (student.average * 100).toFixed(0) + "%"
                   : "-"}
+
+                {student.missingCategories?.length > 0 && (
+                  <div style={{ color: "red", fontSize: "12px" }}>
+                    Missing:{" "}
+                    {student.missingCategories
+                      .map(
+                        (id) =>
+                          data.categories.find((c) => c.id === id)?.name
+                      )
+                      .join(", ")}
+                  </div>
+                )}
               </td>
 
               <td>{student.missingCount ?? "-"}</td>
