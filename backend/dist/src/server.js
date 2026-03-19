@@ -36,6 +36,7 @@ const admin_teacherSubjects_routes_1 = __importDefault(require("./routes/admin/a
 const teacherAssignments_routes_1 = __importDefault(require("./routes/teacherAssignments.routes"));
 // ✅ Phase-7: Report Cards
 const reportCardReadRoutes_1 = require("./routes/reportCardReadRoutes");
+const reportCardRoutes_1 = require("./routes/reportCardRoutes");
 // ✅ Phase-7.5: Parent ↔ Student linking
 const parentStudentRoutes_1 = require("./routes/parentStudentRoutes");
 // ✅ Phase-8: Report Card PDF
@@ -111,6 +112,7 @@ app.use("/api", teacherAssignments_routes_1.default);
 // REPORT CARDS
 // ----------------------------------
 app.use("/api/report-cards", reportCardReadRoutes_1.reportCardReadRoutes);
+app.use("/api/report-cards", reportCardRoutes_1.reportCardReadRoutes);
 app.use("/api", reportCardPdf_routes_1.default);
 // ----------------------------------
 // PARENT ↔ STUDENT

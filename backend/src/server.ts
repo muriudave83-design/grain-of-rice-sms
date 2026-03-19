@@ -41,6 +41,7 @@ import teacherAssignmentsRoutes from "./routes/teacherAssignments.routes";
 
 // ✅ Phase-7: Report Cards
 import { reportCardReadRoutes } from "./routes/reportCardReadRoutes";
+import { reportCardReadRoutes as reportCardRoutes } from "./routes/reportCardRoutes";
 
 // ✅ Phase-7.5: Parent ↔ Student linking
 import { parentStudentRoutes } from "./routes/parentStudentRoutes";
@@ -133,6 +134,7 @@ app.use("/api", teacherAssignmentsRoutes);
 // REPORT CARDS
 // ----------------------------------
 app.use("/api/report-cards", reportCardReadRoutes);
+app.use("/api/report-cards", reportCardRoutes);
 app.use("/api", reportCardPdfRoutes);
 
 // ----------------------------------
