@@ -32,17 +32,11 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
       select: {
         id: true,
         weight: true,
-        name: true, 
+        name: true,
       },
     });
 
-    // 3️⃣ Build category weight lookup map
-    const categoryWeightMap: Record<number, number> = {};
-    for (const c of categories) {
-      categoryWeightMap[c.id] = c.weight;
-    }
-
-    // 4️⃣ Students in class
+    // 3️⃣ Students in class
     const students = await prisma.student.findMany({
       where: { classId },
       orderBy: { firstName: "asc" },
@@ -53,7 +47,7 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
       },
     });
 
-    // 5️⃣ Scores
+    // 4️⃣ Scores
     const assessmentIds = assessments.map((a) => a.id);
 
     const scores =
@@ -70,7 +64,7 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
           })
         : [];
 
-    // 6️⃣ Build score map
+    // 5️⃣ Build score map
     const scoreMap: Record<number, Record<string, number>> = {};
 
     for (const s of scores) {
@@ -85,7 +79,7 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
       (a) => a.status === AssessmentStatus.SUBMITTED
     );
 
-    // 7️⃣ Build rows
+    // 6️⃣ Build rows
     const studentRows = students.map((student) => {
       const studentScores = scoreMap[student.id] || {};
       const categoryBuckets: Record<number, number[]> = {};
@@ -99,7 +93,6 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
           assessment.categoryId &&
           assessment.maxScore > 0
         ) {
-          // ✅ Normalize score (important fix)
           const value = score / assessment.maxScore;
 
           if (!categoryBuckets[assessment.categoryId]) {
@@ -110,29 +103,31 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
         }
       }
 
-      // compute weighted average
+      // ✅ NEW: compute weighted average (no inflation)
       let weightedTotal = 0;
-      let totalWeightUsed = 0;
+      const missingCategories: number[] = [];
 
-      for (const categoryId of Object.keys(categoryBuckets)) {
-        const parsedCategoryId = parseInt(categoryId, 10);
-        const values = categoryBuckets[parsedCategoryId];
-        const weight = (categoryWeightMap[parsedCategoryId] ?? 0) / 100;
+      for (const category of categories) {
+        const categoryId = category.id;
+        const values = categoryBuckets[categoryId] || [];
+        const weight = (category.weight ?? 0) / 100;
 
-        // skip invalid categories
         if (!weight) continue;
 
-        const categoryAverage =
-          values.reduce((a, b) => a + b, 0) / values.length;
+        let categoryAverage = 0;
+
+        if (values.length > 0) {
+          categoryAverage =
+            values.reduce((a, b) => a + b, 0) / values.length;
+        } else {
+          // 👇 Track missing category
+          missingCategories.push(categoryId);
+        }
 
         weightedTotal += categoryAverage * weight;
-        totalWeightUsed += weight;
       }
 
-      const average =
-        totalWeightUsed > 0
-          ? Number((weightedTotal / totalWeightUsed).toFixed(2))
-          : null;
+      const average = Number(weightedTotal.toFixed(2));
 
       // better missing count (only published)
       const missingCount =
@@ -147,13 +142,14 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
         scores: studentScores,
         average,
         missingCount,
+        missingCategories, // 👈 NEW
       };
     });
 
     res.json({
       assessments,
       students: studentRows,
-      categories, // 👈 ADD THIS LINE
+      categories,
     });
 
   } catch (err) {
