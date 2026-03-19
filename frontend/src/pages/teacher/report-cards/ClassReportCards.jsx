@@ -53,7 +53,7 @@ export default function ClassReportCards() {
     try {
       setPublishing(true);
       await api.post(
-        `/teacher/report-cards/${classId}/${term}/publish`
+        `/report-cards/teacher/${classId}/${term}/publish`
       );
 
       setReport((prev) => ({
