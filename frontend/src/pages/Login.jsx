@@ -45,7 +45,8 @@ export default function Login() {
       console.log("✅ LOGIN RESPONSE:", res.data);
 
       const { token, role, mustChangePassword, user } = res.data;
-
+      
+      console.log("🔥 TOKEN BEFORE SAVE:", token);
       console.log("👉 ROLE:", role);
       console.log("🔐 mustChangePassword:", mustChangePassword);
       console.log("👤 USER:", user);
@@ -53,7 +54,7 @@ export default function Login() {
       // Persist token
       localStorage.setItem("token", token);
 
-      // ✅ Correctly store the user in AuthContext
+      // Store user in AuthContext
       login({
         id: user.id,
         name: user.name,
@@ -68,33 +69,26 @@ export default function Login() {
         return;
       }
 
-      // ✅ ROLE-BASED REDIRECT (paths fixed)
-      switch (role) {
-        case "ADMIN":
-          navigate("/admin", { replace: true });
-          break;
-
-        case "TEACHER":
-          navigate("/teacher", { replace: true }); // <-- fixed
-          break;
-
-        case "PARENT":
-          navigate("/parent", { replace: true });
-          break;
-
-        case "STUDENT":
-          navigate("/student", { replace: true });
-          break;
-
-        default:
-          navigate("/", { replace: true });
+      // ✅ FIXED ROLE-BASED REDIRECT
+      if (role === "ADMIN") {
+        navigate("/admin", { replace: true });
+      } else if (role === "TEACHER") {
+        navigate("/teacher/assessments", { replace: true });
+      } else if (role === "PARENT") {
+        navigate("/parent", { replace: true });
+      } else if (role === "STUDENT") {
+        // 🔥 TEMP HARD-CODE (as instructed)
+        navigate("/student/report-cards/1/term1", { replace: true });
+      } else {
+        navigate("/", { replace: true });
       }
+
     } catch (err) {
       console.error("❌ LOGIN ERROR:", err);
       setError(
         err?.response?.data?.message ||
-          err?.message ||
-          "Login failed"
+        err?.message ||
+        "Login failed"
       );
     } finally {
       setLoading(false);

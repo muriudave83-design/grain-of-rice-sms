@@ -113,8 +113,8 @@ app.get("/debug/subjects", async (_req: Request, res: Response) => {
 // CORE ROUTES
 // ----------------------------------
 app.use("/api/auth", authRoutes);
-app.use("/api", protectedRoutes);
 app.use("/api/students", studentRoutes);
+app.use("/api", protectedRoutes);
 app.use("/api/assessments", assessmentRoutes);
 app.use("/api/classes", classesRoutes);
 app.use("/api/gradebook", gradebookRoutes);
@@ -133,8 +133,8 @@ app.use("/api", teacherAssignmentsRoutes);
 // ----------------------------------
 // REPORT CARDS
 // ----------------------------------
-app.use("/api/report-cards", reportCardReadRoutes);
 app.use("/api/report-cards", reportCardRoutes);
+app.use("/api/report-cards", reportCardReadRoutes);
 app.use("/api", reportCardPdfRoutes);
 
 // ----------------------------------

@@ -14,10 +14,22 @@ router.post(
   requireRole(["ADMIN", "TEACHER"]),
   async (req, res) => {
     try {
-      const { firstName, lastName, classId, admissionNo, dob } = req.body;
+      console.log("🔥 student route hit");
+      console.log("📦 BODY:", req.body);
 
+      const { firstName, lastName, classId, admissionNo, dob, userId } = req.body;
+
+      // ✅ HARD VALIDATION (CRITICAL)
       if (!classId) {
         return res.status(400).json({ message: "classId is required" });
+      }
+
+      if (!admissionNo) {
+        return res.status(400).json({ message: "admissionNo is required" });
+      }
+
+      if (!userId) {
+        return res.status(400).json({ message: "userId is required" });
       }
 
       const student = await prisma.student.create({
@@ -27,19 +39,23 @@ router.post(
           classId: Number(classId),
           admissionNo,
           dob: dob ? new Date(dob) : null,
+          userId: Number(userId), // ✅ FORCE LINK (no silent null)
         },
       });
 
       res.status(201).json(student);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: "Server error" });
+    } catch (err: any) {
+      console.error("❌ ERROR:", err);
+
+      res.status(500).json({
+        message: err.message,
+        meta: err.meta || null,
+      });
     }
   }
 );
 
 // ✅ Get ALL students (Admin + Teacher)
-// MUST be above router.get("/:id")
 router.get(
   "/",
   authenticate,
@@ -50,6 +66,7 @@ router.get(
         orderBy: { id: "asc" },
         include: {
           class: true,
+          user: true, // ✅ added for visibility
           parentLinks: {
             include: {
               parent: true,
@@ -79,6 +96,7 @@ router.get(
         where: { id },
         include: {
           class: true,
+          user: true, // ✅ added
           parentLinks: {
             include: {
               parent: true,

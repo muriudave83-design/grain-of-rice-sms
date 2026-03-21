@@ -1,7 +1,8 @@
+console.log("🔥 reportCardRoutes.ts LOADED");
+
 import { Router } from "express";
 import { prisma } from "../prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
-import { requireRole } from "../middlewares/rolesMiddleware";
 import { Role } from "@prisma/client";
 
 // ✅ CONTROLLER IMPORT
@@ -26,8 +27,7 @@ function getGrade(avg: number) {
 
 /**
  * ============================================================
- * 🚀 NEW — GENERATE REPORT CARD (DYNAMIC)
- * GET /api/report-cards/generate/:studentId
+ * 🚀 GENERATE REPORT CARD
  * ============================================================
  */
 router.get(
@@ -45,7 +45,6 @@ router.get(
         return res.status(404).json({ error: "Student not found" });
       }
 
-      // Subjects in class
       const classSubjects = await prisma.classSubject.findMany({
         where: { classId: student.classId },
         include: { subject: true },
@@ -70,7 +69,7 @@ router.get(
           },
         });
 
-        if (assessments.length === 0) continue;
+        if (!assessments.length) continue;
 
         const scores = await prisma.assessmentScore.findMany({
           where: {
@@ -88,7 +87,6 @@ router.get(
 
         const categoryBuckets: Record<number, number[]> = {};
 
-        // Normalize + group
         for (const a of assessments) {
           const score = scoreMap[a.id];
 
@@ -103,7 +101,6 @@ router.get(
           }
         }
 
-        // Weighted calculation
         let weightedTotal = 0;
 
         for (const category of categories) {
@@ -155,69 +152,46 @@ router.get(
 
 /**
  * ============================================================
- * STUDENT — GET MY REPORT CARDS
- * ============================================================
- */
-router.get(
-  "/me",
-  authenticate,
-  requireRole([Role.STUDENT]),
-  async (req, res) => {
-    const user = req.user;
-
-    if (!user?.studentId) {
-      return res.status(400).json({
-        message: "Student account not linked",
-      });
-    }
-
-    const reportCards = await prisma.reportCard.findMany({
-      where: {
-        studentId: user.studentId,
-        status: "PUBLISHED",
-      },
-      include: {
-        class: true,
-        term: true,
-      },
-      orderBy: {
-        publishedAt: "desc",
-      },
-    });
-
-    res.json(reportCards);
-  }
-);
-
-/**
- * ============================================================
- * PARENT — GET REPORT CARDS
- * ============================================================
- */
-router.get(
-  "/parent",
-  authenticate,
-  requireRole([Role.PARENT]),
-  getParentReportCards
-);
-
-/**
- * ============================================================
- * 👨‍🏫 TEACHER — CLASS REPORT CARDS (DYNAMIC)
- * GET /api/teacher/report-cards/:classId/:term
+ * 👨‍🏫 TEACHER + 🎓 STUDENT — REPORT CARDS
  * ============================================================
  */
 router.get(
   "/teacher/:classId/:term",
   authenticate,
-  requireRole([Role.TEACHER]),
-  async (req, res) => {
-    try {
-      const classId = Number(req.params.classId);
+  async (req: any, res) => {
+    console.log("🔥 REPORT CARD ROUTE HIT");
 
-      const students = await prisma.student.findMany({
-        where: { classId },
-      });
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      console.log("USER:", req.user);
+
+      let classId = Number(req.params.classId);
+      const userId = req.user.id;
+      const role = req.user.role;
+
+      let students;
+
+      if (role === Role.STUDENT) {
+        const student = await prisma.student.findFirst({
+          where: { userId },
+        });
+
+        if (!student) {
+          return res.status(403).json({
+            message: "No student profile linked",
+          });
+        }
+        
+        classId = student.classId;
+        students = [student];
+      } else {
+        students = await prisma.student.findMany({
+          where: { classId },
+        });
+      }
 
       const classSubjects = await prisma.classSubject.findMany({
         where: { classId },
@@ -320,73 +294,19 @@ router.get(
         });
       }
 
-      res.json(results);
-    } catch (err) {
-      console.error("Teacher report cards failed:", err);
-      res.status(500).json({
-        message: "Failed to load class report cards",
-      });
-    }
-  }
-);
-
-/**
- * ============================================================
- * READ — GET SINGLE REPORT CARD
- * ============================================================
- */
-router.get(
-  "/:id",
-  authenticate,
-  async (req, res) => {
-    const id = Number(req.params.id);
-
-    if (Number.isNaN(id)) {
-      return res.status(400).json({
-        message: "Invalid report card id",
-      });
-    }
-
-    const reportCard = await prisma.reportCard.findUnique({
-      where: { id },
-      include: {
-        student: true,
-        class: true,
-        term: true,
-      },
-    });
-
-    if (!reportCard) {
-      return res.status(404).json({
-        message: "Report card not found",
-      });
-    }
-
-    if (
-      reportCard.status !== "PUBLISHED" &&
-      req.user?.role !== Role.ADMIN
-    ) {
-      return res.status(403).json({
-        message: "You are not authorized to view this report card",
-      });
-    }
-
-    if (req.user?.role === Role.PARENT) {
-      const parentStudent = await prisma.parentStudent.findFirst({
-        where: {
-          parentId: req.user.id,
-          studentId: reportCard.studentId,
-        },
-      });
-
-      if (!parentStudent) {
-        return res.status(403).json({
-          message: "You are not authorized to view this report card",
-        });
+      if (role === Role.STUDENT) {
+        return res.json(results[0] || null);
       }
-    }
 
-    res.json(reportCard);
+      res.json(results);
+
+    } catch (err) {
+      console.error("🔥 REAL ERROR:", err);
+      res.status(500).json({
+        message: "Failed to load report cards",
+        error: err instanceof Error ? err.message : err,
+      });
+    }
   }
 );
 

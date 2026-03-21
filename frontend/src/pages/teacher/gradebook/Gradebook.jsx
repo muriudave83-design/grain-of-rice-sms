@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import axios from "../../../api/axios";
+import API from "../../../api/apiClient";
 
 export default function Gradebook() {
   const [data, setData] = useState(null);
@@ -12,8 +12,8 @@ export default function Gradebook() {
 
   const fetchGradebook = async () => {
     try {
-      const res = await axios.get(
-        "/api/gradebook?classId=1&subjectId=1&termId=1"
+      const res = await API.get(
+        "/gradebook?classId=1&subjectId=1&termId=1" // ✅ FIXED (removed /api)
       );
       setData(res.data);
     } catch {
@@ -48,7 +48,7 @@ export default function Gradebook() {
     setSaving((prev) => ({ ...prev, [key]: true }));
 
     try {
-      await axios.post("/api/gradebook/score", {
+      await API.post("/gradebook/score", { // ✅ FIXED (removed /api)
         studentId,
         assessmentId,
         score,
@@ -156,7 +156,6 @@ export default function Gradebook() {
     <div className="p-4 overflow-x-auto">
       <h2>Gradebook</h2>
 
-      {/* ✅ Grading Weights */}
       {data?.categories && data.categories.length > 0 && (
         <div style={{ marginBottom: "10px" }}>
           <strong>Grading Weights:</strong>{" "}
@@ -168,7 +167,6 @@ export default function Gradebook() {
         </div>
       )}
 
-      {/* ✅ NEW: Warning for empty categories */}
       {data?.categories?.some(
         (c) => !data.assessments.some((a) => a.categoryId === c.id)
       ) && (
@@ -249,7 +247,6 @@ export default function Gradebook() {
                 );
               })}
 
-              {/* ✅ UPDATED AVG CELL */}
               <td>
                 {student.average != null
                   ? (student.average * 100).toFixed(0) + "%"

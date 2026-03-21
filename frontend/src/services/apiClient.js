@@ -11,7 +11,7 @@ if (import.meta.env.DEV) {
 
 const apiClient = axios.create({
   baseURL: API_URL,
-  withCredentials: true, // required for cookies if using them
+  withCredentials: true, // req uired for cookies if using them
 });
 
 // 🔐 Attach token from localStorage (if present)
@@ -30,21 +30,15 @@ apiClient.interceptors.request.use(
 );
 
 // 🔐 GLOBAL 401 HANDLER
+// 🔐 GLOBAL 401 HANDLER
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error?.response?.status;
 
     if (status === 401) {
-      console.warn("⚠️ Session expired. Logging out.");
-
-      // Clear stored auth
-      localStorage.removeItem("token");
-
-      // Redirect safely
-      if (window.location.pathname !== "/login") {
-        window.location.href = "/login";
-      }
+      console.warn("⚠️ 401 detected — TEMP ignore during debug");
+      return Promise.reject(error); // 🚫 DO NOT remove token
     }
 
     return Promise.reject(error);

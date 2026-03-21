@@ -315,7 +315,7 @@ export default function AppRoutes() {
           />
 
           <Route
-            path="/student/report-cards/:termId"
+            path="/student/report-cards/:classId/:term"
             element={<StudentReportCardView />}
           />
 
