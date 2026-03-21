@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import API from "../../../api/apiClient";
+import api from "@/services/apiClient";
 import { useNavigate } from "react-router-dom";
 
 export default function CreateHomework() {

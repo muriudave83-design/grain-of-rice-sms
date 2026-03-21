@@ -1,26 +1,22 @@
 import axios from "axios";
 
-console.log("API URL:", import.meta.env.VITE_API_URL);
+// 🔥 PRODUCTION BACKEND (Render ONLY)
+const API_URL = "https://sms-backend-1w30.onrender.com/api";
 
-// Ensure API URL is defined
-const API_URL = import.meta.env.VITE_API_URL;
-
-if (import.meta.env.DEV) {
-  console.log("🌍 API Base URL:", API_URL);
-}
+console.log("🌍 API URL:", API_URL);
 
 const apiClient = axios.create({
   baseURL: API_URL,
-  withCredentials: true, // req uired for cookies if using them
 });
 
-// 🔐 Attach token from localStorage (if present)
+// 🔐 Attach token
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
 
+    console.log("🔑 TOKEN:", token);
+
     if (token) {
-      config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${token}`;
     }
 
@@ -29,18 +25,11 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// 🔐 GLOBAL 401 HANDLER
-// 🔐 GLOBAL 401 HANDLER
+// ❗ KEEP THIS (important for debugging)
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    const status = error?.response?.status;
-
-    if (status === 401) {
-      console.warn("⚠️ 401 detected — TEMP ignore during debug");
-      return Promise.reject(error); // 🚫 DO NOT remove token
-    }
-
+    console.error("❌ API ERROR:", error.response || error.message);
     return Promise.reject(error);
   }
 );

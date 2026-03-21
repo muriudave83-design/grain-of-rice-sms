@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import API from "../../api/apiClient"; // ✅ FIX PATH
+import api from "../../services/apiClient";
 
 export default function StudentReportCardView() {
-  const { classId, term } = useParams();
+  const { term } = useParams(); // ✅ ONLY term is needed
 
   const [studentData, setStudentData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -11,21 +11,22 @@ export default function StudentReportCardView() {
 
   useEffect(() => {
     fetchData();
-  }, [classId, term]);
+  }, [term]);
 
   async function fetchData() {
     try {
       setLoading(true);
 
-      console.log("🔥 CALLING:", `/report-cards/teacher/${classId}/${term}`);
-      console.log("TOKEN:", localStorage.getItem("token")); // ✅ DEBUG
+      console.log("🔥 CALLING:", `/report-cards/me?termId=${term}`);
+      console.log("🔑 TOKEN:", localStorage.getItem("token"));
 
-      const res = await API.get(
-        `/report-cards/teacher/${classId}/${term}`
+      const res = await api.get(
+        `/report-cards/me?termId=${term}`
       );
 
       console.log("🔥 AXIOS DATA:", res.data);
       setStudentData(res.data);
+
     } catch (err) {
       console.error("❌ ERROR:", err.response || err);
       setError("Failed to load report card");
@@ -53,7 +54,7 @@ export default function StudentReportCardView() {
           </tr>
         </thead>
         <tbody>
-          {studentData.subjects.map((subj, i) => (
+          {studentData.subjects?.map((subj, i) => (
             <tr key={i}>
               <td className="p-2 border">{subj.subject}</td>
               <td className="p-2 border">

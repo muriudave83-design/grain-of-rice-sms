@@ -27,6 +27,142 @@ function getGrade(avg: number) {
 
 /**
  * ============================================================
+ * 🎓 STUDENT — OWN REPORT CARD (/me)
+ * ============================================================
+ */
+router.get(
+  "/me",
+  authenticate,
+  async (req: any, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (req.user.role !== Role.STUDENT) {
+        return res.status(403).json({ message: "Only students allowed" });
+      }
+
+      const termId = Number(req.query.termId);
+
+      const student = await prisma.student.findFirst({
+        where: { userId: req.user.id },
+      });
+
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      const classId = student.classId;
+
+      const classSubjects = await prisma.classSubject.findMany({
+        where: { classId },
+        include: { subject: true },
+      });
+
+      const categories = await prisma.assignmentCategory.findMany();
+
+      let overallTotal = 0;
+      let subjectCount = 0;
+      const subjects = [];
+
+      for (const cs of classSubjects) {
+        const assessments = await prisma.assessment.findMany({
+          where: {
+            subjectId: cs.subjectId,
+            classId,
+          },
+          select: {
+            id: true,
+            maxScore: true,
+            categoryId: true,
+          },
+        });
+
+        if (!assessments.length) continue;
+
+        const scores = await prisma.assessmentScore.findMany({
+          where: {
+            studentId: student.id,
+            assessmentId: {
+              in: assessments.map((a) => a.id),
+            },
+          },
+        });
+
+        const scoreMap: Record<number, number> = {};
+        scores.forEach((s) => {
+          scoreMap[s.assessmentId] = s.score;
+        });
+
+        const categoryBuckets: Record<number, number[]> = {};
+
+        for (const a of assessments) {
+          const score = scoreMap[a.id];
+
+          if (score != null && a.categoryId && a.maxScore > 0) {
+            const value = score / a.maxScore;
+
+            if (!categoryBuckets[a.categoryId]) {
+              categoryBuckets[a.categoryId] = [];
+            }
+
+            categoryBuckets[a.categoryId].push(value);
+          }
+        }
+
+        let weightedTotal = 0;
+
+        for (const category of categories) {
+          const values = categoryBuckets[category.id] || [];
+          const weight = (category.weight ?? 0) / 100;
+
+          if (!weight) continue;
+
+          let categoryAverage = 0;
+
+          if (values.length > 0) {
+            categoryAverage =
+              values.reduce((a, b) => a + b, 0) / values.length;
+          }
+
+          weightedTotal += categoryAverage * weight;
+        }
+
+        if (weightedTotal === 0) continue;
+
+        overallTotal += weightedTotal;
+        subjectCount++;
+
+        subjects.push({
+          subject: cs.subject.name,
+          average: Number((weightedTotal * 100).toFixed(2)),
+          grade: getGrade(weightedTotal),
+        });
+      }
+
+      const overallAverage =
+        subjectCount > 0 ? overallTotal / subjectCount : 0;
+
+      return res.json({
+        studentId: student.id,
+        name: `${student.firstName} ${student.lastName}`,
+        subjects,
+        overallAverage: Number((overallAverage * 100).toFixed(2)),
+        overallGrade: getGrade(overallAverage),
+      });
+
+    } catch (err) {
+      console.error("❌ /me route error:", err);
+      res.status(500).json({
+        message: "Failed to load student report card",
+      });
+    }
+  }
+);
+
+/**
+ * ============================================================
  * 🚀 GENERATE REPORT CARD
  * ============================================================
  */

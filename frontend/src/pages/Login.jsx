@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import axios from "axios";
+import api from "../services/apiClient";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
@@ -15,7 +15,6 @@ export default function Login() {
 
   useEffect(() => {
     console.log("✅ Login component mounted");
-    console.log("🌐 VITE_API_URL =", import.meta.env.VITE_API_URL);
     console.log("🔁 Redirect from:", location.state?.from);
   }, [location.state]);
 
@@ -27,14 +26,10 @@ export default function Login() {
     setError(null);
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL;
-      if (!API_URL) throw new Error("VITE_API_URL is not defined");
+      console.log("🚀 Calling API: /auth/login");
 
-      const url = `${API_URL}/auth/login`;
-      console.log("🚀 Calling API:", url);
-
-      const res = await axios.post(
-        url,
+      const res = await api.post(
+        "/auth/login",
         { email, password },
         {
           withCredentials: true,
@@ -45,7 +40,7 @@ export default function Login() {
       console.log("✅ LOGIN RESPONSE:", res.data);
 
       const { token, role, mustChangePassword, user } = res.data;
-      
+
       console.log("🔥 TOKEN BEFORE SAVE:", token);
       console.log("👉 ROLE:", role);
       console.log("🔐 mustChangePassword:", mustChangePassword);
@@ -69,7 +64,7 @@ export default function Login() {
         return;
       }
 
-      // ✅ FIXED ROLE-BASED REDIRECT
+      // ✅ ROLE-BASED REDIRECT (UNCHANGED)
       if (role === "ADMIN") {
         navigate("/admin", { replace: true });
       } else if (role === "TEACHER") {
@@ -77,7 +72,6 @@ export default function Login() {
       } else if (role === "PARENT") {
         navigate("/parent", { replace: true });
       } else if (role === "STUDENT") {
-        // 🔥 TEMP HARD-CODE (as instructed)
         navigate("/student/report-cards/1/term1", { replace: true });
       } else {
         navigate("/", { replace: true });

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import API from "../../../api/apiClient";
+import api from "@/services/apiClient";
 
 export default function Gradebook() {
   const [data, setData] = useState(null);
