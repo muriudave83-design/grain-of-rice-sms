@@ -7,13 +7,25 @@ export default function ProtectedRoute({ allowedRoles }) {
 
   const token = localStorage.getItem("token");
 
+  // 🔥 SAFE FALLBACK (does NOT break existing logic)
+  let storedUser = null;
+  try {
+    storedUser = localStorage.getItem("user")
+      ? JSON.parse(localStorage.getItem("user"))
+      : null;
+  } catch {
+    storedUser = null;
+  }
+
+  const effectiveUser = user || storedUser;
+
   // ⏳ Wait for auth restoration
   if (loading) {
-    return <div>Loading...</div>; // or spinner
+    return <div>Loading...</div>;
   }
 
   // 🔒 Not logged in OR token missing
-  if (!user || !token) {
+  if (!effectiveUser || !token) {
     return (
       <Navigate
         to="/login"
@@ -25,14 +37,14 @@ export default function ProtectedRoute({ allowedRoles }) {
 
   // 🔐 FORCE PASSWORD CHANGE ENFORCEMENT
   if (
-    user.forcePasswordChange &&
+    effectiveUser.forcePasswordChange &&
     location.pathname !== "/change-password"
   ) {
     return <Navigate to="/change-password" replace />;
   }
 
   // 🚫 Role restriction
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
+  if (allowedRoles && !allowedRoles.includes(effectiveUser.role)) {
     return <Navigate to="/login" replace />;
   }
 
