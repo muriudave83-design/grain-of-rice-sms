@@ -60,11 +60,17 @@ const StudentDashboard = () => {
         <select
           value={term}
           onChange={(e) => setTerm(e.target.value)}
-          style={{ padding: "5px" }}
+          style={{
+            padding: "8px",
+            background: "#222",
+            color: "#fff",
+            border: "1px solid #555",
+            borderRadius: "4px",
+          }}
         >
-          <option value="term1">Term 1</option>
-          <option value="term2">Term 2</option>
-          <option value="term3">Term 3</option>
+          <option value="term1" style={{ color: "#000" }}>Term 1</option>
+          <option value="term2" style={{ color: "#000" }}>Term 2</option>
+          <option value="term3" style={{ color: "#000" }}>Term 3</option>
         </select>
       </div>
 
