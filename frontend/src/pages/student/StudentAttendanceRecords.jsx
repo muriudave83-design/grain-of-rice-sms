@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "@/services/apiClient";
 
-export default function StudentAttendance() {
+export default function StudentAttendanceRecords() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
