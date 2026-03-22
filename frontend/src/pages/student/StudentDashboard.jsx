@@ -4,12 +4,13 @@ import api from "@/services/apiClient";
 const StudentDashboard = () => {
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [term, setTerm] = useState("term1"); // ✅ NEW STATE
 
   useEffect(() => {
     const fetchStudent = async () => {
       try {
-        // ✅ Correct endpoint (auth-driven)
-        const res = await api.get("/report-cards/me");
+        // ✅ Now dynamic with term
+        const res = await api.get(`/report-cards/me?term=${term}`);
 
         console.log("DASHBOARD DATA:", res.data);
 
@@ -22,7 +23,7 @@ const StudentDashboard = () => {
     };
 
     fetchStudent();
-  }, []);
+  }, [term]); // ✅ Refetch when term changes
 
   if (loading) return <p style={{ padding: "20px" }}>Loading...</p>;
 
@@ -31,7 +32,6 @@ const StudentDashboard = () => {
     student?.name || student?.studentName || "Student";
 
   const studentId = student?.studentId || student?.id || 1;
-  const term = "term1"; // TEMP: static until dynamic terms added
 
   return (
     <div style={{ padding: "20px", color: "white", background: "#111", minHeight: "100vh" }}>
@@ -52,6 +52,21 @@ const StudentDashboard = () => {
       </p>
 
       <hr style={{ margin: "20px 0" }} />
+
+      {/* ✅ TERM SELECTOR */}
+      <div style={{ margin: "20px 0" }}>
+        <label style={{ marginRight: "10px" }}>Select Term:</label>
+
+        <select
+          value={term}
+          onChange={(e) => setTerm(e.target.value)}
+          style={{ padding: "5px" }}
+        >
+          <option value="term1">Term 1</option>
+          <option value="term2">Term 2</option>
+          <option value="term3">Term 3</option>
+        </select>
+      </div>
 
       <h3>Quick Links</h3>
 

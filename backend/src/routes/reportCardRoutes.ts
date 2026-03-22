@@ -43,7 +43,22 @@ router.get(
         return res.status(403).json({ message: "Only students allowed" });
       }
 
-      const termId = Number(req.query.termId);
+      // ✅ Support both ?term=term1 and ?termId=1
+      let termId: number | undefined;
+
+      if (req.query.term) {
+        const termMap: Record<string, number> = {
+          term1: 1,
+          term2: 2,
+          term3: 3,
+        };
+
+        termId = termMap[String(req.query.term).toLowerCase()];
+      } else if (req.query.termId) {
+        termId = Number(req.query.termId);
+      }
+
+      console.log("📘 TERM FILTER:", termId);
 
       const student = await prisma.student.findFirst({
         where: { userId: req.user.id },
@@ -67,11 +82,12 @@ router.get(
       const subjects = [];
 
       for (const cs of classSubjects) {
-        const assessments = await prisma.assessment.findMany({
-          where: {
-            subjectId: cs.subjectId,
-            classId,
-          },
+      const assessments = await prisma.assessment.findMany({
+        where: {
+          subjectId: cs.subjectId,
+          classId,
+          ...(termId && { termId }), // ✅ APPLY TERM FILTER
+        },
           select: {
             id: true,
             maxScore: true,
