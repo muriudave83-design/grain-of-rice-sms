@@ -4,7 +4,6 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // 🔁 Restore session on refresh
@@ -22,15 +21,13 @@ export function AuthProvider({ children }) {
           role: parsed.role,
           forcePasswordChange: parsed.forcePasswordChange || false,
         });
-
-        setIsAuthenticated(true);
       } catch (err) {
         console.error("Corrupt user in storage:", err);
         localStorage.removeItem("user");
       }
     }
 
-    setLoading(false);
+    setLoading(false); // ✅ CRITICAL FIX
   }, []);
 
   // 🔐 Login
@@ -44,7 +41,6 @@ export function AuthProvider({ children }) {
     };
 
     setUser(userData);
-    setIsAuthenticated(true);
     localStorage.setItem("user", JSON.stringify(userData));
 
     console.log("🔐 AuthContext.login → stored user:", userData);
@@ -53,7 +49,6 @@ export function AuthProvider({ children }) {
   // 🚪 Logout
   const logout = () => {
     setUser(null);
-    setIsAuthenticated(false);
     localStorage.removeItem("user");
     localStorage.removeItem("token");
   };
@@ -71,12 +66,15 @@ export function AuthProvider({ children }) {
     localStorage.setItem("user", JSON.stringify(updatedUser));
   };
 
+  // ✅ Derive auth state (prevents sync bugs)
+  const isAuthenticated = !!user;
+
   return (
     <AuthContext.Provider
       value={{
         user,
         isAuthenticated,
-        loading,
+        loading, // ✅ route guards must check this
         login,
         logout,
         clearForcePasswordFlag,

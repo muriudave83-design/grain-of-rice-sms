@@ -2,18 +2,18 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function ProtectedRoute({ allowedRoles }) {
-  const { user, isAuthenticated, loading } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
 
   const token = localStorage.getItem("token");
 
   // ⏳ Wait for auth restoration
   if (loading) {
-    return null;
+    return <div>Loading...</div>; // or spinner
   }
 
   // 🔒 Not logged in OR token missing
-  if (!isAuthenticated || !user || !token) {
+  if (!user || !token) {
     return (
       <Navigate
         to="/login"

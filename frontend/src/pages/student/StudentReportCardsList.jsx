@@ -12,20 +12,28 @@ export default function StudentReportCardsList() {
   }, []);
 
   async function fetchList() {
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      // ✅ FIXED: correct backend route
-      const res = await api.get("/report-cards/me");
+    const res = await api.get("/report-cards/me");
 
-      setItems(res.data || []);
-    } catch (err) {
-      console.error("Failed to load student report cards", err);
-      setError("Unable to load report cards");
-    } finally {
-      setLoading(false);
-    }
+    console.log("📦 REPORT CARDS RESPONSE:", res.data);
+
+    setItems(
+      Array.isArray(res.data)
+        ? res.data
+        : res.data
+        ? [res.data]
+        : []
+    );
+    
+  } catch (err) {
+    console.error("Failed to load student report cards", err);
+    setError("Unable to load report cards");
+  } finally {
+    setLoading(false);
   }
+}
 
   return (
     <div className="p-6 space-y-6">

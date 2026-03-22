@@ -39,7 +39,12 @@ export default function Login() {
 
       console.log("✅ LOGIN RESPONSE:", res.data);
 
-      const { token, role, mustChangePassword, user } = res.data;
+      const {
+        token,
+        role,
+        mustChangePassword,
+        user = {},
+      } = res.data;
 
       console.log("🔥 TOKEN BEFORE SAVE:", token);
       console.log("👉 ROLE:", role);
@@ -64,15 +69,18 @@ export default function Login() {
         return;
       }
 
-      // ✅ ROLE-BASED REDIRECT (UNCHANGED)
-      if (role === "ADMIN") {
+      // ✅ ROLE-BASED REDIRECT (FIXED)
+      const normalizedRole = role?.toUpperCase();
+
+      if (normalizedRole === "ADMIN") {
         navigate("/admin", { replace: true });
-      } else if (role === "TEACHER") {
+      } else if (normalizedRole === "TEACHER") {
         navigate("/teacher/assessments", { replace: true });
-      } else if (role === "PARENT") {
+      } else if (normalizedRole === "PARENT") {
         navigate("/parent", { replace: true });
-      } else if (role === "STUDENT") {
-        navigate("/student/report-cards/1/term1", { replace: true });
+      } else if (normalizedRole === "STUDENT") {
+        // ✅ FIXED: go to dashboard instead of hardcoded report card
+        navigate("/student/dashboard", { replace: true });
       } else {
         navigate("/", { replace: true });
       }

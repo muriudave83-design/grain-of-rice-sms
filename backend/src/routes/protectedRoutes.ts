@@ -4,10 +4,10 @@ import { reportCardReadRoutes } from "./reportCardRoutes";
 
 const router = Router();
 
-// ✅ Mount report card routes
-router.use("/", reportCardReadRoutes);
+// ✅ Protect ALL report card routes
+router.use("/", authenticate, reportCardReadRoutes);
 
-// Existing test route
+// ✅ Protected dashboard test route
 router.get("/dashboard", authenticate, (req, res) => {
   res.json({
     message: "Welcome to the protected dashboard!",

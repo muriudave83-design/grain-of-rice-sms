@@ -56,6 +56,7 @@ import ParentAttendanceSummary from "../pages/parent/attendance/ParentAttendance
 // =======================
 import StudentReportCardsList from "../pages/student/StudentReportCardsList";
 import StudentReportCardView from "../pages/student/StudentReportCardView";
+import StudentDashboard from "@/pages/student/StudentDashboard";
 
 // =======================
 // SHARED
@@ -306,7 +307,12 @@ export default function AppRoutes() {
 
           <Route
             path="/student"
-            element={<Navigate to="/student/report-cards" replace />}
+              element={<Navigate to="/student/dashboard" replace />}
+          />
+
+          <Route
+            path="/student/dashboard"
+            element={<StudentDashboard />}
           />
 
           <Route
