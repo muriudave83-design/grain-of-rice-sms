@@ -28,6 +28,47 @@ export class AttendanceController {
 
 /**
  * ============================================================
+ * STUDENT — ATTENDANCE SUMMARY (NEW)
+ * GET /api/attendance/student
+ * ============================================================
+ */
+export const getStudentAttendanceSummary = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const studentId = (req as any).user.id;
+
+    // Fetch attendance entries for this student
+    const records = await prisma.attendanceEntry.findMany({
+      where: {
+        studentId,
+      },
+    });
+
+    const totalDays = records.length;
+    const present = records.filter((r) => r.status === "PRESENT").length;
+    const absent = records.filter((r) => r.status === "ABSENT").length;
+
+    const percentage =
+      totalDays === 0 ? 0 : Math.round((present / totalDays) * 100);
+
+    res.json({
+      totalDays,
+      present,
+      absent,
+      percentage,
+    });
+  } catch (error) {
+    console.error("getStudentAttendanceSummary error:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to fetch attendance summary" });
+  }
+};
+
+/**
+ * ============================================================
  * PARENT — GET ATTENDANCE FOR ALL OWN CHILDREN
  * GET /api/attendance/parent
  * ============================================================

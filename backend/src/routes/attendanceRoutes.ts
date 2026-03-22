@@ -9,7 +9,7 @@ import { getAttendanceSession } from "../controllers/attendance/getAttendanceSes
 import { saveAttendanceRecords } from "../controllers/attendance/saveAttendanceRecords.controller";
 import { getAttendanceByClass } from "../controllers/attendance/getAttendanceByClass.controller";
 import { getParentAttendanceSummary } from "../controllers/attendance/getParentAttendanceSummary.controller";
-import { getParentAttendance } from "../controllers/attendance.controller";
+import { getParentAttendance, getStudentAttendanceSummary } from "../controllers/attendance.controller";
 
 const router = Router();
 
@@ -61,6 +61,17 @@ router.get(
   authenticate,
   requireRole(["TEACHER", "ADMIN"]),
   getAttendanceByClass
+);
+
+// ------------------------------------------------------
+// STUDENT — Attendance summary (NEW)
+// GET /api/attendance/student
+// ------------------------------------------------------
+router.get(
+  "/student",
+  authenticate,
+  requireRole(["STUDENT"]),
+  getStudentAttendanceSummary
 );
 
 // ------------------------------------------------------
