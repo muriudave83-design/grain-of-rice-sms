@@ -59,6 +59,7 @@ import StudentReportCardsList from "../pages/student/StudentReportCardsList";
 import StudentReportCardView from "../pages/student/StudentReportCardView";
 import StudentDashboard from "@/pages/student/StudentDashboard";
 import StudentAttendance from "@/pages/student/StudentAttendance";
+import StudentProfile from "@/pages/student/StudentProfile";
 
 // =======================
 // SHARED
@@ -337,6 +338,11 @@ export default function AppRoutes() {
           <Route
             path="/student/report-cards/:classId/:term"
             element={<StudentReportCardView />}
+          />
+
+          <Route
+           path="/student/profile"
+           element={<StudentProfile />}
           />
 
         </Route>
