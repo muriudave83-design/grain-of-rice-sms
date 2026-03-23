@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "@/services/apiClient";
 
 const StudentDashboard = () => {
@@ -124,10 +125,10 @@ const StudentDashboard = () => {
 
       <h3>Quick Links</h3>
 
-      {/* ✅ UPDATED LINKS */}
+      {/* ✅ FIXED LINKS (React Router) */}
       <div style={{ display: "flex", gap: "10px" }}>
-        <a
-          href={`/student/report-cards/${studentId}/${term}`}
+        <Link
+          to={`/student/report-cards/${studentId}/${term}`}
           style={{
             padding: "10px",
             background: "#333",
@@ -136,10 +137,10 @@ const StudentDashboard = () => {
           }}
         >
           📄 Report Card
-        </a>
+        </Link>
 
-        <a
-          href="/student/attendance"
+        <Link
+          to="/student/attendance"
           style={{
             padding: "10px",
             background: "#333",
@@ -148,10 +149,10 @@ const StudentDashboard = () => {
           }}
         >
           📅 Attendance
-        </a>
+        </Link>
 
-        <a
-          href="/student/profile"
+        <Link
+          to="/student/profile"
           style={{
             padding: "10px",
             background: "#333",
@@ -160,7 +161,7 @@ const StudentDashboard = () => {
           }}
         >
           👤 Profile
-        </a>
+        </Link>
       </div>
     </div>
   );
