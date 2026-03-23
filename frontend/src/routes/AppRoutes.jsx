@@ -76,39 +76,21 @@ import ChangePassword from "../pages/ChangePassword";
 // ======================================
 // PUBLIC ROUTE (PREVENT LOGIN IF LOGGED)
 // ======================================
-function PublicRoute({ children }) {
-  const token = localStorage.getItem("token");
-  const storedUser = localStorage.getItem("user");
+  function PublicRoute({ children }) {
+    const token = localStorage.getItem("token");
+    const role = localStorage.getItem("role");
 
-  let user = null;
+    // 🔥 EXTRA SAFETY CHECK
+    if (token && role) {
+      if (role === "ADMIN") return <Navigate to="/dashboard/admin" replace />;
+      if (role === "TEACHER") return <Navigate to="/teacher" replace />;
+      if (role === "PARENT") return <Navigate to="/parent" replace />;
+      if (role === "STUDENT") return <Navigate to="/student" replace />;
+    }
 
-  try {
-    user = storedUser ? JSON.parse(storedUser) : null;
-  } catch {
-    user = null;
+    // ✅ ALLOW LOGIN PAGE IF ANYTHING MISSING
+    return children;
   }
-
-  if (token && user) {
-    if (user.role === "ADMIN") {
-      return <Navigate to="/dashboard/admin" replace />;
-    }
-
-    if (user.role === "TEACHER") {
-      return <Navigate to="/teacher" replace />;
-    }
-
-    if (user.role === "PARENT") {
-      return <Navigate to="/parent" replace />;
-    }
-
-    if (user.role === "STUDENT") {
-      return <Navigate to="/student/dashboard" replace />;
-    }
-  }
-
-  return children;
-}
-
 
 export default function AppRoutes() {
 

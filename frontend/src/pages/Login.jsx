@@ -14,6 +14,14 @@ export default function Login() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    console.log("🧹 Clearing stale session on login page");
+
+    localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("user");
+  }, []);
+
+  useEffect(() => {
     console.log("✅ Login component mounted");
     console.log("🔁 Redirect from:", location.state?.from);
   }, [location.state]);
@@ -79,7 +87,6 @@ export default function Login() {
       } else if (normalizedRole === "PARENT") {
         navigate("/parent", { replace: true });
       } else if (normalizedRole === "STUDENT") {
-        // ✅ FIXED: go to dashboard instead of hardcoded report card
         navigate("/student/dashboard", { replace: true });
       } else {
         navigate("/", { replace: true });

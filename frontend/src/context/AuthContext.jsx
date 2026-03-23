@@ -46,11 +46,17 @@ export function AuthProvider({ children }) {
     console.log("🔐 AuthContext.login → stored user:", userData);
   };
 
-  // 🚪 Logout
+  // 🚪 Logout (FIXED)
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem("user");
+    console.log("🚪 Logging out...");
+
     localStorage.removeItem("token");
+    localStorage.removeItem("role");
+    localStorage.removeItem("user");
+
+    setUser(null);
+
+    window.location.href = "/login"; // 🔥 HARD RESET (IMPORTANT)
   };
 
   // 🔁 Clear force flag after successful password change
