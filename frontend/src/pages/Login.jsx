@@ -61,6 +61,8 @@ export default function Login() {
 
       // Persist token
       localStorage.setItem("token", token);
+      localStorage.setItem("role", role); 
+      localStorage.setItem("user", JSON.stringify(user));
 
       // Store user in AuthContext
       login({

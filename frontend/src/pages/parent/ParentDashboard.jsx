@@ -57,8 +57,9 @@ const ParentDashboard = () => {
                 </span>
               </p>
 
+              {/* ✅ FIXED LINK (ROUTE PARAMS, NO QUERY PARAMS) */}
               <Link
-                to={`/parent/report-cards/1?studentId=${child.studentId}`}
+                to={`/parent/report-cards/${child.studentId}/1`}
                 className="inline-block mt-2 text-blue-600 hover:underline"
               >
                 View Full Report Card →

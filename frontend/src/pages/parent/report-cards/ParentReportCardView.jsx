@@ -1,12 +1,10 @@
 import { useEffect, useState } from "react";
-import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import api from "@/services/apiClient";
 
 export default function ParentReportCardView() {
-  // In Option A, :id === termId
-  const { id: termId } = useParams();
-  const [searchParams] = useSearchParams();
-  const studentId = searchParams.get("studentId");
+  // ✅ FIXED PARAMS (from route)
+  const { studentId, termId } = useParams();
 
   const [reportCard, setReportCard] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -14,18 +12,16 @@ export default function ParentReportCardView() {
 
   useEffect(() => {
     async function load() {
-      if (!studentId) {
-        setError("Missing student context.");
+      if (!studentId || !termId) {
+        setError("Missing student or term.");
         setLoading(false);
         return;
       }
 
       try {
         /**
-         * Backend contract (CONFIRMED):
+         * Backend contract:
          * GET /report-cards/student/:studentId/term/:termId
-         * - Parent ownership enforced
-         * - Published-only enforced
          */
         const res = await api.get(
           `/report-cards/student/${studentId}/term/${termId}`
@@ -128,8 +124,9 @@ export default function ParentReportCardView() {
         </p>
       </div>
 
+      {/* ✅ FIXED BACK LINK */}
       <Link
-        to={`/parent/report-cards?studentId=${studentId}`}
+        to="/parent/report-cards"
         className="inline-block border px-4 py-2 rounded"
       >
         Back to Report Cards
