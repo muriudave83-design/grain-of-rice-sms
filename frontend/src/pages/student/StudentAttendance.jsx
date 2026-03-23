@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "@/services/apiClient";
 
 const StudentAttendance = () => {
   const [attendance, setAttendance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/login");
+  };
 
   useEffect(() => {
     const fetchAttendance = async () => {
@@ -45,6 +53,40 @@ const StudentAttendance = () => {
         minHeight: "100vh",
       }}
     >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: "20px",
+        }}
+      >
+        <button
+          onClick={() => navigate("/student/dashboard")}
+          style={{
+            padding: "8px 12px",
+            background: "#333",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          ⬅ Back
+        </button>
+
+        <button
+          onClick={handleLogout}
+          style={{
+            padding: "8px 12px",
+            background: "#b91c1c",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          🚪 Logout
+        </button>
+      </div>
+
       <h2>📅 Attendance</h2>
 
       <div style={{ display: "flex", gap: "20px", marginTop: "20px" }}>

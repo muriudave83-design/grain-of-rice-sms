@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "@/services/apiClient";
 
 const StudentDashboard = () => {
@@ -7,6 +7,13 @@ const StudentDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [term, setTerm] = useState("term1");
+
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/login");
+  };
 
   useEffect(() => {
     const fetchStudent = async () => {
@@ -56,7 +63,22 @@ const StudentDashboard = () => {
         minHeight: "100vh",
       }}
     >
-      <h2>🎓 Student Dashboard</h2>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <h2>🎓 Student Dashboard</h2>
+
+        <button
+          onClick={handleLogout}
+          style={{
+            padding: "8px 12px",
+            background: "#b91c1c",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          🚪 Logout
+        </button>
+      </div>
 
       {/* ✅ CARD UI */}
       <div style={{ display: "flex", gap: "20px", marginTop: "20px" }}>
