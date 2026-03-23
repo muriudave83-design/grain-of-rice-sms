@@ -58,6 +58,7 @@ import ParentAttendanceSummary from "../pages/parent/attendance/ParentAttendance
 import StudentReportCardsList from "../pages/student/StudentReportCardsList";
 import StudentReportCardView from "../pages/student/StudentReportCardView";
 import StudentDashboard from "@/pages/student/StudentDashboard";
+import StudentAttendance from "@/pages/student/StudentAttendance";
 
 // =======================
 // SHARED
