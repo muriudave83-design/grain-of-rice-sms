@@ -76,24 +76,71 @@ import ChangePassword from "../pages/ChangePassword";
 // ======================================
 // PUBLIC ROUTE (PREVENT LOGIN IF LOGGED)
 // ======================================
-  function PublicRoute({ children }) {
-    const token = localStorage.getItem("token");
-    const role = localStorage.getItem("role");
+    function PublicRoute({ children }) {
+      // 🔥 DO NOT TRUST TOKEN ALONE
+      const token = localStorage.getItem("token");
+      const userStr = localStorage.getItem("user");
 
-    // 🔥 EXTRA SAFETY CHECK
-    if (token && role) {
-      if (role === "ADMIN") return <Navigate to="/dashboard/admin" replace />;
-      if (role === "TEACHER") return <Navigate to="/teacher" replace />;
-      if (role === "PARENT") return <Navigate to="/parent" replace />;
-      if (role === "STUDENT") return <Navigate to="/student" replace />;
+      if (!token || !userStr) {
+        return children;
+      }
+
+      try {
+        const user = JSON.parse(userStr);
+
+        // 🔥 OPTIONAL: decode token expiry (extra safety)
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        const isExpired = payload.exp * 1000 < Date.now();
+
+        if (isExpired) {
+          console.warn("⛔ Token expired — clearing session");
+
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("role");
+
+          return children;
+        }
+
+        // ✅ VALID SESSION → redirect
+        if (user.role === "ADMIN") return <Navigate to="/dashboard/admin" replace />;
+        if (user.role === "TEACHER") return <Navigate to="/teacher" replace />;
+        if (user.role === "PARENT") return <Navigate to="/parent" replace />;
+        if (user.role === "STUDENT") return <Navigate to="/student" replace />;
+
+      } catch (err) {
+        console.warn("⚠️ Corrupt auth data — clearing");
+
+        localStorage.clear();
+        return children;
+      }
+
+      return children;
     }
 
-    // ✅ ALLOW LOGIN PAGE IF ANYTHING MISSING
-    return children;
-  }
-
 export default function AppRoutes() {
+     // 🔥 GLOBAL SESSION GUARD (runs once)
+    (function enforceSessionValidity() {
+      const token = localStorage.getItem("token");
 
+      if (!token) return;
+
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        const isExpired = payload.exp * 1000 < Date.now();
+
+        if (isExpired) {
+          console.warn("⛔ App load: token expired → clearing");
+
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("role");
+        }
+      } catch {
+        localStorage.clear();
+      }
+    })();
+    
   return (
     <BrowserRouter>
 
