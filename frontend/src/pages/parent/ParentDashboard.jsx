@@ -1,74 +1,74 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import api from "../../services/apiClient";
+import api from "@/services/apiClient";
+import { Link } from "react-router-dom";
 
-export default function ParentDashboard() {
+const ParentDashboard = () => {
   const [children, setChildren] = useState([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    async function loadChildren() {
+    const fetchReportCards = async () => {
       try {
-        const res = await api.get("/parent-students");
+        const res = await api.get("/report-cards/me");
         setChildren(res.data);
       } catch (err) {
-        console.error("Failed to load children:", err);
+        console.error(err);
+        setError("Failed to load children");
       } finally {
         setLoading(false);
       }
-    }
+    };
 
-    loadChildren();
+    fetchReportCards();
   }, []);
 
-  if (loading) {
-    return <div className="p-6">Loading children...</div>;
-  }
-
-  if (children.length === 0) {
-    return (
-      <div className="p-6">
-        <h1 className="text-xl font-semibold">Parent Dashboard</h1>
-        <p>No children linked to this account.</p>
-      </div>
-    );
-  }
+  if (loading) return <p className="p-4">Loading...</p>;
+  if (error) return <p className="p-4 text-red-500">{error}</p>;
 
   return (
-    <div className="p-6">
-      <h1 className="text-xl font-semibold mb-4">Parent Dashboard</h1>
+    <div className="p-4">
+      <h1 className="text-xl font-bold mb-4">My Children</h1>
 
-      <div className="space-y-3">
-        {children.map((link) => {
-          const child = link.student;
-
-          return (
+      {children.length === 0 ? (
+        <p>No children found</p>
+      ) : (
+        <div className="grid gap-4">
+          {children.map((child) => (
             <div
-              key={child.id}
-              className="border p-4 rounded flex justify-between items-center"
+              key={child.studentId}
+              className="p-4 border rounded-xl shadow bg-white"
             >
-              <div>
-                <p className="font-medium">
-                  {child.firstName} {child.lastName}
-                </p>
-                <p className="text-sm text-gray-500">
-                  {child.class?.name || "No class"}
-                </p>
-              </div>
+              <h2 className="text-lg font-semibold mb-2">
+                {child.name}
+              </h2>
 
-              <button
-                onClick={() =>
-                  navigate(`/parent/report-cards?studentId=${child.id}`)
-                }
-                className="bg-blue-600 text-white px-4 py-2 rounded"
+              <p className="text-sm">
+                Overall Average:{" "}
+                <span className="font-medium">
+                  {child.overallAverage ?? "-"}
+                </span>
+              </p>
+
+              <p className="text-sm mb-2">
+                Overall Grade:{" "}
+                <span className="font-medium">
+                  {child.overallGrade ?? "-"}
+                </span>
+              </p>
+
+              <Link
+                to={`/parent/report-cards/${child.studentId}/term1`}
+                className="inline-block mt-2 text-blue-600 hover:underline"
               >
-                View Report Cards
-              </button>
+                View Full Report Card →
+              </Link>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default ParentDashboard;

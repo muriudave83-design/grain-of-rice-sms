@@ -51,6 +51,7 @@ import ParentDashboard from "../pages/parent/ParentDashboard";
 import ParentReportCards from "../pages/parent/report-cards/ParentReportCards";
 import ParentReportCardView from "../pages/parent/report-cards/ParentReportCardView";
 import ParentAttendanceSummary from "../pages/parent/attendance/ParentAttendanceSummary";
+import ParentDashboard from "@/pages/parent/ParentDashboard";
 
 // =======================
 // STUDENT PAGES
@@ -285,6 +286,10 @@ export default function AppRoutes() {
           <Route
             path="/parent/attendance"
             element={<ParentAttendanceSummary />}
+          />
+
+          <Route path="/parent/dashboard" 
+            element={<ParentDashboard />} 
           />
 
         </Route>
