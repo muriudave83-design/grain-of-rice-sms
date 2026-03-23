@@ -58,7 +58,7 @@ const ParentDashboard = () => {
               </p>
 
               <Link
-                to={`/parent/report-cards/${child.studentId}/1`}
+                to={`/parent/report-cards/1?studentId=${child.studentId}`}
                 className="inline-block mt-2 text-blue-600 hover:underline"
               >
                 View Full Report Card →
