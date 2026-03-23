@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
 import AdminLayout from "../layouts/AdminLayout";
 import TeacherLayout from "../layouts/TeacherLayout";
+import StudentLayout from "@/layouts/StudentLayout";
 
 // =======================
 // ADMIN PAGES
@@ -310,15 +311,21 @@ export default function AppRoutes() {
         {/* ======================= */}
 
         <Route element={<ProtectedRoute allowedRoles={["STUDENT"]} />}>
+        <Route element={<StudentLayout />}>
 
           <Route
             path="/student"
-              element={<Navigate to="/student/dashboard" replace />}
+            element={<Navigate to="/student/dashboard" replace />}
           />
 
           <Route
             path="/student/dashboard"
             element={<StudentDashboard />}
+          />
+
+          <Route
+            path="/student/attendance"
+            element={<StudentAttendance />}
           />
 
           <Route
@@ -332,7 +339,7 @@ export default function AppRoutes() {
           />
 
         </Route>
-
+      </Route>
 
         {/* ======================= */}
         {/* SHARED */}
