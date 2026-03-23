@@ -6,28 +6,57 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔁 Restore session on refresh
+  // 🔁 Restore session on refresh (FIXED)
   useEffect(() => {
+    const token = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
 
-    if (storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-
-        setUser({
-          id: parsed.id,
-          name: parsed.name,
-          email: parsed.email,
-          role: parsed.role,
-          forcePasswordChange: parsed.forcePasswordChange || false,
-        });
-      } catch (err) {
-        console.error("Corrupt user in storage:", err);
-        localStorage.removeItem("user");
-      }
+    // ❌ No token OR no user → no session
+    if (!token || !storedUser) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("role");
+      setLoading(false);
+      return;
     }
 
-    setLoading(false); // ✅ CRITICAL FIX
+    try {
+      // 🔥 DECODE TOKEN
+      const payload = JSON.parse(atob(token.split(".")[1]));
+
+      const isExpired = payload.exp * 1000 < Date.now();
+
+      if (isExpired) {
+        console.warn("⛔ Token expired on load → clearing session");
+
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("role");
+
+        setLoading(false);
+        return;
+      }
+
+      // ✅ VALID TOKEN → restore user
+      const parsed = JSON.parse(storedUser);
+
+      setUser({
+        id: parsed.id,
+        name: parsed.name,
+        email: parsed.email,
+        role: parsed.role,
+        forcePasswordChange: parsed.forcePasswordChange || false,
+      });
+
+    } catch (err) {
+      console.error("⚠️ Corrupt session → clearing:", err);
+
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("role");
+    }
+
+    setLoading(false);
   }, []);
 
   // 🔐 Login
@@ -41,12 +70,13 @@ export function AuthProvider({ children }) {
     };
 
     setUser(userData);
+
     localStorage.setItem("user", JSON.stringify(userData));
 
     console.log("🔐 AuthContext.login → stored user:", userData);
   };
 
-  // 🚪 Logout (FIXED)
+  // 🚪 Logout (HARD RESET)
   const logout = () => {
     console.log("🚪 Logging out...");
 
@@ -56,10 +86,10 @@ export function AuthProvider({ children }) {
 
     setUser(null);
 
-    window.location.href = "/login"; // 🔥 HARD RESET (IMPORTANT)
+    window.location.href = "/login";
   };
 
-  // 🔁 Clear force flag after successful password change
+  // 🔁 Clear force flag
   const clearForcePasswordFlag = () => {
     if (!user) return;
 
@@ -72,7 +102,6 @@ export function AuthProvider({ children }) {
     localStorage.setItem("user", JSON.stringify(updatedUser));
   };
 
-  // ✅ Derive auth state (prevents sync bugs)
   const isAuthenticated = !!user;
 
   return (
@@ -80,7 +109,7 @@ export function AuthProvider({ children }) {
       value={{
         user,
         isAuthenticated,
-        loading, // ✅ route guards must check this
+        loading,
         login,
         logout,
         clearForcePasswordFlag,
