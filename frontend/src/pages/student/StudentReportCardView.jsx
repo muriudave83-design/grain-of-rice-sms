@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import api from "../../services/apiClient";
 
 export default function StudentReportCardView() {
   const { term } = useParams(); // ✅ ONLY term is needed
+  const navigate = useNavigate();
 
   const [studentData, setStudentData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const handleLogout = () => {
+    localStorage.clear();
+    navigate("/login");
+  };
 
   useEffect(() => {
     fetchData();
@@ -35,38 +41,69 @@ export default function StudentReportCardView() {
     }
   }
 
-  if (loading) return <div className="p-6">Loading...</div>;
-  if (error) return <div className="p-6 text-red-600">{error}</div>;
-  if (!studentData) return <div className="p-6">No data</div>;
+  if (loading) return <div style={{ padding: "20px" }}>Loading...</div>;
+  if (error) return <div style={{ padding: "20px", color: "red" }}>{error}</div>;
+  if (!studentData) return <div style={{ padding: "20px" }}>No data</div>;
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-xl font-semibold">
+    <div style={{ padding: "20px", background: "#111", minHeight: "100vh", color: "white" }}>
+      
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
+
+        <button
+          onClick={() => navigate("/student/dashboard")}
+          style={{
+            padding: "8px 12px",
+            background: "#333",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          ⬅ Back
+        </button>
+
+        <button
+          onClick={handleLogout}
+          style={{
+            padding: "8px 12px",
+            background: "#b91c1c",
+            color: "white",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          🚪 Logout
+        </button>
+
+      </div>
+
+      <h1>
         Report Card — {studentData.name}
       </h1>
 
-      <table className="min-w-full border">
+      <table style={{ width: "100%", marginTop: "20px", borderCollapse: "collapse" }}>
         <thead>
-          <tr className="bg-gray-100">
-            <th className="p-2 border">Subject</th>
-            <th className="p-2 border">Average</th>
-            <th className="p-2 border">Grade</th>
+          <tr>
+            <th style={{ padding: "10px", borderBottom: "1px solid #444" }}>Subject</th>
+            <th style={{ padding: "10px", borderBottom: "1px solid #444" }}>Average</th>
+            <th style={{ padding: "10px", borderBottom: "1px solid #444" }}>Grade</th>
           </tr>
         </thead>
         <tbody>
           {studentData.subjects?.map((subj, i) => (
-            <tr key={i}>
-              <td className="p-2 border">{subj.subject}</td>
-              <td className="p-2 border">
+            <tr key={i} style={{ background: "#1f2937", color: "white" }}>
+              <td style={{ padding: "10px" }}>{subj.subject}</td>
+              <td style={{ padding: "10px" }}>
                 {subj.average?.toFixed(2) || "0.00"}
               </td>
-              <td className="p-2 border">{subj.grade}</td>
+              <td style={{ padding: "10px" }}>{subj.grade}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <div>
+      <div style={{ marginTop: "20px" }}>
         <strong>Overall Average:</strong>{" "}
         {studentData.overallAverage?.toFixed(2) || "0.00"}
       </div>
