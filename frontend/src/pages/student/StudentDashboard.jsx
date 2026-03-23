@@ -13,7 +13,7 @@ const StudentDashboard = () => {
       try {
         setError(null);
 
-        const res = await api.get(`/report-cards/me?term=${term}`);
+        const res = await api.get("/report-cards/me");
 
         console.log("DASHBOARD DATA:", res.data);
 
