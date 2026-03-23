@@ -213,6 +213,70 @@ router.get(
   }
 );
 
+// ============================================================
+// 👨‍👩‍👧 PARENT — VIEW SINGLE REPORT CARD
+// ============================================================
+router.get(
+  "/student/:studentId/term/:termId",
+  authenticate,
+  async (req: any, res) => {
+    try {
+      const studentId = Number(req.params.studentId);
+      const termId = Number(req.params.termId);
+
+      if (!req.user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // 🔐 Ensure parent owns this student
+      if (req.user.role === Role.PARENT) {
+        const link = await prisma.parentStudent.findFirst({
+          where: {
+            parentId: req.user.id,
+            studentId,
+          },
+        });
+
+        if (!link) {
+          return res.status(403).json({ message: "Not authorized" });
+        }
+      }
+
+      const reportCard = await prisma.reportCard.findFirst({
+        where: {
+          studentId,
+          termId,
+          status: "PUBLISHED",
+        },
+        include: {
+          student: true,
+          term: true,
+          class: true,
+          subjects: {
+            include: {
+              subject: true,
+            },
+          },
+        },
+      });
+
+      if (!reportCard) {
+        return res.status(404).json({
+          message: "Report card not found",
+        });
+      }
+
+      return res.json(reportCard);
+
+    } catch (err) {
+      console.error("❌ Parent report card error:", err);
+      res.status(500).json({
+        message: "Failed to load report card",
+      });
+    }
+  }
+);
+
 /**
  * ============================================================
  * 🚀 GENERATE REPORT CARD
