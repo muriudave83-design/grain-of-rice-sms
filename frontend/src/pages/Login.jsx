@@ -16,9 +16,9 @@ export default function Login() {
   useEffect(() => {
     console.log("🧹 Clearing stale session on login page");
 
-    localStorage.removeItem("token");
-    localStorage.removeItem("role");
-    localStorage.removeItem("user");
+    //localStorage.removeItem("token");
+    //localStorage.removeItem("role");
+    //localStorage.removeItem("user");
   }, []);
 
   useEffect(() => {

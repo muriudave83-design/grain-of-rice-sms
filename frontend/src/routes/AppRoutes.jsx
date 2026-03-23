@@ -278,7 +278,7 @@ export default function AppRoutes() {
           <Route path="/parent/report-cards" element={<ParentReportCards />} />
 
           <Route
-            path="/parent/report-cards/:id"
+            path="/parent/report-cards/:studentId/:termId"
             element={<ParentReportCardView />}
           />
 
