@@ -39,9 +39,45 @@ router.get(
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      if (req.user.role !== Role.STUDENT) {
-        return res.status(403).json({ message: "Only students allowed" });
+    if (req.user.role === Role.STUDENT) {
+      // continue (existing logic below will run)
+    }
+
+    else if (req.user.role === Role.PARENT) {
+      const parentId = req.user.id;
+
+      const children = await prisma.student.findMany({
+        where: {
+          parentLinks: {
+            some: {
+              parentId: parentId,
+            },
+          },
+        },
+      });
+
+      if (!children.length) {
+        return res.json([]);
       }
+
+      const results = [];
+
+      for (const child of children) {
+        results.push({
+          studentId: child.id,
+          name: `${child.firstName} ${child.lastName}`,
+          subjects: [],
+          overallAverage: 0,
+          overallGrade: "N/A",
+        });
+      }
+
+      return res.json(results);
+    }
+
+    else {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
 
       // ✅ Support both ?term=term1 and ?termId=1
       let termId: number | undefined;
