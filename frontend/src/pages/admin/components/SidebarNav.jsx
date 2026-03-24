@@ -61,6 +61,11 @@ export default function SidebarNav() {
             <NavLink to={path("classes")} className={linkClass}>
               🏫 Classes
             </NavLink>
+
+            {/* ✅ NEW — ARCHIVED */}
+            <NavLink to="/dashboard/admin/archived" className={linkClass}>
+              <span>🗂️</span> Archived
+            </NavLink>
           </div>
         )}
       </div>
