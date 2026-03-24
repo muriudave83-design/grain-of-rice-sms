@@ -92,6 +92,10 @@ export default function AdminStudents() {
   }, [students]);
 
   // ✅ NEW — handlers
+    
+    const handleEdit = (student) => {
+      navigate(`/dashboard/admin/students/${student.id}/edit`);
+    };
     const handleDelete = async (student) => {
       const fullName = `${student.firstName} ${student.lastName}`;
 
