@@ -1,10 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import SidebarNav from "./components/SidebarNav";
-import Topbar from "./components/Topbar";
 import KPIGrid from "./components/KPIGrid";
-
 import api from "../../services/apiClient";
 
 export default function AdminDashboardPage() {
@@ -44,54 +41,47 @@ export default function AdminDashboardPage() {
   ];
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <SidebarNav />
+    <div className="p-6 overflow-y-auto space-y-6">
+      {/* ✅ CENTERED CLEAN LAYOUT */}
+      <div className="max-w-5xl mx-auto space-y-6">
 
-      <div className="flex-1 flex flex-col">
+        {/* KPI SUMMARY */}
+        <KPIGrid data={kpiData} />
 
-        <div className="p-6 overflow-y-auto space-y-6">
-          {/* ✅ CENTERED CLEAN LAYOUT */}
-          <div className="max-w-5xl mx-auto space-y-6">
+        {/* QUICK ACTIONS */}
+        <div className="bg-white border rounded-lg p-4 space-y-4">
+          <h3 className="text-sm font-semibold text-gray-700">
+            Quick Actions
+          </h3>
 
-            {/* KPI SUMMARY */}
-            <KPIGrid data={kpiData} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button
+              onClick={() => navigate("/dashboard/admin/students")}
+              className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            >
+              Add Student
+            </button>
 
-            {/* QUICK ACTIONS ONLY */}
-            <div className="bg-white border rounded-lg p-4 space-y-4">
-              <h3 className="text-sm font-semibold text-gray-700">
-                Quick Actions
-              </h3>
+            <button
+              onClick={() =>
+                navigate("/dashboard/admin/users?role=TEACHER")
+              }
+              className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              Add Teacher
+            </button>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <button
-                  onClick={() => navigate("/dashboard/admin/students")}
-                  className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Add Student
-                </button>
-
-                <button
-                  onClick={() =>
-                    navigate("/dashboard/admin/users?role=TEACHER")
-                  }
-                  className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                >
-                  Add Teacher
-                </button>
-
-                <button
-                  onClick={() =>
-                    navigate("/dashboard/admin/users?role=PARENT")
-                  }
-                  className="px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
-                >
-                  Add Parent
-                </button>
-              </div>
-            </div>
-
+            <button
+              onClick={() =>
+                navigate("/dashboard/admin/users?role=PARENT")
+              }
+              className="px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+            >
+              Add Parent
+            </button>
           </div>
         </div>
+
       </div>
     </div>
   );
