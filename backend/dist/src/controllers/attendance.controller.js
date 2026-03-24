@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getParentAttendance = exports.AttendanceController = void 0;
+exports.getParentAttendance = exports.getStudentAttendanceSummary = exports.AttendanceController = void 0;
 const client_1 = require("../prisma/client");
 const attendanceSession_service_1 = require("../services/attendance/attendanceSession.service");
 class AttendanceController {
@@ -23,6 +23,40 @@ class AttendanceController {
     }
 }
 exports.AttendanceController = AttendanceController;
+/**
+ * ============================================================
+ * STUDENT — ATTENDANCE SUMMARY (NEW)
+ * GET /api/attendance/student
+ * ============================================================
+ */
+const getStudentAttendanceSummary = async (req, res) => {
+    try {
+        const studentId = req.user.id;
+        // Fetch attendance entries for this student
+        const records = await client_1.prisma.attendanceEntry.findMany({
+            where: {
+                studentId,
+            },
+        });
+        const totalDays = records.length;
+        const present = records.filter((r) => r.status === "PRESENT").length;
+        const absent = records.filter((r) => r.status === "ABSENT").length;
+        const percentage = totalDays === 0 ? 0 : Math.round((present / totalDays) * 100);
+        res.json({
+            totalDays,
+            present,
+            absent,
+            percentage,
+        });
+    }
+    catch (error) {
+        console.error("getStudentAttendanceSummary error:", error);
+        res
+            .status(500)
+            .json({ message: "Failed to fetch attendance summary" });
+    }
+};
+exports.getStudentAttendanceSummary = getStudentAttendanceSummary;
 /**
  * ============================================================
  * PARENT — GET ATTENDANCE FOR ALL OWN CHILDREN

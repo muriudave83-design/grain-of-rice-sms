@@ -9,12 +9,15 @@ const client_1 = require("../../prisma/client");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const router = (0, express_1.Router)();
 /**
+ * ✅ GET ACTIVE STUDENTS
  * GET /api/admin/students
- * List all students with class + parent
  */
 router.get("/students", async (req, res) => {
     try {
         const students = await client_1.prisma.student.findMany({
+            where: {
+                isArchived: false,
+            },
             include: {
                 class: true,
                 parentLinks: {
@@ -22,7 +25,7 @@ router.get("/students", async (req, res) => {
                         parent: true,
                     },
                 },
-                user: true, // include linked login
+                user: true,
             },
             orderBy: { id: "asc" },
         });
@@ -38,8 +41,81 @@ router.get("/students", async (req, res) => {
     }
 });
 /**
+ * ✅ NEW — GET SINGLE STUDENT (FIXED FOR PRISMA)
+ * GET /api/admin/students/:id
+ */
+router.get("/students/:id", async (req, res) => {
+    const id = Number(req.params.id);
+    try {
+        const student = await client_1.prisma.student.findFirst({
+            where: {
+                id,
+                isArchived: false,
+            },
+            include: {
+                class: true,
+                parentLinks: {
+                    include: {
+                        parent: true,
+                    },
+                },
+                user: true,
+            },
+        });
+        if (!student) {
+            return res.status(404).json({ message: "Student not found" });
+        }
+        const result = {
+            id: student.id,
+            name: `${student.firstName} ${student.lastName}`,
+            admissionNo: student.admissionNo,
+            className: student.class?.name || "—",
+            parent: student.parentLinks[0]?.parent || null,
+        };
+        res.json(result);
+    }
+    catch (err) {
+        console.error("Fetch single student error:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+/**
+ * ✅ GET ARCHIVED STUDENTS (FIXED ROUTE)
+ * GET /api/admin/archived/students
+ */
+router.get("/archived/students", async (req, res) => {
+    try {
+        const students = await client_1.prisma.student.findMany({
+            where: {
+                isArchived: true,
+            },
+            include: {
+                class: true,
+                parentLinks: {
+                    include: {
+                        parent: true,
+                    },
+                },
+            },
+            orderBy: { id: "asc" },
+        });
+        const result = students.map((s) => ({
+            id: s.id,
+            name: `${s.firstName} ${s.lastName}`, // ✅ FIXED NAME
+            admissionNo: s.admissionNo,
+            className: s.class?.name || "—", // ✅ FIXED CLASS
+            parent: s.parentLinks[0]?.parent || null,
+        }));
+        res.json(result);
+    }
+    catch (err) {
+        console.error("Failed to fetch archived students:", err);
+        res.status(500).json({ message: "Failed to fetch archived students" });
+    }
+});
+/**
+ * ✅ CREATE STUDENT
  * POST /api/admin/students
- * Create student + auto-create login account
  */
 router.post("/students", async (req, res) => {
     console.log("🔥 ADMIN STUDENTS ROUTE HIT");
@@ -58,14 +134,12 @@ router.post("/students", async (req, res) => {
                 message: "Invalid or missing fields",
             });
         }
-        // Ensure class exists
         const classExists = await client_1.prisma.class.findUnique({
             where: { id: classId },
         });
         if (!classExists) {
             return res.status(404).json({ message: "Class not found." });
         }
-        // Prevent duplicate admission numbers
         const existingStudent = await client_1.prisma.student.findUnique({
             where: { admissionNo },
         });
@@ -74,9 +148,7 @@ router.post("/students", async (req, res) => {
                 message: "Student with this admission number already exists.",
             });
         }
-        // Generate student email
         const email = `${admissionNo.toLowerCase()}@student.school.com`;
-        // Check duplicate email
         const existingUser = await client_1.prisma.user.findUnique({
             where: { email },
         });
@@ -85,10 +157,8 @@ router.post("/students", async (req, res) => {
                 message: "Generated email already exists.",
             });
         }
-        // Default password (force change later if desired)
         const defaultPassword = "student123";
         const hashedPassword = await bcryptjs_1.default.hash(defaultPassword, 10);
-        // Create login user first
         const user = await client_1.prisma.user.create({
             data: {
                 email,
@@ -97,7 +167,6 @@ router.post("/students", async (req, res) => {
                 name: `${firstName} ${lastName}`,
             },
         });
-        // Create student linked to user
         const student = await client_1.prisma.student.create({
             data: {
                 firstName,
@@ -107,7 +176,6 @@ router.post("/students", async (req, res) => {
                 userId: user.id,
             },
         });
-        // Link parent if provided
         if (parentId) {
             await client_1.prisma.parentStudent.create({
                 data: {
@@ -138,7 +206,41 @@ router.post("/students", async (req, res) => {
     }
 });
 /**
- * POST /api/admin/students/:studentId/link-user
+ * ✅ ARCHIVE STUDENT (DELETE)
+ * DELETE /api/admin/students/:id
+ */
+router.delete("/students/:id", async (req, res) => {
+    try {
+        await client_1.prisma.student.update({
+            where: { id: Number(req.params.id) },
+            data: { isArchived: true },
+        });
+        res.json({ message: "Student archived successfully" });
+    }
+    catch (err) {
+        console.error("Archive failed:", err);
+        res.status(500).json({ error: "Failed to archive student" });
+    }
+});
+/**
+ * ✅ RESTORE STUDENT
+ * PUT /api/admin/students/:id/restore
+ */
+router.put("/students/:id/restore", async (req, res) => {
+    try {
+        await client_1.prisma.student.update({
+            where: { id: Number(req.params.id) },
+            data: { isArchived: false },
+        });
+        res.json({ message: "Student restored" });
+    }
+    catch (err) {
+        console.error("Restore failed:", err);
+        res.status(500).json({ error: "Restore failed" });
+    }
+});
+/**
+ * LINK USER
  */
 router.post("/students/:studentId/link-user", async (req, res) => {
     const studentId = Number(req.params.studentId);

@@ -95,8 +95,8 @@ app.get("/debug/subjects", async (_req, res) => {
 // CORE ROUTES
 // ----------------------------------
 app.use("/api/auth", authRoutes_1.default);
-app.use("/api", protectedRoutes_1.default);
 app.use("/api/students", studentRoutes_1.default);
+app.use("/api", protectedRoutes_1.default);
 app.use("/api/assessments", assessmentRoutes_1.assessmentRoutes);
 app.use("/api/classes", classes_1.default);
 app.use("/api/gradebook", gradebookRoutes_1.default);
@@ -111,8 +111,8 @@ app.use("/api", teacherAssignments_routes_1.default);
 // ----------------------------------
 // REPORT CARDS
 // ----------------------------------
-app.use("/api/report-cards", reportCardReadRoutes_1.reportCardReadRoutes);
 app.use("/api/report-cards", reportCardRoutes_1.reportCardReadRoutes);
+app.use("/api/report-cards", reportCardReadRoutes_1.reportCardReadRoutes);
 app.use("/api", reportCardPdf_routes_1.default);
 // ----------------------------------
 // PARENT ↔ STUDENT

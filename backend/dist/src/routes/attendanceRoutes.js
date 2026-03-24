@@ -33,6 +33,11 @@ router.post("/sessions/:id/records", authMiddleware_1.authenticate, (0, rolesMid
 // ------------------------------------------------------
 router.get("/classes/:classId", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["TEACHER", "ADMIN"]), getAttendanceByClass_controller_1.getAttendanceByClass);
 // ------------------------------------------------------
+// STUDENT — Attendance summary (NEW)
+// GET /api/attendance/student
+// ------------------------------------------------------
+router.get("/student", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["STUDENT"]), attendance_controller_1.getStudentAttendanceSummary);
+// ------------------------------------------------------
 // PARENT — Attendance summary for a child (READ-ONLY)
 // ------------------------------------------------------
 router.get("/parent/students/:studentId/summary", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["PARENT", "ADMIN"]), ownershipMiddleware_1.authorizeStudentAccess, getParentAttendanceSummary_controller_1.getParentAttendanceSummary);

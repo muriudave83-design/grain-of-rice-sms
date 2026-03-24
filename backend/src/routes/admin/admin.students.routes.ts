@@ -41,40 +41,83 @@ router.get("/students", async (req, res) => {
 });
 
 /**
+ * ✅ NEW — GET SINGLE STUDENT (FIXED FOR PRISMA)
+ * GET /api/admin/students/:id
+ */
+router.get("/students/:id", async (req, res) => {
+  const id = Number(req.params.id);
+
+  try {
+    const student = await prisma.student.findFirst({
+      where: {
+        id,
+        isArchived: false,
+      },
+      include: {
+        class: true,
+        parentLinks: {
+          include: {
+            parent: true,
+          },
+        },
+        user: true,
+      },
+    });
+
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+
+    const result = {
+      id: student.id,
+      name: `${student.firstName} ${student.lastName}`,
+      admissionNo: student.admissionNo,
+      className: student.class?.name || "—",
+      parent: student.parentLinks[0]?.parent || null,
+    };
+
+    res.json(result);
+  } catch (err) {
+    console.error("Fetch single student error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+/**
  * ✅ GET ARCHIVED STUDENTS (FIXED ROUTE)
  * GET /api/admin/archived/students
  */
-  router.get("/archived/students", async (req, res) => {
-    try {
-      const students = await prisma.student.findMany({
-        where: {
-          isArchived: true,
-        },
-        include: {
-          class: true,
-          parentLinks: {
-            include: {
-              parent: true,
-            },
+router.get("/archived/students", async (req, res) => {
+  try {
+    const students = await prisma.student.findMany({
+      where: {
+        isArchived: true,
+      },
+      include: {
+        class: true,
+        parentLinks: {
+          include: {
+            parent: true,
           },
         },
-        orderBy: { id: "asc" },
-      });
+      },
+      orderBy: { id: "asc" },
+    });
 
-      const result = students.map((s) => ({
-        id: s.id,
-        name: `${s.firstName} ${s.lastName}`, // ✅ FIXED NAME
-        admissionNo: s.admissionNo,
-        className: s.class?.name || "—", // ✅ FIXED CLASS
-        parent: s.parentLinks[0]?.parent || null,
-      }));
+    const result = students.map((s) => ({
+      id: s.id,
+      name: `${s.firstName} ${s.lastName}`, // ✅ FIXED NAME
+      admissionNo: s.admissionNo,
+      className: s.class?.name || "—", // ✅ FIXED CLASS
+      parent: s.parentLinks[0]?.parent || null,
+    }));
 
-      res.json(result);
-    } catch (err) {
-      console.error("Failed to fetch archived students:", err);
-      res.status(500).json({ message: "Failed to fetch archived students" });
-    }
-  });
+    res.json(result);
+  } catch (err) {
+    console.error("Failed to fetch archived students:", err);
+    res.status(500).json({ message: "Failed to fetch archived students" });
+  }
+});
 
 /**
  * ✅ CREATE STUDENT
