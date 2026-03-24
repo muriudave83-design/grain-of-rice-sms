@@ -29,6 +29,7 @@ import AdminAttendanceClass from "../pages/admin/attendance/AdminAttendanceClass
 import AdminAuditLogs from "../pages/admin/audit/AdminAuditLogs";
 import AttendanceAnalytics from "../pages/admin/AttendanceAnalytics";
 import AdminArchived from "../pages/admin/AdminArchived";
+import EditStudent from "../pages/admin/EditStudent";
 
 // =======================
 // TEACHER PAGES
@@ -226,6 +227,11 @@ export default function AppRoutes() {
             <Route
               path="/dashboard/admin/archived"
               element={<AdminArchived />}
+            />
+
+            <Route
+              path="/dashboard/admin/students/:id/edit"
+              element={<EditStudent />}
             />
 
           </Route>

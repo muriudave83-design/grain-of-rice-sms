@@ -93,7 +93,7 @@ export default function AdminStudents() {
 
   // ✅ NEW — handlers
   const handleEdit = (student) => {
-    navigate(`/dashboard/admin/students/edit/${student.id}`);
+    navigate(`/dashboard/admin/students/${student.id}/edit`);
   };
 
   const handleDelete = async (student) => {
