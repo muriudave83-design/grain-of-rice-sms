@@ -8,7 +8,7 @@ export default function SidebarNav() {
     management: true,
     academics: true,
     attendance: true,
-    finance: false,
+    // 🔥 removed finance state
   });
 
   const toggle = (section) => {
@@ -92,9 +92,7 @@ export default function SidebarNav() {
               🏫 Class Subject Assignment
             </NavLink>
 
-            <NavLink to={path("grades")} className={linkClass}>
-              📝 Grades
-            </NavLink>
+            {/* ❌ REMOVED GRADES */}
 
             <NavLink to={path("exams")} className={linkClass}>
               📊 Exams
@@ -118,34 +116,12 @@ export default function SidebarNav() {
               ✅ Attendance
             </NavLink>
 
-            <NavLink to={path("attendance-analytics")} className={linkClass}>
-              📈 Attendance Analytics
-            </NavLink>
+            {/* ❌ REMOVED ATTENDANCE ANALYTICS */}
           </div>
         )}
       </div>
 
-      {/* FINANCE */}
-      <div className="mt-4">
-        <button
-          onClick={() => toggle("finance")}
-          className="w-full text-left text-xs font-bold text-gray-500 uppercase tracking-wide mb-2"
-        >
-          Finance
-        </button>
-
-        {open.finance && (
-          <div className="ml-2">
-            <NavLink to={path("fees")} className={linkClass}>
-              💰 Fees
-            </NavLink>
-
-            <NavLink to={path("payments")} className={linkClass}>
-              💳 Payments
-            </NavLink>
-          </div>
-        )}
-      </div>
+      {/* ❌ FULL FINANCE SECTION REMOVED */}
 
       {/* FOOTER */}
       <div className="mt-6 text-xs text-gray-400">
