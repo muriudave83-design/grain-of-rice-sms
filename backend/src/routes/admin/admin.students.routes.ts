@@ -44,35 +44,37 @@ router.get("/students", async (req, res) => {
  * ✅ GET ARCHIVED STUDENTS (FIXED ROUTE)
  * GET /api/admin/archived/students
  */
-router.get("/archived/students", async (req, res) => {
-  try {
-    const students = await prisma.student.findMany({
-      where: {
-        isArchived: true,
-      },
-      include: {
-        class: true,
-        parentLinks: {
-          include: {
-            parent: true,
+  router.get("/archived/students", async (req, res) => {
+    try {
+      const students = await prisma.student.findMany({
+        where: {
+          isArchived: true,
+        },
+        include: {
+          class: true,
+          parentLinks: {
+            include: {
+              parent: true,
+            },
           },
         },
-        user: true,
-      },
-      orderBy: { id: "asc" },
-    });
+        orderBy: { id: "asc" },
+      });
 
-    const result = students.map((s) => ({
-      ...s,
-      parent: s.parentLinks[0]?.parent || null,
-    }));
+      const result = students.map((s) => ({
+        id: s.id,
+        name: `${s.firstName} ${s.lastName}`, // ✅ FIXED NAME
+        admissionNo: s.admissionNo,
+        className: s.class?.name || "—", // ✅ FIXED CLASS
+        parent: s.parentLinks[0]?.parent || null,
+      }));
 
-    res.json(result);
-  } catch (err) {
-    console.error("Failed to fetch archived students:", err);
-    res.status(500).json({ message: "Failed to fetch archived students" });
-  }
-});
+      res.json(result);
+    } catch (err) {
+      console.error("Failed to fetch archived students:", err);
+      res.status(500).json({ message: "Failed to fetch archived students" });
+    }
+  });
 
 /**
  * ✅ CREATE STUDENT
