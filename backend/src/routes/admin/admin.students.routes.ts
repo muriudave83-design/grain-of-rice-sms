@@ -232,6 +232,31 @@ router.post("/students", async (req, res) => {
 });
 
 /**
+ * ✅ UPDATE STUDENT
+ * PUT /api/admin/students/:id
+ */
+router.put("/students/:id", async (req, res) => {
+  const { id } = req.params;
+  const { firstName, lastName, admissionNo } = req.body;
+
+  try {
+    const updated = await prisma.student.update({
+      where: { id: Number(id) },
+      data: {
+        firstName,
+        lastName,
+        admissionNo,
+      },
+    });
+
+    res.json(updated);
+  } catch (err) {
+    console.error("Update student error:", err);
+    res.status(500).json({ message: "Failed to update student" });
+  }
+});
+
+/**
  * ✅ ARCHIVE STUDENT (DELETE)
  * DELETE /api/admin/students/:id
  */
