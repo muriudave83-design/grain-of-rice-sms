@@ -3,7 +3,6 @@ import { useParams, Link } from "react-router-dom";
 import api from "@/services/apiClient";
 
 export default function ParentReportCardView() {
-  // ✅ FIXED PARAMS (from route)
   const { studentId, termId } = useParams();
 
   const [reportCard, setReportCard] = useState(null);
@@ -19,10 +18,6 @@ export default function ParentReportCardView() {
       }
 
       try {
-        /**
-         * Backend contract:
-         * GET /report-cards/student/:studentId/term/:termId
-         */
         const res = await api.get(
           `/report-cards/student/${studentId}/term/${termId}`
         );
@@ -44,6 +39,27 @@ export default function ParentReportCardView() {
     load();
   }, [studentId, termId]);
 
+  // ✅ NEW: secure PDF download
+  const handleDownload = async () => {
+    try {
+      const res = await api.get(
+        `/report-cards/${reportCard.id}/pdf`,
+        { responseType: "blob" }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "report-card.pdf");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      console.error("PDF download failed:", err);
+      alert("Failed to download PDF");
+    }
+  };
+
   if (loading) return <div className="p-6">Loading…</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
   if (!reportCard) return null;
@@ -62,14 +78,13 @@ export default function ParentReportCardView() {
           </p>
         </div>
 
-        <a
-          href={`/api/report-cards/${reportCard.id}/pdf`}
-          target="_blank"
-          rel="noopener noreferrer"
+        {/* ✅ FIXED PDF BUTTON */}
+        <button
+          onClick={handleDownload}
           className="bg-blue-600 text-white px-4 py-2 rounded"
         >
           Download PDF
-        </a>
+        </button>
       </div>
 
       {/* Subjects */}
@@ -124,12 +139,12 @@ export default function ParentReportCardView() {
         </p>
       </div>
 
-      {/* ✅ FIXED BACK LINK */}
+      {/* ✅ BACK LINK (CORRECT) */}
       <Link
-        to="/parent/report-cards"
+        to="/parent"
         className="inline-block border px-4 py-2 rounded"
       >
-        Back to Report Cards
+        Back to Dashboard
       </Link>
     </div>
   );

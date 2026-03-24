@@ -12,7 +12,7 @@ const ParentDashboard = () => {
       try {
         const res = await api.get("/report-cards/me");
 
-        console.log("👨‍👩‍👧 CHILDREN DATA:", res.data); // 🔍 DEBUG
+        console.log("👨‍👩‍👧 CHILDREN DATA:", res.data);
 
         setChildren(res.data);
       } catch (err) {
@@ -38,8 +38,13 @@ const ParentDashboard = () => {
       ) : (
         <div className="grid gap-4">
           {children.map((child) => {
-            // 🔥 SAFE ID RESOLUTION (handles different backend shapes)
             const studentId = child.studentId || child.id;
+
+            // ✅ SAFE COMPUTATION (FIXES JSX ERROR)
+            const avg =
+              child.overallAverage > 0
+                ? child.overallAverage
+                : "-";
 
             return (
               <div
@@ -52,9 +57,7 @@ const ParentDashboard = () => {
 
                 <p className="text-sm">
                   Overall Average:{" "}
-                  <span className="font-medium">
-                    {child.overallAverage ?? "-"}
-                  </span>
+                  <span className="font-medium">{avg}</span>
                 </p>
 
                 <p className="text-sm mb-2">
@@ -64,7 +67,6 @@ const ParentDashboard = () => {
                   </span>
                 </p>
 
-                {/* ✅ FIXED LINK (USES CORRECT STUDENT ID) */}
                 <Link
                   to={`/parent/report-cards/${studentId}/1`}
                   className="inline-block mt-2 text-blue-600 hover:underline"
