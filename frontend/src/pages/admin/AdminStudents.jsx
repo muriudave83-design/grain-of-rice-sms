@@ -3,6 +3,7 @@ import apiClient from "../../services/apiClient";
 
 export default function AdminStudents() {
   const [students, setStudents] = useState([]);
+  const [search, setSearch] = useState(""); // ✅ STEP 1
   const [classes, setClasses] = useState([]);
   const [parents, setParents] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -41,6 +42,35 @@ export default function AdminStudents() {
     }
   }
 
+  // ✅ STEP 2 — filtering (adapted safely)
+  const filteredStudents = students.filter((s) => {
+    const query = search.toLowerCase();
+
+    return (
+      `${s.firstName || ""} ${s.lastName || ""}`
+        .toLowerCase()
+        .includes(query) ||
+      s.admissionNo?.toLowerCase().includes(query) ||
+      (s.class?.name || "").toLowerCase().includes(query)
+    );
+  });
+
+  // ✅ STEP 3 — grouping
+  const groupedStudents = filteredStudents.reduce((acc, student) => {
+    const className =
+      student.className ||
+      student.class?.name ||
+      student.class ||
+      "Unassigned";
+
+    if (!acc[className]) {
+      acc[className] = [];
+    }
+
+    acc[className].push(student);
+    return acc;
+  }, {});
+
   // ✅ DEBUG VERSION
   async function submitForm(e) {
     e.preventDefault();
@@ -62,7 +92,6 @@ export default function AdminStudents() {
         payload.parentId = Number(form.parentId);
       }
 
-      // 🔥 DEBUG LOGS
       console.log("======================================");
       console.log("🚀 BACKEND VERSION TEST 123");
       console.log("API BASE URL:", apiClient.defaults.baseURL);
@@ -117,43 +146,66 @@ export default function AdminStudents() {
         </div>
       )}
 
+      {/* ✅ STEP 4 — Search UI */}
+      <div className="mb-4 flex justify-between items-center">
+        <input
+          type="text"
+          placeholder="Search by name, class, or admission no..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full md:w-80 px-3 py-2 border rounded-md text-sm"
+        />
+      </div>
+
+      {/* ✅ KEEP ORIGINAL WRAPPER */}
       <div className="bg-white border rounded overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="p-3 text-left">Name</th>
-              <th className="p-3 text-left">Admission No</th>
-              <th className="p-3 text-left">Class</th>
-              <th className="p-3 text-left">Parent</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan="4" className="p-4 text-center">
-                  Loading…
-                </td>
-              </tr>
-            ) : students.length === 0 ? (
-              <tr>
-                <td colSpan="4" className="p-4 text-center text-gray-500">
-                  No students yet
-                </td>
-              </tr>
-            ) : (
-              students.map((s) => (
-                <tr key={s.id} className="border-t">
-                  <td className="p-3">
-                    {s.firstName} {s.lastName}
-                  </td>
-                  <td className="p-3">{s.admissionNo}</td>
-                  <td className="p-3">{s.class?.name || "—"}</td>
-                  <td className="p-3">{s.parent?.name || "—"}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+
+        {/* ✅ STEP 5 — REPLACED TABLE CONTENT ONLY */}
+        {loading ? (
+          <div className="p-4 text-center">Loading…</div>
+        ) : students.length === 0 ? (
+          <div className="p-4 text-center text-gray-500">
+            No students yet
+          </div>
+        ) : (
+          Object.entries(groupedStudents).map(([className, classStudents]) => (
+            <div key={className} className="mb-6">
+
+              <h2 className="text-lg font-semibold text-gray-700 mb-2 px-3 pt-3">
+                {className}
+              </h2>
+
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="p-3 text-left">Name</th>
+                    <th className="p-3 text-left">Admission No</th>
+                    <th className="p-3 text-left">Class</th>
+                    <th className="p-3 text-left">Parent</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {classStudents.map((s) => (
+                    <tr key={s.id} className="border-t">
+                      <td className="p-3">
+                        {s.firstName} {s.lastName}
+                      </td>
+                      <td className="p-3">{s.admissionNo}</td>
+                      <td className="p-3">
+                        {s.className || s.class?.name || s.class}
+                      </td>
+                      <td className="p-3">
+                        {s.parentName || s.parent?.name || "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+            </div>
+          ))
+        )}
       </div>
 
       {showForm && (
