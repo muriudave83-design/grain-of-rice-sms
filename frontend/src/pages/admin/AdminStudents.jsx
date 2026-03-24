@@ -92,29 +92,26 @@ export default function AdminStudents() {
   }, [students]);
 
   // ✅ NEW — handlers
-  const handleEdit = (student) => {
-    navigate(`/dashboard/admin/students/${student.id}/edit`);
-  };
+    const handleDelete = async (student) => {
+      const fullName = `${student.firstName} ${student.lastName}`;
 
-  const handleDelete = async (student) => {
-    const fullName = `${student.firstName} ${student.lastName}`;
+      const confirmDelete = window.confirm(
+        `Delete ${fullName}? This will archive the student.`
+      );
 
-    const confirmDelete = window.confirm(
-      `Delete ${fullName}? This will archive the student.`
-    );
+      if (!confirmDelete) return;
 
-    if (!confirmDelete) return;
+      try {
+        await apiClient.delete(`/admin/students/${student.id}`);
 
-    try {
-      await apiClient.delete(`/admin/students/${student.id}`);
+        // ✅ CRITICAL: remove from UI immediately
+        setStudents((prev) => prev.filter((s) => s.id !== student.id));
 
-      // remove from UI instantly
-      setStudents((prev) => prev.filter((s) => s.id !== student.id));
-    } catch (err) {
-      console.error("Failed to delete student", err);
-      alert("Failed to delete student");
-    }
-  };
+      } catch (err) {
+        console.error("Failed to delete student", err);
+        alert("Failed to delete student");
+      }
+    };
 
   async function submitForm(e) {
     e.preventDefault();
