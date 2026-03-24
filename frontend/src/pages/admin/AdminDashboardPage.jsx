@@ -14,6 +14,7 @@ export default function AdminDashboardPage() {
     students: 0,
     teachers: 0,
     classes: 0,
+    avgAttendance: 0,
   });
 
   useEffect(() => {
@@ -33,7 +34,13 @@ export default function AdminDashboardPage() {
     { label: "Total Students", value: stats.students },
     { label: "Total Teachers", value: stats.teachers },
     { label: "Active Classes", value: stats.classes },
-    { label: "Avg Attendance", value: "—" },
+    {
+      label: "Avg Attendance",
+      value:
+        stats.avgAttendance > 0
+          ? `${stats.avgAttendance}%`
+          : "—",
+    },
   ];
 
   return (
