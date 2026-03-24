@@ -48,9 +48,7 @@ export default function AdminDashboardPage() {
       <SidebarNav />
 
       <div className="flex-1 flex flex-col">
-        <Topbar title="Admin Dashboard" />
-        
-        <h1 style={{ color: "red" }}>NEW DASHBOARD VERSION</h1>
+
         <div className="p-6 overflow-y-auto space-y-6">
           {/* ✅ CENTERED CLEAN LAYOUT */}
           <div className="max-w-5xl mx-auto space-y-6">
