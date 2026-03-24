@@ -7,14 +7,14 @@ import bcrypt from "bcryptjs";
 const router = Router();
 
 /**
+ * ✅ GET ACTIVE STUDENTS
  * GET /api/admin/students
- * List all students with class + parent (EXCLUDES archived)
  */
 router.get("/students", async (req, res) => {
   try {
     const students = await prisma.student.findMany({
       where: {
-        isArchived: false, // ✅ FIXED
+        isArchived: false,
       },
       include: {
         class: true,
@@ -41,10 +41,10 @@ router.get("/students", async (req, res) => {
 });
 
 /**
- * ✅ NEW — GET ARCHIVED STUDENTS
- * GET /api/admin/students/archived
+ * ✅ GET ARCHIVED STUDENTS (FIXED ROUTE)
+ * GET /api/admin/archived/students
  */
-router.get("/students/archived", async (req, res) => {
+router.get("/archived/students", async (req, res) => {
   try {
     const students = await prisma.student.findMany({
       where: {
@@ -75,8 +75,8 @@ router.get("/students/archived", async (req, res) => {
 });
 
 /**
+ * ✅ CREATE STUDENT
  * POST /api/admin/students
- * Create student + auto-create login account
  */
 router.post("/students", async (req, res) => {
   console.log("🔥 ADMIN STUDENTS ROUTE HIT");
@@ -187,7 +187,7 @@ router.post("/students", async (req, res) => {
 });
 
 /**
- * ✅ NEW — ARCHIVE STUDENT (DELETE)
+ * ✅ ARCHIVE STUDENT (DELETE)
  * DELETE /api/admin/students/:id
  */
 router.delete("/students/:id", async (req, res) => {
@@ -205,7 +205,7 @@ router.delete("/students/:id", async (req, res) => {
 });
 
 /**
- * ✅ NEW — RESTORE STUDENT
+ * ✅ RESTORE STUDENT
  * PUT /api/admin/students/:id/restore
  */
 router.put("/students/:id/restore", async (req, res) => {
@@ -223,7 +223,7 @@ router.put("/students/:id/restore", async (req, res) => {
 });
 
 /**
- * POST /api/admin/students/:studentId/link-user
+ * LINK USER
  */
 router.post("/students/:studentId/link-user", async (req, res) => {
   const studentId = Number(req.params.studentId);
