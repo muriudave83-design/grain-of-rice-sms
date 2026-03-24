@@ -49,6 +49,21 @@ export default function AdminCategories() {
     }
   };
 
+  // ✅ DELETE FUNCTION
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this category?")) return;
+
+    try {
+      await apiClient.delete(`/assignment-categories/${id}`);
+
+      // update UI instantly
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+    } catch (err) {
+       console.error("Failed to delete category", err);
+       alert(err.response?.data?.message || "Delete failed");
+    }
+  };
+
   return (
     <div>
       <h1 className="text-xl font-semibold mb-4">
@@ -74,17 +89,17 @@ export default function AdminCategories() {
       {categories.length === 0 ? (
         <p>No categories yet</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-3">
           {categories.map((cat) => (
             <li
               key={cat.id}
-              className="flex justify-between items-center border p-2"
+              className="flex justify-between items-center border p-3 rounded"
             >
               <span className="font-medium">
                 {cat.name}
               </span>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <input
                   type="number"
                   min="0"
@@ -96,11 +111,20 @@ export default function AdminCategories() {
                   onBlur={() =>
                     handleWeightSave(cat.id, cat.weight)
                   }
-                  className="w-20 border p-1 text-center"
+                  className="w-20 border p-1 text-center rounded"
                 />
+
                 <span className="text-sm text-gray-500">
                   Weight
                 </span>
+
+                {/* ✅ DELETE BUTTON */}
+                <button
+                  onClick={() => handleDelete(cat.id)}
+                  className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                >
+                  Delete
+                </button>
               </div>
             </li>
           ))}
