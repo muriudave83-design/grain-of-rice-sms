@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom"; // ✅ added
 import apiClient from "../../services/apiClient";
 
 export default function AdminStudents() {
   const [students, setStudents] = useState([]);
-  const [search, setSearch] = useState(""); // ✅ STEP 1
+  const [search, setSearch] = useState("");
   const [classes, setClasses] = useState([]);
   const [parents, setParents] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -18,8 +19,9 @@ export default function AdminStudents() {
     parentId: "",
   });
 
-  // ✅ NEW — collapsible state
   const [openClasses, setOpenClasses] = useState({});
+
+  const navigate = useNavigate(); // ✅ added
 
   useEffect(() => {
     fetchData();
@@ -45,7 +47,7 @@ export default function AdminStudents() {
     }
   }
 
-  // ✅ STEP 2 — filtering
+  // filtering
   const filteredStudents = students.filter((s) => {
     const query = search.toLowerCase();
 
@@ -58,7 +60,7 @@ export default function AdminStudents() {
     );
   });
 
-  // ✅ STEP 3 — grouping
+  // grouping
   const groupedStudents = filteredStudents.reduce((acc, student) => {
     const className =
       student.className ||
@@ -74,7 +76,6 @@ export default function AdminStudents() {
     return acc;
   }, {});
 
-  // ✅ NEW — toggle function
   const toggleClass = (className) => {
     setOpenClasses((prev) => ({
       ...prev,
@@ -82,7 +83,6 @@ export default function AdminStudents() {
     }));
   };
 
-  // ✅ OPTIONAL — open all by default
   useEffect(() => {
     const initialState = {};
     Object.keys(groupedStudents).forEach((cls) => {
@@ -91,7 +91,31 @@ export default function AdminStudents() {
     setOpenClasses(initialState);
   }, [students]);
 
-  // ✅ DEBUG VERSION
+  // ✅ NEW — handlers
+  const handleEdit = (student) => {
+    navigate(`/dashboard/admin/students/edit/${student.id}`);
+  };
+
+  const handleDelete = async (student) => {
+    const fullName = `${student.firstName} ${student.lastName}`;
+
+    const confirmDelete = window.confirm(
+      `Delete ${fullName}? This will archive the student.`
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      await apiClient.delete(`/admin/students/${student.id}`);
+
+      // remove from UI instantly
+      setStudents((prev) => prev.filter((s) => s.id !== student.id));
+    } catch (err) {
+      console.error("Failed to delete student", err);
+      alert("Failed to delete student");
+    }
+  };
+
   async function submitForm(e) {
     e.preventDefault();
 
@@ -112,19 +136,7 @@ export default function AdminStudents() {
         payload.parentId = Number(form.parentId);
       }
 
-      console.log("======================================");
-      console.log("🚀 BACKEND VERSION TEST 123");
-      console.log("API BASE URL:", apiClient.defaults.baseURL);
-      console.log(
-        "FULL URL:",
-        `${apiClient.defaults.baseURL}/admin/students`
-      );
-      console.log("PAYLOAD:", payload);
-      console.log("======================================");
-
       const response = await apiClient.post("/admin/students", payload);
-
-      console.log("✅ RESPONSE:", response.data);
 
       setForm({
         firstName: "",
@@ -136,10 +148,8 @@ export default function AdminStudents() {
 
       setShowForm(false);
       fetchData();
-
     } catch (err) {
-      console.error("❌ CREATE STUDENT ERROR:", err);
-      console.error("❌ RESPONSE:", err?.response);
+      console.error("CREATE STUDENT ERROR:", err);
 
       alert(
         err?.response?.data?.message ||
@@ -166,7 +176,6 @@ export default function AdminStudents() {
         </div>
       )}
 
-      {/* SEARCH */}
       <div className="mb-4 flex justify-between items-center">
         <input
           type="text"
@@ -188,7 +197,6 @@ export default function AdminStudents() {
           Object.entries(groupedStudents).map(([className, classStudents]) => (
             <div key={className} className="mb-6">
 
-              {/* ✅ COLLAPSIBLE HEADER */}
               <div
                 onClick={() => toggleClass(className)}
                 className="flex justify-between items-center cursor-pointer bg-gray-100 px-4 py-3 rounded-md hover:bg-gray-200"
@@ -208,7 +216,6 @@ export default function AdminStudents() {
                 </div>
               </div>
 
-              {/* ✅ CONDITIONAL TABLE */}
               {openClasses[className] && (
                 <div className="bg-white border rounded-lg overflow-hidden mt-2">
                   <table className="w-full text-sm">
@@ -217,6 +224,7 @@ export default function AdminStudents() {
                         <th className="p-3">Name</th>
                         <th className="p-3">Admission No</th>
                         <th className="p-3">Parent</th>
+                        <th className="p-3">Actions</th> {/* ✅ added */}
                       </tr>
                     </thead>
 
@@ -229,6 +237,23 @@ export default function AdminStudents() {
                           <td className="p-3">{s.admissionNo}</td>
                           <td className="p-3">
                             {s.parentName || s.parent?.name || "—"}
+                          </td>
+
+                          {/* ✅ ACTION BUTTONS */}
+                          <td className="p-3 flex gap-2">
+                            <button
+                              onClick={() => handleEdit(s)}
+                              className="px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              onClick={() => handleDelete(s)}
+                              className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                            >
+                              Delete
+                            </button>
                           </td>
                         </tr>
                       ))}
