@@ -39,7 +39,7 @@ router.post(
           classId: Number(classId),
           admissionNo,
           dob: dob ? new Date(dob) : null,
-          userId: Number(userId), // ✅ FORCE LINK (no silent null)
+          userId: Number(userId),
         },
       });
 
@@ -55,7 +55,7 @@ router.post(
   }
 );
 
-// ✅ Get ALL students (Admin + Teacher)
+// ✅ Get ALL students (EXCLUDES archived)
 router.get(
   "/",
   authenticate,
@@ -63,10 +63,13 @@ router.get(
   async (req, res) => {
     try {
       const students = await prisma.student.findMany({
+        where: {
+          isArchived: false, // ✅ added
+        },
         orderBy: { id: "asc" },
         include: {
           class: true,
-          user: true, // ✅ added for visibility
+          user: true,
           parentLinks: {
             include: {
               parent: true,
@@ -79,6 +82,30 @@ router.get(
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+
+// ✅ Get ARCHIVED students
+router.get(
+  "/archived",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    try {
+      const students = await prisma.student.findMany({
+        where: {
+          isArchived: true,
+        },
+        include: {
+          class: true,
+        },
+      });
+
+      res.json(students);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to fetch archived students" });
     }
   }
 );
@@ -96,7 +123,7 @@ router.get(
         where: { id },
         include: {
           class: true,
-          user: true, // ✅ added
+          user: true,
           parentLinks: {
             include: {
               parent: true,
@@ -119,6 +146,46 @@ router.get(
     } catch (err) {
       console.error(err);
       res.status(500).json({ message: "Server error" });
+    }
+  }
+);
+
+// ✅ DELETE → ARCHIVE (safe delete)
+router.delete(
+  "/:id",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    try {
+      await prisma.student.update({
+        where: { id: Number(req.params.id) },
+        data: { isArchived: true },
+      });
+
+      res.json({ message: "Student archived" });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Failed to archive student" });
+    }
+  }
+);
+
+// ✅ RESTORE student
+router.put(
+  "/:id/restore",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    try {
+      await prisma.student.update({
+        where: { id: Number(req.params.id) },
+        data: { isArchived: false },
+      });
+
+      res.json({ message: "Student restored" });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Restore failed" });
     }
   }
 );
