@@ -65,6 +65,7 @@ model Class {
   reportCards        ReportCard[]
   students           Student[]
   teacherSubjects    TeacherSubject[]
+  isArchived Boolean @default(false)
 }
 
 model Guardian {

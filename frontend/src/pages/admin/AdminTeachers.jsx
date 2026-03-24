@@ -58,6 +58,26 @@ export default function AdminTeachers() {
     }
   };
 
+  // ✅ SAFE DELETE (ARCHIVE TEACHER)
+  const handleDeleteTeacher = async (id) => {
+    if (!window.confirm("Archive this teacher?")) return;
+
+    try {
+      await apiClient.patch(`/admin/users/${id}/archive`);
+
+      // update UI instantly
+      setTeachers((prev) =>
+        prev.filter((t) => t.id !== id)
+      );
+    } catch (err) {
+      console.error("Failed to archive teacher", err);
+      alert(
+        err.response?.data?.message ||
+          "Failed to archive teacher"
+      );
+    }
+  };
+
   if (loading) return <div>Loading teachers...</div>;
 
   return (
@@ -127,6 +147,7 @@ export default function AdminTeachers() {
               <th className="p-3">Name</th>
               <th className="p-3">Email</th>
               <th className="p-3">Created</th>
+              <th className="p-3">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -139,12 +160,24 @@ export default function AdminTeachers() {
                     t.createdAt
                   ).toLocaleDateString()}
                 </td>
+
+                <td className="p-3">
+                  <button
+                    onClick={() =>
+                      handleDeleteTeacher(t.id)
+                    }
+                    className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                  >
+                    Archive
+                  </button>
+                </td>
               </tr>
             ))}
+
             {teachers.length === 0 && (
               <tr>
                 <td
-                  colSpan="3"
+                  colSpan="4"
                   className="p-4 text-center text-gray-500"
                 >
                   No teachers found

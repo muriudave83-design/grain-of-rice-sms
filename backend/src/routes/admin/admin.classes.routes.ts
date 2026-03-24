@@ -58,6 +58,7 @@ router.get(
   async (_req, res) => {
     try {
       const classes = await prisma.class.findMany({
+        where: { isArchived: false }, // ✅ hide archived
         orderBy: { createdAt: "asc" },
       });
 
@@ -116,6 +117,45 @@ router.get(
       console.error("Fetch class students failed:", error);
       return res.status(500).json({
         message: "Failed to fetch students",
+      });
+    }
+  }
+);
+
+/**
+ * 🗂️ PATCH /api/admin/classes/:id/archive
+ * Archive a class (safe delete)
+ */
+router.patch(
+  "/classes/:id/archive",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    const { id } = req.params;
+
+    try {
+      // 🔒 Prevent archiving if students exist
+      const studentCount = await prisma.student.count({
+        where: { classId: Number(id) },
+      });
+
+      if (studentCount > 0) {
+        return res.status(400).json({
+          message:
+            "Cannot archive class with assigned students",
+        });
+      }
+
+      await prisma.class.update({
+        where: { id: Number(id) },
+        data: { isArchived: true },
+      });
+
+      res.json({ message: "Class archived" });
+    } catch (err) {
+      console.error("Failed to archive class", err);
+      res.status(500).json({
+        message: "Failed to archive class",
       });
     }
   }

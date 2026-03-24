@@ -46,9 +46,20 @@ export default function AdminClassSubjects() {
     }
   }
 
+  // ✅ SAFE REMOVE WITH CONFIRM + ERROR HANDLING
   async function remove(id) {
-    await apiClient.delete(`/admin/class-subjects/${id}`);
-    loadAssignments(selectedClass);
+    if (!window.confirm("Remove this subject from the class?")) return;
+
+    try {
+      await apiClient.delete(`/admin/class-subjects/${id}`);
+      loadAssignments(selectedClass);
+    } catch (err) {
+      console.error("Failed to remove subject", err);
+      alert(
+        err.response?.data?.message ||
+          "Failed to remove subject"
+      );
+    }
   }
 
   const assignedIds = assignments.map((a) => a.subjectId);
@@ -74,7 +85,9 @@ export default function AdminClassSubjects() {
 
       {selectedClass && (
         <>
-          <h3 className="font-semibold mb-2">Available Subjects</h3>
+          <h3 className="font-semibold mb-2">
+            Available Subjects
+          </h3>
 
           <div className="grid grid-cols-2 gap-2">
             {subjects.map((s) => {
@@ -83,7 +96,7 @@ export default function AdminClassSubjects() {
               return (
                 <div
                   key={s.id}
-                  className="border p-2 flex justify-between items-center"
+                  className="border p-2 flex justify-between items-center rounded"
                 >
                   <span>
                     {s.name} {s.code ? `(${s.code})` : ""}
@@ -91,14 +104,14 @@ export default function AdminClassSubjects() {
 
                   {!isAssigned ? (
                     <button
-                      className="bg-green-600 text-white px-2 py-1"
+                      className="bg-green-600 text-white px-2 py-1 rounded"
                       onClick={() => assign(s.id)}
                     >
                       Add
                     </button>
                   ) : (
                     <button
-                      className="bg-red-600 text-white px-2 py-1"
+                      className="bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700"
                       onClick={() =>
                         remove(
                           assignments.find(
