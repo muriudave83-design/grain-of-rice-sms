@@ -8,11 +8,14 @@ const router = Router();
 
 /**
  * GET /api/admin/students
- * List all students with class + parent
+ * List all students with class + parent (EXCLUDES archived)
  */
 router.get("/students", async (req, res) => {
   try {
     const students = await prisma.student.findMany({
+      where: {
+        isArchived: false, // ✅ FIXED
+      },
       include: {
         class: true,
         parentLinks: {
@@ -20,7 +23,7 @@ router.get("/students", async (req, res) => {
             parent: true,
           },
         },
-        user: true, // include linked login
+        user: true,
       },
       orderBy: { id: "asc" },
     });
@@ -34,6 +37,40 @@ router.get("/students", async (req, res) => {
   } catch (err) {
     console.error("Failed to fetch students:", err);
     res.status(500).json({ message: "Failed to fetch students" });
+  }
+});
+
+/**
+ * ✅ NEW — GET ARCHIVED STUDENTS
+ * GET /api/admin/students/archived
+ */
+router.get("/students/archived", async (req, res) => {
+  try {
+    const students = await prisma.student.findMany({
+      where: {
+        isArchived: true,
+      },
+      include: {
+        class: true,
+        parentLinks: {
+          include: {
+            parent: true,
+          },
+        },
+        user: true,
+      },
+      orderBy: { id: "asc" },
+    });
+
+    const result = students.map((s) => ({
+      ...s,
+      parent: s.parentLinks[0]?.parent || null,
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error("Failed to fetch archived students:", err);
+    res.status(500).json({ message: "Failed to fetch archived students" });
   }
 });
 
@@ -64,7 +101,6 @@ router.post("/students", async (req, res) => {
       });
     }
 
-    // Ensure class exists
     const classExists = await prisma.class.findUnique({
       where: { id: classId },
     });
@@ -73,7 +109,6 @@ router.post("/students", async (req, res) => {
       return res.status(404).json({ message: "Class not found." });
     }
 
-    // Prevent duplicate admission numbers
     const existingStudent = await prisma.student.findUnique({
       where: { admissionNo },
     });
@@ -84,10 +119,8 @@ router.post("/students", async (req, res) => {
       });
     }
 
-    // Generate student email
     const email = `${admissionNo.toLowerCase()}@student.school.com`;
 
-    // Check duplicate email
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -98,11 +131,9 @@ router.post("/students", async (req, res) => {
       });
     }
 
-    // Default password (force change later if desired)
     const defaultPassword = "student123";
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
-    // Create login user first
     const user = await prisma.user.create({
       data: {
         email,
@@ -112,7 +143,6 @@ router.post("/students", async (req, res) => {
       },
     });
 
-    // Create student linked to user
     const student = await prisma.student.create({
       data: {
         firstName,
@@ -123,7 +153,6 @@ router.post("/students", async (req, res) => {
       },
     });
 
-    // Link parent if provided
     if (parentId) {
       await prisma.parentStudent.create({
         data: {
@@ -154,6 +183,42 @@ router.post("/students", async (req, res) => {
     res.status(500).json({
       message: "Failed to create student.",
     });
+  }
+});
+
+/**
+ * ✅ NEW — ARCHIVE STUDENT (DELETE)
+ * DELETE /api/admin/students/:id
+ */
+router.delete("/students/:id", async (req, res) => {
+  try {
+    await prisma.student.update({
+      where: { id: Number(req.params.id) },
+      data: { isArchived: true },
+    });
+
+    res.json({ message: "Student archived successfully" });
+  } catch (err) {
+    console.error("Archive failed:", err);
+    res.status(500).json({ error: "Failed to archive student" });
+  }
+});
+
+/**
+ * ✅ NEW — RESTORE STUDENT
+ * PUT /api/admin/students/:id/restore
+ */
+router.put("/students/:id/restore", async (req, res) => {
+  try {
+    await prisma.student.update({
+      where: { id: Number(req.params.id) },
+      data: { isArchived: false },
+    });
+
+    res.json({ message: "Student restored" });
+  } catch (err) {
+    console.error("Restore failed:", err);
+    res.status(500).json({ error: "Restore failed" });
   }
 });
 
