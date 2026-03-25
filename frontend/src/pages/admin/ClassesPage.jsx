@@ -68,14 +68,15 @@ export default function ClassesPage() {
     }
   }
 
+  // ✅ ARCHIVE CLASS (NOT HARD DELETE)
   async function deleteClass(cls) {
-    if (!confirm(`Delete class "${cls.name}"?`)) return;
+    if (!window.confirm(`Archive class "${cls.name}"?`)) return;
 
     try {
       await api.delete(`/admin/classes/${cls.id}`);
       fetchData();
     } catch (err) {
-      console.error("Failed to delete class", err);
+      console.error("Failed to archive class", err);
     }
   }
 
@@ -149,7 +150,7 @@ export default function ClassesPage() {
                         onClick={() => deleteClass(cls)}
                         className="text-red-600 text-xs"
                       >
-                        Delete
+                        Archive
                       </button>
                     </td>
                   </tr>

@@ -335,4 +335,109 @@ router.post("/students/:studentId/link-user", async (req, res) => {
   res.json({ message: "Student successfully linked to user" });
 });
 
+// ===============================
+// TEACHERS ARCHIVE (SAFE ADD)
+// ===============================
+
+// Archive teacher
+router.delete("/teachers/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    await prisma.user.update({
+      where: { id },
+      data: { isArchived: true },
+    });
+
+    res.json({ message: "Teacher archived" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Failed to archive teacher" });
+  }
+});
+
+// Get archived teachers
+router.get("/archived/teachers", async (req, res) => {
+  try {
+    const teachers = await prisma.user.findMany({
+      where: {
+        role: "TEACHER",
+        isArchived: true,
+      },
+    });
+
+    res.json(teachers);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch teachers" });
+  }
+});
+
+// Restore teacher
+router.put("/teachers/:id/restore", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    await prisma.user.update({
+      where: { id },
+      data: { isArchived: false },
+    });
+
+    res.json({ message: "Teacher restored" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to restore teacher" });
+  }
+});
+
+// ===============================
+// PARENTS ARCHIVE (SAFE ADD)
+// ===============================
+
+// Archive parent
+router.delete("/parents/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    await prisma.user.update({
+      where: { id },
+      data: { isArchived: true },
+    });
+
+    res.json({ message: "Parent archived" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to archive parent" });
+  }
+});
+
+// Get archived parents
+router.get("/archived/parents", async (req, res) => {
+  try {
+    const parents = await prisma.user.findMany({
+      where: {
+        role: "PARENT",
+        isArchived: true,
+      },
+    });
+
+    res.json(parents);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch parents" });
+  }
+});
+
+// Restore parent
+router.put("/parents/:id/restore", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    await prisma.user.update({
+      where: { id },
+      data: { isArchived: false },
+    });
+
+    res.json({ message: "Parent restored" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to restore parent" });
+  }
+});
+
 export default router;
