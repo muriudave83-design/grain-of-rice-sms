@@ -78,28 +78,26 @@ router.get(
 
           if (!score) return;
 
-          const subjectName = assessment.subject.name;
+          const subjectName = assessment.subjectId.toString();
 
           if (!subjectMap[subjectName]) {
             subjectMap[subjectName] = { total: 0, count: 0 };
           }
 
           subjectMap[subjectName].total += score.score;
-          subjectMap[subjectName].count += 1;
+          subjectMap[subjectName].count++;
         });
 
-        const subjects = Object.entries(subjectMap).map(
-          ([subject, data]) => ({
+        const subjects = Object.entries(subjectMap).map(([subject, data]) => {
+          const avg = data.count > 0 ? data.total / data.count : 0;
+
+          return {
             subject,
-            average: data.count > 0 ? data.total / data.count : 0,
-          })
-        );
+            average: avg,
+          };
+        });
 
-        const overallTotal = subjects.reduce(
-          (sum, s) => sum + s.average,
-          0
-        );
-
+        const overallTotal = subjects.reduce((sum, s) => sum + s.average, 0);
         const overallAverage =
           subjects.length > 0 ? overallTotal / subjects.length : 0;
 
@@ -112,8 +110,6 @@ router.get(
           overallAverage,
         };
       });
-
-      res.json(report);
 
     } catch (err) {
       console.error("🔥 REPORT CARD ERROR:", err);
