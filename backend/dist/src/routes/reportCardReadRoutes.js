@@ -8,9 +8,12 @@ const rolesMiddleware_1 = require("../middlewares/rolesMiddleware");
 const client_2 = require("@prisma/client");
 const router = (0, express_1.Router)();
 exports.reportCardReadRoutes = router;
+// 🔥 GLOBAL DEBUG (CONFIRMS FILE IS USED)
+console.log("🔥 reportCardReadRoutes.ts LOADED");
 /**
  * ============================================================
  * TEACHER — COMPUTED REPORT CARDS (🔥 FIXED ENGINE)
+ * MUST BE FIRST ROUTE (VERY IMPORTANT)
  * GET /api/report-cards/teacher/:classId/:term
  * ============================================================
  */
@@ -102,7 +105,6 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
             };
         });
         console.log("🧠 FINAL REPORT:", report);
-        // ✅ IMPORTANT: SEND RESPONSE
         return res.json(report);
     }
     catch (err) {
@@ -113,7 +115,6 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
 /**
  * ============================================================
  * STUDENT — VIEW OWN REPORT CARD (TERM)
- * GET /api/report-cards/me?termId=
  * ============================================================
  */
 router.get("/me", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.STUDENT]), async (req, res) => {
@@ -186,6 +187,7 @@ router.get("/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requi
 /**
  * ============================================================
  * ADMIN / PARENT — VIEW REPORT CARD BY ID
+ * MUST BE LAST (VERY IMPORTANT)
  * ============================================================
  */
 router.get("/:id", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.ADMIN, client_2.Role.PARENT]), async (req, res) => {

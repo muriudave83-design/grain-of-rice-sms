@@ -6,9 +6,13 @@ import { Role } from "@prisma/client";
 
 const router = Router();
 
+// 🔥 GLOBAL DEBUG (CONFIRMS FILE IS USED)
+console.log("🔥 reportCardReadRoutes.ts LOADED");
+
 /**
  * ============================================================
  * TEACHER — COMPUTED REPORT CARDS (🔥 FIXED ENGINE)
+ * MUST BE FIRST ROUTE (VERY IMPORTANT)
  * GET /api/report-cards/teacher/:classId/:term
  * ============================================================
  */
@@ -134,7 +138,6 @@ router.get(
 
       console.log("🧠 FINAL REPORT:", report);
 
-      // ✅ IMPORTANT: SEND RESPONSE
       return res.json(report);
 
     } catch (err) {
@@ -147,7 +150,6 @@ router.get(
 /**
  * ============================================================
  * STUDENT — VIEW OWN REPORT CARD (TERM)
- * GET /api/report-cards/me?termId=
  * ============================================================
  */
 router.get(
@@ -246,6 +248,7 @@ router.get(
 /**
  * ============================================================
  * ADMIN / PARENT — VIEW REPORT CARD BY ID
+ * MUST BE LAST (VERY IMPORTANT)
  * ============================================================
  */
 router.get(
