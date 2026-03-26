@@ -19,12 +19,11 @@ router.get(
   async (req, res) => {
     console.log("🔥 NEW REPORT LOGIC RUNNING");
     console.log("PARAMS:", req.params);
+
     try {
       const classId = Number(req.params.classId);
 
-      // ✅ FIX: properly handle term param type
       const termParam = req.params.term;
-
       if (Array.isArray(termParam)) {
         return res.status(400).json({ message: "Invalid term parameter" });
       }
@@ -35,7 +34,7 @@ router.get(
         return res.status(400).json({ message: "Invalid classId" });
       }
 
-      // 🔍 Find term by name (handles "term1", "Term 1", etc.)
+      // 🔍 Find term
       const term = await prisma.term.findFirst({
         where: {
           name: {
@@ -55,60 +54,73 @@ router.get(
         include: { user: true },
       });
 
-      // ✅ Get assessments + scores
+      // ✅ Get assessments WITH SUBJECT + SCORES
       const assessments = await prisma.assessment.findMany({
         where: {
           classId,
           termId: term.id,
+          status: "SUBMITTED", // 🔥 IMPORTANT
         },
         include: {
+          subject: true,
           scores: true,
         },
       });
 
-      // ✅ Compute report
+      // ✅ Compute report PROPERLY
       const report = students.map((student) => {
-        let total = 0;
-        let count = 0;
+        const subjectMap: Record<string, { total: number; count: number }> = {};
 
         assessments.forEach((assessment) => {
           const score = assessment.scores.find(
             (s) => s.studentId === student.id
           );
 
-          if (score) {
-            total += score.score;
-            count++;
+          if (!score) return;
+
+          const subjectName = assessment.subject.name;
+
+          if (!subjectMap[subjectName]) {
+            subjectMap[subjectName] = { total: 0, count: 0 };
           }
+
+          subjectMap[subjectName].total += score.score;
+          subjectMap[subjectName].count += 1;
         });
 
-        const average = count > 0 ? total / count : 0;
+        const subjects = Object.entries(subjectMap).map(
+          ([subject, data]) => ({
+            subject,
+            average: data.count > 0 ? data.total / data.count : 0,
+          })
+        );
 
-        let grade = "E";
-        if (average >= 80) grade = "A";
-        else if (average >= 70) grade = "B";
-        else if (average >= 60) grade = "C";
-        else if (average >= 50) grade = "D";
+        const overallTotal = subjects.reduce(
+          (sum, s) => sum + s.average,
+          0
+        );
+
+        const overallAverage =
+          subjects.length > 0 ? overallTotal / subjects.length : 0;
 
         return {
           studentId: student.id,
-          student:
+          name:
             student.user?.name ||
             `${student.firstName} ${student.lastName}`,
-          total,
-          average,
-          grade,
+          subjects,
+          overallAverage,
         };
       });
 
       res.json(report);
+
     } catch (err) {
       console.error("🔥 REPORT CARD ERROR:", err);
       res.status(500).json({ message: "Failed to load report cards" });
     }
   }
 );
-
 /**
  * ============================================================
  * STUDENT — VIEW OWN REPORT CARD (TERM)
