@@ -10,6 +10,108 @@ const router = (0, express_1.Router)();
 exports.reportCardReadRoutes = router;
 /**
  * ============================================================
+ * TEACHER — COMPUTED REPORT CARDS (🔥 FIXED ENGINE)
+ * GET /api/report-cards/teacher/:classId/:term
+ * ============================================================
+ */
+router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.TEACHER]), async (req, res) => {
+    console.log("🔥 NEW REPORT LOGIC RUNNING");
+    console.log("PARAMS:", req.params);
+    try {
+        const classId = Number(req.params.classId);
+        const termParam = req.params.term;
+        if (Array.isArray(termParam)) {
+            return res.status(400).json({ message: "Invalid term parameter" });
+        }
+        const termName = termParam;
+        if (Number.isNaN(classId)) {
+            return res.status(400).json({ message: "Invalid classId" });
+        }
+        // 🔍 Normalize term input (term1 → term 1)
+        const normalizedTermName = termName
+            .toLowerCase()
+            .replace("term", "term ")
+            .trim();
+        const term = await client_1.prisma.term.findFirst({
+            where: {
+                name: {
+                    equals: normalizedTermName,
+                    mode: "insensitive",
+                },
+            },
+        });
+        console.log("✅ TERM FOUND:", term);
+        if (!term) {
+            return res.status(404).json({ message: "Term not found" });
+        }
+        // ✅ Get students
+        const students = await client_1.prisma.student.findMany({
+            where: { classId },
+            include: { user: true },
+        });
+        console.log("👨‍🎓 STUDENTS:", students);
+        // ✅ Get assessments WITH SUBJECT + SCORES
+        const assessments = await client_1.prisma.assessment.findMany({
+            where: {
+                classId,
+                termId: term.id,
+                status: "SUBMITTED",
+            },
+            include: {
+                subject: true,
+                scores: true,
+            },
+        });
+        console.log("📊 ASSESSMENTS:", assessments);
+        console.log("📊 ASSESSMENTS COUNT:", assessments.length);
+        // ✅ Compute report
+        const report = students.map((student) => {
+            const subjectMap = {};
+            assessments.forEach((assessment) => {
+                console.log("➡️ CHECKING ASSESSMENT:", {
+                    assessmentId: assessment.id,
+                    subjectId: assessment.subjectId,
+                    scores: assessment.scores,
+                });
+                const score = assessment.scores.find((s) => s.studentId === student.id);
+                console.log("➡️ MATCHED SCORE:", score);
+                if (!score)
+                    return;
+                const subjectName = assessment.subject?.name || `Subject ${assessment.subjectId}`;
+                if (!subjectMap[subjectName]) {
+                    subjectMap[subjectName] = { total: 0, count: 0 };
+                }
+                subjectMap[subjectName].total += score.score;
+                subjectMap[subjectName].count++;
+            });
+            const subjects = Object.entries(subjectMap).map(([subject, data]) => {
+                const avg = data.count > 0 ? data.total / data.count : 0;
+                return {
+                    subject,
+                    average: avg,
+                };
+            });
+            const overallTotal = subjects.reduce((sum, s) => sum + s.average, 0);
+            const overallAverage = subjects.length > 0 ? overallTotal / subjects.length : 0;
+            return {
+                studentId: student.id,
+                name: student.user?.name ||
+                    `${student.firstName} ${student.lastName}`,
+                subjects,
+                overallAverage,
+            };
+        });
+        console.log("🧠 FINAL REPORT:", report);
+        // ✅ IMPORTANT: SEND RESPONSE
+        return res.json(report);
+    }
+    catch (err) {
+        console.error("🔥 REPORT CARD ERROR:", err);
+        res.status(500).json({ message: "Failed to load report cards" });
+    }
+});
+/**
+ * ============================================================
  * STUDENT — VIEW OWN REPORT CARD (TERM)
  * GET /api/report-cards/me?termId=
  * ============================================================
@@ -56,7 +158,6 @@ router.get("/me", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRo
 /**
  * ============================================================
  * PARENT — VIEW CHILDREN REPORT CARDS
- * GET /api/report-cards/parent
  * ============================================================
  */
 router.get("/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.PARENT]), async (req, res) => {
@@ -68,7 +169,7 @@ router.get("/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requi
     if (links.length === 0) {
         return res.json([]);
     }
-    const studentIds = links.map(l => l.studentId);
+    const studentIds = links.map((l) => l.studentId);
     const reportCards = await client_1.prisma.reportCard.findMany({
         where: {
             studentId: { in: studentIds },
@@ -85,7 +186,6 @@ router.get("/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requi
 /**
  * ============================================================
  * ADMIN / PARENT — VIEW REPORT CARD BY ID
- * GET /api/report-cards/:id
  * ============================================================
  */
 router.get("/:id", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.ADMIN, client_2.Role.PARENT]), async (req, res) => {
@@ -111,7 +211,6 @@ router.get("/:id", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireR
             message: "Report card not available",
         });
     }
-    // 🔐 PARENT ACCESS GUARD
     if (req.user.role === client_2.Role.PARENT) {
         const link = await client_1.prisma.parentStudent.findFirst({
             where: {

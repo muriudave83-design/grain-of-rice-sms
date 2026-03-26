@@ -10,12 +10,14 @@ const auditLog_service_1 = require("../services/auditLog.service");
 const password_1 = require("../utils/password");
 const prisma = new client_1.PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
+// 🔥 DEFAULT PASSWORD (ADMIN-CONTROLLED)
+const DEFAULT_PASSWORD = "password123";
 // ======================================================
 // REGISTER USER
 // ======================================================
 const registerUser = async (req, res) => {
     try {
-        const { name, password, role } = req.body;
+        const { name, role } = req.body;
         const email = req.body.email?.toLowerCase()?.trim();
         if (!email) {
             return res.status(400).json({ message: "Email is required" });
@@ -33,17 +35,22 @@ const registerUser = async (req, res) => {
                 message: "Email already registered",
             });
         }
-        const hashedPassword = await (0, password_1.hashPassword)(password);
+        // 🔥 ALWAYS USE DEFAULT PASSWORD (ignore incoming password)
+        const hashedPassword = await (0, password_1.hashPassword)(DEFAULT_PASSWORD);
         const user = await prisma.user.create({
             data: {
                 name,
                 email,
                 password: hashedPassword,
                 role,
+                isActive: true, // ✅ ALWAYS ACTIVE
+                isArchived: false, // ✅ SAFETY
+                mustChangePassword: true, // ✅ FORCE PASSWORD RESET
             },
         });
         res.status(201).json({
             message: "User registered successfully",
+            defaultPassword: DEFAULT_PASSWORD, // ✅ Optional: helps admin communicate login
             user: {
                 id: user.id,
                 name: user.name,
@@ -172,7 +179,6 @@ const changePassword = async (req, res) => {
             });
         }
         const hashedNewPassword = await (0, password_1.hashPassword)(newPassword);
-        // ✅ CRITICAL FIX — clear mustChangePassword
         await prisma.user.update({
             where: { id: userId },
             data: {
@@ -181,7 +187,6 @@ const changePassword = async (req, res) => {
                 updatedAt: new Date(),
             },
         });
-        // ✅ Audit Log
         await (0, auditLog_service_1.createAuditLog)({
             action: client_1.AuditAction.PASSWORD_CHANGED,
             entityType: "User",

@@ -206,21 +206,38 @@ router.post("/students", async (req, res) => {
     }
 });
 /**
- * ✅ UPDATE STUDENT
+ * ✅ UPDATE STUDENT (FIXED — WITH PARENT LINKING)
  * PUT /api/admin/students/:id
  */
 router.put("/students/:id", async (req, res) => {
     const { id } = req.params;
-    const { firstName, lastName, admissionNo } = req.body;
+    const { firstName, lastName, admissionNo, classId, parentId } = req.body;
     try {
+        const studentId = Number(id);
+        // ✅ 1. Update student basic info
         const updated = await client_1.prisma.student.update({
-            where: { id: Number(id) },
+            where: { id: studentId },
             data: {
                 firstName,
                 lastName,
                 admissionNo,
+                classId: classId ? Number(classId) : undefined,
             },
         });
+        // ✅ 2. HANDLE PARENT RELATION (CRITICAL FIX)
+        // Remove existing parent links
+        await client_1.prisma.parentStudent.deleteMany({
+            where: { studentId },
+        });
+        // Add new parent if provided
+        if (parentId) {
+            await client_1.prisma.parentStudent.create({
+                data: {
+                    studentId,
+                    parentId: Number(parentId),
+                },
+            });
+        }
         res.json(updated);
     }
     catch (err) {
@@ -295,5 +312,98 @@ router.post("/students/:studentId/link-user", async (req, res) => {
         data: { userId: user.id },
     });
     res.json({ message: "Student successfully linked to user" });
+});
+// ===============================
+// TEACHERS ARCHIVE (SAFE ADD)
+// ===============================
+// Archive teacher
+router.delete("/teachers/:id", async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        await client_1.prisma.user.update({
+            where: { id },
+            data: { isArchived: true },
+        });
+        res.json({ message: "Teacher archived" });
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to archive teacher" });
+    }
+});
+// Get archived teachers
+router.get("/archived/teachers", async (req, res) => {
+    try {
+        const teachers = await client_1.prisma.user.findMany({
+            where: {
+                role: "TEACHER",
+                isArchived: true,
+            },
+        });
+        res.json(teachers);
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to fetch teachers" });
+    }
+});
+// Restore teacher
+router.put("/teachers/:id/restore", async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        await client_1.prisma.user.update({
+            where: { id },
+            data: { isArchived: false },
+        });
+        res.json({ message: "Teacher restored" });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to restore teacher" });
+    }
+});
+// ===============================
+// PARENTS ARCHIVE (SAFE ADD)
+// ===============================
+// Archive parent
+router.delete("/parents/:id", async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        await client_1.prisma.user.update({
+            where: { id },
+            data: { isArchived: true },
+        });
+        res.json({ message: "Parent archived" });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to archive parent" });
+    }
+});
+// Get archived parents
+router.get("/archived/parents", async (req, res) => {
+    try {
+        const parents = await client_1.prisma.user.findMany({
+            where: {
+                role: "PARENT",
+                isArchived: true,
+            },
+        });
+        res.json(parents);
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to fetch parents" });
+    }
+});
+// Restore parent
+router.put("/parents/:id/restore", async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        await client_1.prisma.user.update({
+            where: { id },
+            data: { isArchived: false },
+        });
+        res.json({ message: "Parent restored" });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Failed to restore parent" });
+    }
 });
 exports.default = router;

@@ -44,6 +44,7 @@ router.post("/classes", authMiddleware_1.authenticate, (0, rolesMiddleware_1.req
 router.get("/classes", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (_req, res) => {
     try {
         const classes = await client_1.prisma.class.findMany({
+            where: { isArchived: false }, // ✅ hide archived
             orderBy: { createdAt: "asc" },
         });
         return res.json(classes);
@@ -92,6 +93,35 @@ router.get("/classes/:classId/students", authMiddleware_1.authenticate, (0, role
         console.error("Fetch class students failed:", error);
         return res.status(500).json({
             message: "Failed to fetch students",
+        });
+    }
+});
+/**
+ * 🗂️ PATCH /api/admin/classes/:id/archive
+ * Archive a class (safe delete)
+ */
+router.patch("/classes/:id/archive", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
+    const { id } = req.params;
+    try {
+        // 🔒 Prevent archiving if students exist
+        const studentCount = await client_1.prisma.student.count({
+            where: { classId: Number(id) },
+        });
+        if (studentCount > 0) {
+            return res.status(400).json({
+                message: "Cannot archive class with assigned students",
+            });
+        }
+        await client_1.prisma.class.update({
+            where: { id: Number(id) },
+            data: { isArchived: true },
+        });
+        res.json({ message: "Class archived" });
+    }
+    catch (err) {
+        console.error("Failed to archive class", err);
+        res.status(500).json({
+            message: "Failed to archive class",
         });
     }
 });
