@@ -35,14 +35,20 @@ router.get(
       }
 
       // 🔍 Find term
-      const term = await prisma.term.findFirst({
-        where: {
-          name: {
-            contains: termName,
-            mode: "insensitive",
-          },
+    // ✅ Normalize term input (term1 → Term 1)
+    const normalizedTermName = termName
+      .toLowerCase()
+      .replace("term", "term ")
+      .trim();
+
+    const term = await prisma.term.findFirst({
+      where: {
+        name: {
+          equals: normalizedTermName,
+          mode: "insensitive",
         },
-      });
+      },
+    });
 
       if (!term) {
         return res.status(404).json({ message: "Term not found" });
