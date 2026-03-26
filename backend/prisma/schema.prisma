@@ -165,7 +165,7 @@ model AssessmentScore {
   studentId    Int
   score        Float
   createdAt    DateTime   @default(now())
-  assessment   Assessment @relation(fields: [assessmentId], references: [id])
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   student      Student    @relation(fields: [studentId], references: [id])
 
   @@unique([assessmentId, studentId])
@@ -247,8 +247,8 @@ model ReportCardSubjectEntry {
   subjectId    Int
   average      Float
   total        Float
-  reportCard   ReportCard @relation(fields: [reportCardId], references: [id])
-  subject      Subject    @relation(fields: [subjectId], references: [id])
+  reportCard   ReportCard @relation(fields: [reportCardId], references: [id], onDelete: Cascade)
+  subject      Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
   @@unique([reportCardId, subjectId])
 }
