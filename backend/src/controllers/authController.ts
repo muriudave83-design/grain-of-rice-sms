@@ -44,6 +44,9 @@ export const registerUser = async (req: Request, res: Response) => {
         email,
         password: hashedPassword,
         role,
+        isActive: true,          // ✅ FORCE ACTIVE
+        isArchived: false,       // ✅ SAFETY
+        mustChangePassword: true // ✅ FORCE PASSWORD RESET
       },
     });
 
