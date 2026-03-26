@@ -20,60 +20,83 @@ export default function ClassReportCards() {
   const [error, setError] = useState(null);
   const [publishing, setPublishing] = useState(false);
 
-  useEffect(() => {
-    async function fetchReport() {
-      try {
-        const res = await api.get(
-          `/report-cards/teacher/${classId}/${term}`
-        );
+useEffect(() => {
+  async function fetchReport() {
+    try {
+      console.log("🔥 FETCHING REPORT...", classId, term);
 
-        // ✅ TRANSFORM BACKEND RESPONSE → MATCH YOUR UI
-        const data = res.data;
+      const url = `/report-cards/teacher/${classId}/${term}`;
+      console.log("📡 REQUEST URL:", url);
 
-        const subjectsSet = new Set();
-        data.forEach((student) => {
+      const res = await api.get(url);
+
+      console.log("✅ RESPONSE STATUS:", res.status);
+      console.log("📦 RAW RESPONSE DATA:", res.data);
+
+      // ✅ TRANSFORM BACKEND RESPONSE → MATCH YOUR UI
+      const data = res.data;
+
+      const subjectsSet = new Set();
+
+      data.forEach((student) => {
+        console.log("👤 STUDENT FROM API:", student);
+
+        if (student.subjects) {
           student.subjects.forEach((s) => {
             subjectsSet.add(s.subject);
           });
-        });
+        }
+      });
 
-        const transformed = {
-          class: { name: `Class ${classId}` },
-          term,
-          status: "draft",
-          subjects: Array.from(subjectsSet),
-          students: data.map((student) => ({
+      const transformed = {
+        class: { name: `Class ${classId}` },
+        term,
+        status: "draft",
+        subjects: Array.from(subjectsSet),
+        students: data.map((student) => {
+          console.log("🔄 TRANSFORMING STUDENT:", student);
+
+          return {
             id: student.studentId,
-            name: student.name,
-            subjects: student.subjects.map((s) => ({
+            name: student.student || student.name,
+            subjects: (student.subjects || []).map((s) => ({
               subject: s.subject,
               score: s.average,
-              average: s.average,               // ✅ ensure average exists
-              grade: getGrade(s.average),       // ✅ compute grade per subject
+              average: s.average,
+              grade: getGrade(s.average),
             })),
-            total: student.overallAverage,
-            average: student.overallAverage,
-          })),
-        };
+            total: student.total || student.overallAverage || 0,
+            average: student.average || student.overallAverage || 0,
+          };
+        }),
+      };
 
-        setReport(transformed);
+      console.log("🧠 FINAL TRANSFORMED DATA:", transformed);
 
-      } catch (err) {
-        if (err.response?.status === 404) {
-          setError("No submitted assessments found for this class and term.");
-        } else if (err.response?.status === 403) {
-          setError("You are not authorized to view this report.");
-        } else {
-          setError("Failed to load report card data.");
-        }
-      } finally {
-        setLoading(false);
+      setReport(transformed);
+
+    } catch (err) {
+      console.error("❌ FETCH ERROR:", err);
+
+      if (err.response) {
+        console.error("❌ ERROR RESPONSE:", err.response.data);
+        console.error("❌ STATUS:", err.response.status);
       }
+
+      if (err.response?.status === 404) {
+        setError("No submitted assessments found for this class and term.");
+      } else if (err.response?.status === 403) {
+        setError("You are not authorized to view this report.");
+      } else {
+        setError("Failed to load report card data.");
+      }
+    } finally {
+      setLoading(false);
     }
+  }
 
-    fetchReport();
-
-  }, [classId, term]);
+  fetchReport();
+}, [classId, term]);
 
   async function handlePublish() {
     const confirmed = window.confirm(
