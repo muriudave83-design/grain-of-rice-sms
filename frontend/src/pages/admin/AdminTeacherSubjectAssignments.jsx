@@ -29,10 +29,12 @@ export default function AdminTeacherSubjectAssignments() {
           apiClient.get("/admin/teacher-subjects"),
         ]);
 
-      setTeachers(teachersRes.data);
-      setSubjects(subjectsRes.data);
-      setClasses(classesRes.data);
-      setAssignments(assignmentsRes.data);
+      setTeachers(teachersRes.data || []);
+      setSubjects(subjectsRes.data || []);
+      setClasses(classesRes.data || []);
+      setAssignments(assignmentsRes.data || []);
+    } catch (err) {
+      console.error("Failed to load data", err);
     } finally {
       setLoading(false);
     }
@@ -46,33 +48,34 @@ export default function AdminTeacherSubjectAssignments() {
 
     return assignments.find(
       (a) =>
-        String(a.teacher.id) === form.teacherId &&
-        String(a.subject.id) === form.subjectId &&
-        String(a.class.id) === form.classId
+        String(a?.teacher?.id) === form.teacherId &&
+        String(a?.subject?.id) === form.subjectId &&
+        String(a?.class?.id) === form.classId
     );
   }, [form, assignments]);
 
   /**
-   * Submit new assignment
+   * Submit new assignment (FIXED)
    */
   async function submitAssignment(e) {
     e.preventDefault();
 
-    const res = await apiClient.post("/admin/teacher-subjects", form);
+    try {
+      await apiClient.post("/admin/teacher-subjects", form);
 
-    const newAssignment = res.data;
+      // ✅ Reset form
+      setForm({
+        teacherId: "",
+        subjectId: "",
+        classId: "",
+      });
 
-    /**
-     * Instead of refetching everything,
-     * just update local state (10x faster)
-     */
-    setAssignments((prev) => [...prev, newAssignment]);
-
-    setForm({
-      teacherId: "",
-      subjectId: "",
-      classId: "",
-    });
+      // ✅ ALWAYS refetch (prevents UI crash)
+      await fetchData();
+    } catch (err) {
+      console.error("Failed to assign teacher", err);
+      alert("Failed to assign teacher");
+    }
   }
 
   /**
@@ -81,12 +84,15 @@ export default function AdminTeacherSubjectAssignments() {
   async function removeAssignment(id) {
     if (!confirm("Remove this assignment?")) return;
 
-    await apiClient.delete(`/admin/teacher-subjects/${id}`);
+    try {
+      await apiClient.delete(`/admin/teacher-subjects/${id}`);
 
-    /**
-     * Remove locally instead of refetching
-     */
-    setAssignments((prev) => prev.filter((a) => a.id !== id));
+      // ✅ Safe local update
+      setAssignments((prev) => prev.filter((a) => a.id !== id));
+    } catch (err) {
+      console.error("Failed to remove assignment", err);
+      alert("Failed to remove assignment");
+    }
   }
 
   return (
@@ -201,9 +207,15 @@ export default function AdminTeacherSubjectAssignments() {
             ) : (
               assignments.map((a) => (
                 <tr key={a.id} className="border-t">
-                  <td className="p-3">{a.teacher.name}</td>
-                  <td className="p-3">{a.subject.name}</td>
-                  <td className="p-3">{a.class.name}</td>
+                  <td className="p-3">
+                    {a?.teacher?.name || "—"}
+                  </td>
+                  <td className="p-3">
+                    {a?.subject?.name || "—"}
+                  </td>
+                  <td className="p-3">
+                    {a?.class?.name || "—"}
+                  </td>
 
                   <td className="p-3 text-right">
                     <button
