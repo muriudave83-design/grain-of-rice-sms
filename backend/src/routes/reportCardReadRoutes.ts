@@ -17,6 +17,8 @@ router.get(
   authenticate,
   requireRole([Role.TEACHER]),
   async (req, res) => {
+    console.log("🔥 NEW REPORT LOGIC RUNNING");
+    console.log("PARAMS:", req.params);
     try {
       const classId = Number(req.params.classId);
 
