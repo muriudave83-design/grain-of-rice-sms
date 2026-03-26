@@ -7,48 +7,69 @@ export default function EditStudent() {
   const navigate = useNavigate();
 
   const [student, setStudent] = useState(null);
+  const [parents, setParents] = useState([]);
+  const [classes, setClasses] = useState([]);
+
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
     admissionNo: "",
+    parentId: "",
+    classId: "",
   });
+
   const [loading, setLoading] = useState(true);
 
-  // ✅ Fetch student
+  // ✅ FETCH ALL REQUIRED DATA
   useEffect(() => {
-    const fetchStudent = async () => {
+    const fetchData = async () => {
       try {
-        const res = await apiClient.get(`/admin/students/${id}`);
+        const [studentRes, parentsRes, classesRes] = await Promise.all([
+          apiClient.get(`/admin/students/${id}`),
+          apiClient.get(`/admin/users?role=PARENT`),
+          apiClient.get(`/admin/classes`),
+        ]);
 
-        setStudent(res.data);
+        const studentData = studentRes.data;
+
+        setStudent(studentData);
+        setParents(parentsRes.data || []);
+        setClasses(classesRes.data || []);
 
         setForm({
-          firstName: res.data.firstName || "",
-          lastName: res.data.lastName || "",
-          admissionNo: res.data.admissionNo || "",
+          firstName: studentData.firstName || "",
+          lastName: studentData.lastName || "",
+          admissionNo: studentData.admissionNo || "",
+          parentId: studentData.parentId || "",
+          classId: studentData.classId || "",
         });
 
       } catch (err) {
-        console.error("Failed to fetch student", err);
+        console.error("Failed to load data", err);
         alert("Failed to load student");
       } finally {
         setLoading(false);
       }
     };
 
-    fetchStudent();
+    fetchData();
   }, [id]);
 
-  // ✅ Handle submit
+  // ✅ HANDLE SUBMIT
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     try {
-      await apiClient.put(`/admin/students/${id}`, form);
+      await apiClient.put(`/admin/students/${id}`, {
+        firstName: form.firstName,
+        lastName: form.lastName,
+        admissionNo: form.admissionNo,
+        parentId: form.parentId ? Number(form.parentId) : null,
+        classId: form.classId ? Number(form.classId) : null,
+      });
 
       alert("Student updated successfully");
 
-      // ✅ go back to list
       navigate("/dashboard/admin/students");
 
     } catch (err) {
@@ -58,7 +79,6 @@ export default function EditStudent() {
   };
 
   if (loading) return <div className="p-6">Loading...</div>;
-
   if (!student) return <div className="p-6">Student not found</div>;
 
   return (
@@ -98,6 +118,38 @@ export default function EditStudent() {
             setForm({ ...form, admissionNo: e.target.value })
           }
         />
+
+        {/* ✅ CLASS SELECT */}
+        <select
+          className="w-full p-2 border rounded"
+          value={form.classId}
+          onChange={(e) =>
+            setForm({ ...form, classId: e.target.value })
+          }
+        >
+          <option value="">Select Class</option>
+          {classes.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+
+        {/* ✅ PARENT SELECT */}
+        <select
+          className="w-full p-2 border rounded"
+          value={form.parentId}
+          onChange={(e) =>
+            setForm({ ...form, parentId: e.target.value })
+          }
+        >
+          <option value="">Select Parent</option>
+          {parents.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
 
         <div className="flex gap-2">
           <button
