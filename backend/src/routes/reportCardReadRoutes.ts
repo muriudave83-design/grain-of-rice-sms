@@ -8,6 +8,107 @@ const router = Router();
 
 /**
  * ============================================================
+ * TEACHER — COMPUTED REPORT CARDS (🔥 FIXED ENGINE)
+ * GET /api/report-cards/teacher/:classId/:term
+ * ============================================================
+ */
+router.get(
+  "/teacher/:classId/:term",
+  authenticate,
+  requireRole([Role.TEACHER]),
+  async (req, res) => {
+    try {
+      const classId = Number(req.params.classId);
+
+      // ✅ FIX: properly handle term param type
+      const termParam = req.params.term;
+
+      if (Array.isArray(termParam)) {
+        return res.status(400).json({ message: "Invalid term parameter" });
+      }
+
+      const termName = termParam;
+
+      if (Number.isNaN(classId)) {
+        return res.status(400).json({ message: "Invalid classId" });
+      }
+
+      // 🔍 Find term by name (handles "term1", "Term 1", etc.)
+      const term = await prisma.term.findFirst({
+        where: {
+          name: {
+            contains: termName,
+            mode: "insensitive",
+          },
+        },
+      });
+
+      if (!term) {
+        return res.status(404).json({ message: "Term not found" });
+      }
+
+      // ✅ Get students
+      const students = await prisma.student.findMany({
+        where: { classId },
+        include: { user: true },
+      });
+
+      // ✅ Get assessments + scores
+      const assessments = await prisma.assessment.findMany({
+        where: {
+          classId,
+          termId: term.id,
+        },
+        include: {
+          scores: true,
+        },
+      });
+
+      // ✅ Compute report
+      const report = students.map((student) => {
+        let total = 0;
+        let count = 0;
+
+        assessments.forEach((assessment) => {
+          const score = assessment.scores.find(
+            (s) => s.studentId === student.id
+          );
+
+          if (score) {
+            total += score.score;
+            count++;
+          }
+        });
+
+        const average = count > 0 ? total / count : 0;
+
+        let grade = "E";
+        if (average >= 80) grade = "A";
+        else if (average >= 70) grade = "B";
+        else if (average >= 60) grade = "C";
+        else if (average >= 50) grade = "D";
+
+        return {
+          studentId: student.id,
+          student:
+            student.user?.name ||
+            `${student.firstName} ${student.lastName}`,
+          total,
+          average,
+          grade,
+        };
+      });
+
+      res.json(report);
+    } catch (err) {
+      console.error("🔥 REPORT CARD ERROR:", err);
+      res.status(500).json({ message: "Failed to load report cards" });
+    }
+  }
+);
+
+/**
+ * ============================================================
  * STUDENT — VIEW OWN REPORT CARD (TERM)
  * GET /api/report-cards/me?termId=
  * ============================================================
@@ -88,7 +189,7 @@ router.get(
       return res.json([]);
     }
 
-    const studentIds = links.map(l => l.studentId);
+    const studentIds = links.map((l) => l.studentId);
 
     const reportCards = await prisma.reportCard.findMany({
       where: {
