@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom"; // ✅ added
+import { useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 
 export default function AdminStudents() {
@@ -21,7 +21,7 @@ export default function AdminStudents() {
 
   const [openClasses, setOpenClasses] = useState({});
 
-  const navigate = useNavigate(); // ✅ added
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchData();
@@ -91,31 +91,35 @@ export default function AdminStudents() {
     setOpenClasses(initialState);
   }, [students]);
 
-  // ✅ NEW — handlers
-    
-    const handleEdit = (student) => {
-      navigate(`/dashboard/admin/students/${student.id}/edit`);
-    };
-    const handleDelete = async (student) => {
-      const fullName = `${student.firstName} ${student.lastName}`;
+  // ✅ EDIT (NOW PASSES PARENT CONTEXT)
+  const handleEdit = (student) => {
+    navigate(`/dashboard/admin/students/${student.id}/edit`, {
+      state: {
+        student,
+        parents, // 🔥 pass parents list to edit page
+        classes, // 🔥 pass classes too (prevents refetch bugs)
+      },
+    });
+  };
 
-      const confirmDelete = window.confirm(
-        `Delete ${fullName}? This will archive the student.`
-      );
+  const handleDelete = async (student) => {
+    const fullName = `${student.firstName} ${student.lastName}`;
 
-      if (!confirmDelete) return;
+    const confirmDelete = window.confirm(
+      `Delete ${fullName}? This will archive the student.`
+    );
 
-      try {
-        await apiClient.delete(`/admin/students/${student.id}`);
+    if (!confirmDelete) return;
 
-        // ✅ CRITICAL: remove from UI immediately
-        setStudents((prev) => prev.filter((s) => s.id !== student.id));
+    try {
+      await apiClient.delete(`/admin/students/${student.id}`);
 
-      } catch (err) {
-        console.error("Failed to delete student", err);
-        alert("Failed to delete student");
-      }
-    };
+      setStudents((prev) => prev.filter((s) => s.id !== student.id));
+    } catch (err) {
+      console.error("Failed to delete student", err);
+      alert("Failed to delete student");
+    }
+  };
 
   async function submitForm(e) {
     e.preventDefault();
@@ -137,7 +141,7 @@ export default function AdminStudents() {
         payload.parentId = Number(form.parentId);
       }
 
-      const response = await apiClient.post("/admin/students", payload);
+      await apiClient.post("/admin/students", payload);
 
       setForm({
         firstName: "",
@@ -154,7 +158,7 @@ export default function AdminStudents() {
 
       alert(
         err?.response?.data?.message ||
-        "Failed to create student"
+          "Failed to create student"
       );
     }
   }
@@ -195,76 +199,81 @@ export default function AdminStudents() {
             No students yet
           </div>
         ) : (
-          Object.entries(groupedStudents).map(([className, classStudents]) => (
-            <div key={className} className="mb-6">
+          Object.entries(groupedStudents).map(
+            ([className, classStudents]) => (
+              <div key={className} className="mb-6">
+                <div
+                  onClick={() => toggleClass(className)}
+                  className="flex justify-between items-center cursor-pointer bg-gray-100 px-4 py-3 rounded-md hover:bg-gray-200"
+                >
+                  <h2 className="text-md font-semibold text-gray-800">
+                    {className}
+                  </h2>
 
-              <div
-                onClick={() => toggleClass(className)}
-                className="flex justify-between items-center cursor-pointer bg-gray-100 px-4 py-3 rounded-md hover:bg-gray-200"
-              >
-                <h2 className="text-md font-semibold text-gray-800">
-                  {className}
-                </h2>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                      {classStudents.length} students
+                    </span>
 
-                <div className="flex items-center gap-3">
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                    {classStudents.length} students
-                  </span>
-
-                  <span className="text-sm">
-                    {openClasses[className] ? "▼" : "▶"}
-                  </span>
+                    <span className="text-sm">
+                      {openClasses[className] ? "▼" : "▶"}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {openClasses[className] && (
-                <div className="bg-white border rounded-lg overflow-hidden mt-2">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-100 text-left">
-                      <tr>
-                        <th className="p-3">Name</th>
-                        <th className="p-3">Admission No</th>
-                        <th className="p-3">Parent</th>
-                        <th className="p-3">Actions</th> {/* ✅ added */}
-                      </tr>
-                    </thead>
-
-                    <tbody>
-                      {classStudents.map((s) => (
-                        <tr key={s.id} className="border-t">
-                          <td className="p-3">
-                            {s.firstName} {s.lastName}
-                          </td>
-                          <td className="p-3">{s.admissionNo}</td>
-                          <td className="p-3">
-                            {s.parentName || s.parent?.name || "—"}
-                          </td>
-
-                          {/* ✅ ACTION BUTTONS */}
-                          <td className="p-3 flex gap-2">
-                            <button
-                              onClick={() => handleEdit(s)}
-                              className="px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                            >
-                              Edit
-                            </button>
-
-                            <button
-                              onClick={() => handleDelete(s)}
-                              className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-                            >
-                              Delete
-                            </button>
-                          </td>
+                {openClasses[className] && (
+                  <div className="bg-white border rounded-lg overflow-hidden mt-2">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-100 text-left">
+                        <tr>
+                          <th className="p-3">Name</th>
+                          <th className="p-3">Admission No</th>
+                          <th className="p-3">Parent</th>
+                          <th className="p-3">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+                      </thead>
 
-            </div>
-          ))
+                      <tbody>
+                        {classStudents.map((s) => (
+                          <tr key={s.id} className="border-t">
+                            <td className="p-3">
+                              {s.firstName} {s.lastName}
+                            </td>
+                            <td className="p-3">
+                              {s.admissionNo}
+                            </td>
+                            <td className="p-3">
+                              {s.parentName ||
+                                s.parent?.name ||
+                                "—"}
+                            </td>
+
+                            <td className="p-3 flex gap-2">
+                              <button
+                                onClick={() => handleEdit(s)}
+                                className="px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                onClick={() =>
+                                  handleDelete(s)
+                                }
+                                className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )
+          )
         )}
       </div>
 
@@ -274,7 +283,9 @@ export default function AdminStudents() {
           className="fixed inset-0 bg-black/30 flex items-center justify-center"
         >
           <div className="bg-white p-6 rounded w-96 space-y-4">
-            <h2 className="text-lg font-semibold">Create Student</h2>
+            <h2 className="text-lg font-semibold">
+              Create Student
+            </h2>
 
             <input
               required
@@ -282,7 +293,10 @@ export default function AdminStudents() {
               className="w-full p-2 border rounded"
               value={form.firstName}
               onChange={(e) =>
-                setForm({ ...form, firstName: e.target.value })
+                setForm({
+                  ...form,
+                  firstName: e.target.value,
+                })
               }
             />
 
@@ -292,7 +306,10 @@ export default function AdminStudents() {
               className="w-full p-2 border rounded"
               value={form.lastName}
               onChange={(e) =>
-                setForm({ ...form, lastName: e.target.value })
+                setForm({
+                  ...form,
+                  lastName: e.target.value,
+                })
               }
             />
 
@@ -302,7 +319,10 @@ export default function AdminStudents() {
               className="w-full p-2 border rounded"
               value={form.admissionNo}
               onChange={(e) =>
-                setForm({ ...form, admissionNo: e.target.value })
+                setForm({
+                  ...form,
+                  admissionNo: e.target.value,
+                })
               }
             />
 
@@ -311,7 +331,10 @@ export default function AdminStudents() {
               className="w-full p-2 border rounded"
               value={form.classId}
               onChange={(e) =>
-                setForm({ ...form, classId: e.target.value })
+                setForm({
+                  ...form,
+                  classId: e.target.value,
+                })
               }
             >
               <option value="">Select class</option>
@@ -326,10 +349,15 @@ export default function AdminStudents() {
               className="w-full p-2 border rounded"
               value={form.parentId}
               onChange={(e) =>
-                setForm({ ...form, parentId: e.target.value })
+                setForm({
+                  ...form,
+                  parentId: e.target.value,
+                })
               }
             >
-              <option value="">Link parent (optional)</option>
+              <option value="">
+                Link parent (optional)
+              </option>
               {parents.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}

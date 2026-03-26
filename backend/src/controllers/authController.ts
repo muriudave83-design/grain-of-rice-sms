@@ -7,12 +7,15 @@ import { hashPassword, verifyPassword } from "../utils/password";
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
 
+// 🔥 DEFAULT PASSWORD (ADMIN-CONTROLLED)
+const DEFAULT_PASSWORD = "password123";
+
 // ======================================================
 // REGISTER USER
 // ======================================================
 export const registerUser = async (req: Request, res: Response) => {
   try {
-    const { name, password, role } = req.body;
+    const { name, role } = req.body;
 
     const email = req.body.email?.toLowerCase()?.trim();
 
@@ -36,7 +39,8 @@ export const registerUser = async (req: Request, res: Response) => {
       });
     }
 
-    const hashedPassword = await hashPassword(password);
+    // 🔥 ALWAYS USE DEFAULT PASSWORD (ignore incoming password)
+    const hashedPassword = await hashPassword(DEFAULT_PASSWORD);
 
     const user = await prisma.user.create({
       data: {
@@ -44,14 +48,15 @@ export const registerUser = async (req: Request, res: Response) => {
         email,
         password: hashedPassword,
         role,
-        isActive: true,          // ✅ FORCE ACTIVE
-        isArchived: false,       // ✅ SAFETY
-        mustChangePassword: true // ✅ FORCE PASSWORD RESET
+        isActive: true,           // ✅ ALWAYS ACTIVE
+        isArchived: false,        // ✅ SAFETY
+        mustChangePassword: true, // ✅ FORCE PASSWORD RESET
       },
     });
 
     res.status(201).json({
       message: "User registered successfully",
+      defaultPassword: DEFAULT_PASSWORD, // ✅ Optional: helps admin communicate login
       user: {
         id: user.id,
         name: user.name,
@@ -212,7 +217,6 @@ export const changePassword = async (req: Request, res: Response) => {
 
     const hashedNewPassword = await hashPassword(newPassword);
 
-    // ✅ CRITICAL FIX — clear mustChangePassword
     await prisma.user.update({
       where: { id: userId },
       data: {
@@ -222,7 +226,6 @@ export const changePassword = async (req: Request, res: Response) => {
       },
     });
 
-    // ✅ Audit Log
     await createAuditLog({
       action: AuditAction.PASSWORD_CHANGED,
       entityType: "User",

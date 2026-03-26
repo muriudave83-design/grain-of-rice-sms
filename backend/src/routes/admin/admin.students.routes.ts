@@ -232,22 +232,43 @@ router.post("/students", async (req, res) => {
 });
 
 /**
- * ✅ UPDATE STUDENT
+ * ✅ UPDATE STUDENT (FIXED — WITH PARENT LINKING)
  * PUT /api/admin/students/:id
  */
 router.put("/students/:id", async (req, res) => {
   const { id } = req.params;
-  const { firstName, lastName, admissionNo } = req.body;
+  const { firstName, lastName, admissionNo, classId, parentId } = req.body;
 
   try {
+    const studentId = Number(id);
+
+    // ✅ 1. Update student basic info
     const updated = await prisma.student.update({
-      where: { id: Number(id) },
+      where: { id: studentId },
       data: {
         firstName,
         lastName,
         admissionNo,
+        classId: classId ? Number(classId) : undefined,
       },
     });
+
+    // ✅ 2. HANDLE PARENT RELATION (CRITICAL FIX)
+
+    // Remove existing parent links
+    await prisma.parentStudent.deleteMany({
+      where: { studentId },
+    });
+
+    // Add new parent if provided
+    if (parentId) {
+      await prisma.parentStudent.create({
+        data: {
+          studentId,
+          parentId: Number(parentId),
+        },
+      });
+    }
 
     res.json(updated);
   } catch (err) {
@@ -255,7 +276,6 @@ router.put("/students/:id", async (req, res) => {
     res.status(500).json({ message: "Failed to update student" });
   }
 });
-
 /**
  * ✅ ARCHIVE STUDENT (DELETE)
  * DELETE /api/admin/students/:id
