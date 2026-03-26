@@ -34,21 +34,22 @@ router.get(
         return res.status(400).json({ message: "Invalid classId" });
       }
 
-      // 🔍 Find term
-    // ✅ Normalize term input (term1 → Term 1)
-    const normalizedTermName = termName
-      .toLowerCase()
-      .replace("term", "term ")
-      .trim();
+      // 🔍 Normalize term input (term1 → term 1)
+      const normalizedTermName = termName
+        .toLowerCase()
+        .replace("term", "term ")
+        .trim();
 
-    const term = await prisma.term.findFirst({
-      where: {
-        name: {
-          equals: normalizedTermName,
-          mode: "insensitive",
+      const term = await prisma.term.findFirst({
+        where: {
+          name: {
+            equals: normalizedTermName,
+            mode: "insensitive",
+          },
         },
-      },
-    });
+      });
+
+      console.log("✅ TERM FOUND:", term);
 
       if (!term) {
         return res.status(404).json({ message: "Term not found" });
@@ -60,12 +61,14 @@ router.get(
         include: { user: true },
       });
 
+      console.log("👨‍🎓 STUDENTS:", students);
+
       // ✅ Get assessments WITH SUBJECT + SCORES
       const assessments = await prisma.assessment.findMany({
         where: {
           classId,
           termId: term.id,
-          status: "SUBMITTED", // 🔥 IMPORTANT
+          status: "SUBMITTED",
         },
         include: {
           subject: true,
@@ -73,18 +76,30 @@ router.get(
         },
       });
 
-      // ✅ Compute report PROPERLY
+      console.log("📊 ASSESSMENTS:", assessments);
+      console.log("📊 ASSESSMENTS COUNT:", assessments.length);
+
+      // ✅ Compute report
       const report = students.map((student) => {
         const subjectMap: Record<string, { total: number; count: number }> = {};
 
         assessments.forEach((assessment) => {
+          console.log("➡️ CHECKING ASSESSMENT:", {
+            assessmentId: assessment.id,
+            subjectId: assessment.subjectId,
+            scores: assessment.scores,
+          });
+
           const score = assessment.scores.find(
             (s) => s.studentId === student.id
           );
 
+          console.log("➡️ MATCHED SCORE:", score);
+
           if (!score) return;
 
-          const subjectName = assessment.subjectId.toString();
+          const subjectName =
+            assessment.subject?.name || `Subject ${assessment.subjectId}`;
 
           if (!subjectMap[subjectName]) {
             subjectMap[subjectName] = { total: 0, count: 0 };
@@ -117,12 +132,18 @@ router.get(
         };
       });
 
+      console.log("🧠 FINAL REPORT:", report);
+
+      // ✅ IMPORTANT: SEND RESPONSE
+      return res.json(report);
+
     } catch (err) {
       console.error("🔥 REPORT CARD ERROR:", err);
       res.status(500).json({ message: "Failed to load report cards" });
     }
   }
 );
+
 /**
  * ============================================================
  * STUDENT — VIEW OWN REPORT CARD (TERM)
@@ -186,7 +207,6 @@ router.get(
 /**
  * ============================================================
  * PARENT — VIEW CHILDREN REPORT CARDS
- * GET /api/report-cards/parent
  * ============================================================
  */
 router.get(
@@ -226,7 +246,6 @@ router.get(
 /**
  * ============================================================
  * ADMIN / PARENT — VIEW REPORT CARD BY ID
- * GET /api/report-cards/:id
  * ============================================================
  */
 router.get(
@@ -260,7 +279,6 @@ router.get(
       });
     }
 
-    // 🔐 PARENT ACCESS GUARD
     if (req.user!.role === Role.PARENT) {
       const link = await prisma.parentStudent.findFirst({
         where: {
