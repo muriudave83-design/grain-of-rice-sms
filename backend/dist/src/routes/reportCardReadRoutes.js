@@ -21,11 +21,15 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
         // ✅ FIXED: correct Prisma model name
         const scores = await client_1.prisma.assessmentScore.findMany({
             include: {
-                assessment: true,
+                assessment: {
+                    include: {
+                        subject: true,
+                    },
+                },
                 student: true,
             },
         });
-        console.log("🔥 ALL SCORES:", JSON.stringify(scores, null, 2));
+        console.log("🔥 SCORES WITH SUBJECT:", JSON.stringify(scores, null, 2));
         return res.json({
             debugCount: scores.length,
         });

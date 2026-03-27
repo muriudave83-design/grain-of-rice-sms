@@ -1,19 +1,26 @@
-import { prisma } from "../prisma/client";
-import bcrypt from "bcrypt";
+const { PrismaClient } = require("@prisma/client");
+const bcryptjs = require("bcryptjs");
+
+const prisma = new PrismaClient();
 
 async function main() {
-  const hashedPassword = await bcrypt.hash("admin123", 10);
+  const email = "sarah.teacher@test.com";
+  const newPassword = "123456"; // 👈 use this to login
+
+  const hashedPassword = await bcryptjs.hash(newPassword, 10);
 
   await prisma.user.update({
-    where: { email: "admin@school.com" },
+    where: { email },
     data: { password: hashedPassword },
   });
 
-  console.log("✅ Admin password reset to: admin123");
-  process.exit(0);
+  console.log("✅ Password reset for:", email);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main()
+  .catch((e) => {
+    console.error(e);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

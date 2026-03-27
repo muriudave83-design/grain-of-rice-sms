@@ -1,20 +1,21 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const client_1 = require("../prisma/client");
-const bcrypt_1 = __importDefault(require("bcrypt"));
+const { PrismaClient } = require("@prisma/client");
+const bcryptjs = require("bcryptjs");
+const prisma = new PrismaClient();
 async function main() {
-    const hashedPassword = await bcrypt_1.default.hash("admin123", 10);
-    await client_1.prisma.user.update({
-        where: { email: "admin@school.com" },
+    const email = "sarah.teacher@test.com";
+    const newPassword = "123456"; // 👈 use this to login
+    const hashedPassword = await bcryptjs.hash(newPassword, 10);
+    await prisma.user.update({
+        where: { email },
         data: { password: hashedPassword },
     });
-    console.log("✅ Admin password reset to: admin123");
-    process.exit(0);
+    console.log("✅ Password reset for:", email);
 }
-main().catch((e) => {
+main()
+    .catch((e) => {
     console.error(e);
-    process.exit(1);
+})
+    .finally(async () => {
+    await prisma.$disconnect();
 });

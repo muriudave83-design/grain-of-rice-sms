@@ -25,12 +25,16 @@ router.get(
       // ✅ FIXED: correct Prisma model name
       const scores = await prisma.assessmentScore.findMany({
         include: {
-          assessment: true,
+          assessment: {
+            include: {
+              subject: true,
+            },
+          },
           student: true,
         },
       });
 
-      console.log("🔥 ALL SCORES:", JSON.stringify(scores, null, 2));
+      console.log("🔥 SCORES WITH SUBJECT:", JSON.stringify(scores, null, 2));
 
       return res.json({
         debugCount: scores.length,
