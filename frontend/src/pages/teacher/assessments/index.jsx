@@ -197,7 +197,7 @@ export default function TeacherAssessments() {
 
                       {/* ✅ NEW DYNAMIC REPORT CARDS LINK */}
                       <Link
-                        to={`/teacher/report-cards/${a.class?.id || 0}/term1`}
+                        to={`/teacher/report-cards/${a.classId}/term1`}
                         className="px-2 py-1 text-xs rounded bg-purple-100 text-purple-700 hover:bg-purple-200"
                       >
                         Report Cards
@@ -213,14 +213,8 @@ export default function TeacherAssessments() {
                       )}
 
                       {a.status === "SUBMITTED" && (
-                        <span className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-600">
-                          Waiting publish
-                        </span>
-                      )}
-
-                      {a.status === "PUBLISHED" && (
                         <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700">
-                          Published
+                          Ready for report cards
                         </span>
                       )}
 
