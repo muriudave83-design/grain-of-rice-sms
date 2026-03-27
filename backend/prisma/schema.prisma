@@ -324,7 +324,6 @@ enum Role {
 enum AssessmentStatus {
   DRAFT
   SUBMITTED
-  PUBLISHED
 }
 
 enum AssessmentType {
