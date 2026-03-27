@@ -12,12 +12,33 @@ export default function Gradebook() {
 
   const fetchGradebook = async () => {
     try {
-      const res = await API.get(
-        "/gradebook?classId=1&subjectId=1&termId=1" // ✅ FIXED (removed /api)
-      );
-      setData(res.data);
-    } catch {
-      setError("Failed to load gradebook");
+      console.log("📡 Fetching gradebook...");
+
+      const res = await api.get("/gradebook?subjectId=1"); // ✅ FIXED
+
+      console.log("✅ Gradebook response:", res.data);
+
+      // ✅ ALWAYS SAFE SHAPE
+      setData({
+        students: res.data?.students || [],
+        assessments: res.data?.assessments || [],
+        categories: res.data?.categories || [],
+        message: res.data?.message || null,
+      });
+
+      setError(null);
+    } catch (err) {
+      console.error("❌ Gradebook fetch error:", err);
+
+      // ✅ NEVER FAIL UI
+      setData({
+        students: [],
+        assessments: [],
+        categories: [],
+        message: "Unable to load gradebook data",
+      });
+
+      setError(null); // ❗ don't block UI
     }
   };
 
@@ -35,20 +56,12 @@ export default function Gradebook() {
     return "#f8d7da";
   };
 
-  const getTrend = (studentId, assessmentId, current) => {
-    const prev = previousScores[getKey(studentId, assessmentId)];
-    if (prev == null || current == null) return "";
-    if (current > prev) return "▲";
-    if (current < prev) return "▼";
-    return "";
-  };
-
   const saveScore = async (studentId, assessmentId, score) => {
     const key = getKey(studentId, assessmentId);
     setSaving((prev) => ({ ...prev, [key]: true }));
 
     try {
-      await API.post("/gradebook/score", { // ✅ FIXED (removed /api)
+      await api.post("/gradebook/score", {
         studentId,
         assessmentId,
         score,
@@ -61,7 +74,7 @@ export default function Gradebook() {
 
       fetchGradebook();
     } catch (err) {
-      console.error("Save failed (offline?)", err);
+      console.error("Save failed:", err);
     } finally {
       setSaving((prev) => ({ ...prev, [key]: false }));
     }
@@ -74,22 +87,14 @@ export default function Gradebook() {
     setData((prev) => {
       if (!prev) return prev;
 
-      const assessment = prev.assessments.find(
-        (a) => a.id === assessmentId
-      );
-      const max = assessment?.maxScore || 100;
-
-      const safeScore =
-        newScore == null ? null : Math.min(newScore, max);
-
       const updatedStudents = prev.students.map((student) => {
-        if (student.id !== studentId) return student;
+        if (student.studentId !== studentId) return student;
 
         return {
           ...student,
           scores: {
             ...student.scores,
-            [assessmentId]: safeScore,
+            [assessmentId]: newScore,
           },
         };
       });
@@ -108,103 +113,57 @@ export default function Gradebook() {
     }, 500);
   };
 
-  const handleUndo = (studentId, assessmentId) => {
-    const key = getKey(studentId, assessmentId);
-    const prevValue = previousScores[key];
-
-    if (prevValue === undefined) return;
-
-    handleScoreChange(studentId, assessmentId, prevValue);
-  };
-
-  const handleKeyDown = (e, rowIndex, colIndex, studentId, aId) => {
-    if (e.ctrlKey && e.key === "z") {
-      e.preventDefault();
-      handleUndo(studentId, aId);
-      return;
-    }
-
-    const moves = {
-      ArrowRight: [rowIndex, colIndex + 1],
-      ArrowLeft: [rowIndex, colIndex - 1],
-      ArrowDown: [rowIndex + 1, colIndex],
-      ArrowUp: [rowIndex - 1, colIndex],
-      Enter: [rowIndex, colIndex + 1],
-    };
-
-    if (!moves[e.key]) return;
-
-    e.preventDefault();
-    const [r, c] = moves[e.key];
-    const next = inputRefs.current[`${r}-${c}`];
-    if (next) next.focus();
-  };
-
-  if (error) return <div>{error}</div>;
-  if (!data) return <div>Loading...</div>;
+  // ✅ NEVER FAIL UI
+  if (!data) return <div className="p-4">Loading gradebook…</div>;
 
   const students = data.students || [];
   const assessments = data.assessments || [];
 
-  const classAvg =
-    students.length > 0
-      ? students.reduce((sum, s) => sum + (s.average || 0), 0) /
-        students.length
-      : null;
-
   return (
     <div className="p-4 overflow-x-auto">
-      <h2>Gradebook</h2>
+      <h2 className="text-xl font-semibold mb-2">Gradebook</h2>
 
-      {data?.categories && data.categories.length > 0 && (
-        <div style={{ marginBottom: "10px" }}>
-          <strong>Grading Weights:</strong>{" "}
-          {data.categories.map((c) => (
-            <span key={c.id} style={{ marginRight: "10px" }}>
-              {c.name}: {c.weight}%
-            </span>
-          ))}
+      {/* ✅ SHOW MESSAGE INSTEAD OF FAIL */}
+      {data.message && (
+        <div className="mb-4 text-sm text-gray-600">
+          {data.message}
         </div>
       )}
 
-      {data?.categories?.some(
-        (c) => !data.assessments.some((a) => a.categoryId === c.id)
-      ) && (
-        <div style={{ color: "orange", marginBottom: "10px" }}>
-          ⚠️ Some categories have no assessments yet. These count as 0%.
+      {students.length === 0 && (
+        <div className="text-gray-500">
+          No students or data available.
         </div>
       )}
 
-      <table className="border w-full">
-        <thead>
-          <tr>
-            <th style={{ position: "sticky", left: 0, background: "#fff" }}>
-              Student
-            </th>
+      {students.length > 0 && (
+        <table className="border w-full">
+          <thead>
+            <tr>
+              <th>Student</th>
 
-            {assessments.map((a) => (
-              <th key={a.id}>{a.title}</th>
-            ))}
+              {assessments.map((a) => (
+                <th key={a.id}>{a.title}</th>
+              ))}
 
-            <th>Avg</th>
-            <th>Missing</th>
-          </tr>
-        </thead>
+              <th>Final Score</th>
+              <th>Missing</th>
+            </tr>
+          </thead>
 
-        <tbody>
-          {students.map((student, rowIndex) => (
-            <tr key={student.id}>
-              <td style={{ position: "sticky", left: 0, background: "#fff" }}>
-                {student.name}
-              </td>
+          <tbody>
+            {students.map((student, rowIndex) => (
+              <tr key={student.studentId}>
+                <td>
+                  {student.firstName} {student.lastName}
+                </td>
 
-              {assessments.map((a, colIndex) => {
-                const key = getKey(student.id, a.id);
-                const score = student.scores?.[a.id] ?? "";
+                {assessments.map((a, colIndex) => {
+                  const key = getKey(student.studentId, a.id);
+                  const score = student.scores?.[a.id] ?? "";
 
-                return (
-                  <td key={a.id}>
-                    <div style={{ position: "relative" }}>
+                  return (
+                    <td key={a.id}>
                       <input
                         ref={(el) =>
                           (inputRefs.current[`${rowIndex}-${colIndex}`] = el)
@@ -213,18 +172,9 @@ export default function Gradebook() {
                         type="number"
                         min={0}
                         max={a.maxScore}
-                        onKeyDown={(e) =>
-                          handleKeyDown(
-                            e,
-                            rowIndex,
-                            colIndex,
-                            student.id,
-                            a.id
-                          )
-                        }
                         onChange={(e) =>
                           handleScoreChange(
-                            student.id,
+                            student.studentId,
                             a.id,
                             e.target.value
                           )
@@ -234,53 +184,23 @@ export default function Gradebook() {
                           backgroundColor: getScoreColor(score, a.maxScore),
                         }}
                       />
+                      {saving[key] && <span>...</span>}
+                    </td>
+                  );
+                })}
 
-                      {saving[key] && (
-                        <span style={{ fontSize: 10 }}>...</span>
-                      )}
+                <td>
+                  {student.finalScore != null
+                    ? student.finalScore + "%"
+                    : "-"}
+                </td>
 
-                      <span style={{ marginLeft: 4 }}>
-                        {getTrend(student.id, a.id, score)}
-                      </span>
-                    </div>
-                  </td>
-                );
-              })}
-
-              <td>
-                {student.average != null
-                  ? (student.average * 100).toFixed(0) + "%"
-                  : "-"}
-
-                {student.missingCategories?.length > 0 && (
-                  <div style={{ color: "red", fontSize: "12px" }}>
-                    Missing:{" "}
-                    {student.missingCategories
-                      .map(
-                        (id) =>
-                          data.categories.find((c) => c.id === id)?.name
-                      )
-                      .join(", ")}
-                  </div>
-                )}
-              </td>
-
-              <td>{student.missingCount ?? "-"}</td>
-            </tr>
-          ))}
-
-          <tr>
-            <td style={{ fontWeight: "bold" }}>Class Avg</td>
-            <td colSpan={assessments.length}></td>
-            <td>
-              {classAvg != null
-                ? (classAvg * 100).toFixed(0) + "%"
-                : "-"}
-            </td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
+                <td>{student.missingCount ?? "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
