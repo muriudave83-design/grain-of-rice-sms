@@ -194,11 +194,25 @@ router.post(
         },
       });
 
-      console.log("✅ PUBLISHED COUNT:", result.count);
+      // ✅ ALSO update assessments (🔥 FIX FOR "Waiting publish")
+      const assessmentsUpdated = await prisma.assessment.updateMany({
+        where: {
+          classId,
+          termId: term.id,
+          status: "SUBMITTED",
+        },
+        data: {
+          status: "PUBLISHED",
+        },
+      });
+
+      console.log("✅ REPORT CARDS PUBLISHED:", result.count);
+      console.log("✅ ASSESSMENTS UPDATED:", assessmentsUpdated.count);
 
       return res.json({
         message: "Report cards published successfully",
         updated: result.count,
+        assessmentsUpdated: assessmentsUpdated.count,
       });
 
     } catch (err) {
