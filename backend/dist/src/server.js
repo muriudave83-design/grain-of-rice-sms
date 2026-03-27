@@ -111,8 +111,8 @@ app.use("/api", teacherAssignments_routes_1.default);
 // ----------------------------------
 // REPORT CARDS
 // ----------------------------------
-app.use("/api/report-cards", reportCardRoutes_1.reportCardReadRoutes);
 app.use("/api/report-cards", reportCardReadRoutes_1.reportCardReadRoutes);
+app.use("/api/report-cards", reportCardRoutes_1.reportCardReadRoutes);
 app.use("/api", reportCardPdf_routes_1.default);
 // ----------------------------------
 // PARENT ↔ STUDENT

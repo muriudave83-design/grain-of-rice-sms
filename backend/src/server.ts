@@ -133,8 +133,8 @@ app.use("/api", teacherAssignmentsRoutes);
 // ----------------------------------
 // REPORT CARDS
 // ----------------------------------
-app.use("/api/report-cards", reportCardRoutes);
 app.use("/api/report-cards", reportCardReadRoutes);
+app.use("/api/report-cards", reportCardRoutes);
 app.use("/api", reportCardPdfRoutes);
 
 // ----------------------------------
