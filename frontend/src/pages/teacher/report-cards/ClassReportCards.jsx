@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "@/services/apiClient";
 
-// ✅ STEP 1 — Grade function
+// ✅ Grade function
 function getGrade(avg) {
   if (avg >= 80) return "A";
   if (avg >= 70) return "B";
@@ -20,83 +20,92 @@ export default function ClassReportCards() {
   const [error, setError] = useState(null);
   const [publishing, setPublishing] = useState(false);
 
-useEffect(() => {
-  async function fetchReport() {
-    try {
-      console.log("🔥 FETCHING REPORT...", classId, term);
+  useEffect(() => {
+    async function fetchReport() {
+      try {
+        console.log("🔥 FETCHING REPORT...", classId, term);
 
-      const url = `/report-cards/teacher/${classId}/${term}`;
-      console.log("📡 REQUEST URL:", url);
+        const url = `/report-cards/teacher/${classId}/${term}`;
+        console.log("📡 REQUEST URL:", url);
 
-      const res = await api.get(url);
+        const res = await api.get(url);
 
-      console.log("✅ RESPONSE STATUS:", res.status);
-      console.log("📦 RAW RESPONSE DATA:", res.data);
+        console.log("📦 RAW RESPONSE DATA:", res.data);
 
-      // ✅ TRANSFORM BACKEND RESPONSE → MATCH YOUR UI
-      const data = res.data;
+        const data = res.data;
 
-      const subjectsSet = new Set();
+        // ✅ Collect all subjects dynamically
+        const subjectsSet = new Set();
 
-      data.forEach((student) => {
-        console.log("👤 STUDENT FROM API:", student);
-
-        if (student.subjects) {
-          student.subjects.forEach((s) => {
+        data.forEach((student) => {
+          (student.subjects || []).forEach((s) => {
             subjectsSet.add(s.subject);
           });
-        }
-      });
+        });
 
-      const transformed = {
-        class: { name: `Class ${classId}` },
-        term,
-        status: "draft",
-        subjects: Array.from(subjectsSet),
-        students: data.map((student) => {
-          console.log("🔄 TRANSFORMING STUDENT:", student);
+        const subjects = Array.from(subjectsSet);
+
+        // ✅ Transform students
+        const students = data.map((student) => {
+          const subjectEntries = (student.subjects || []).map((s) => ({
+            subject: s.subject,
+            score: s.average,
+            average: s.average,
+            grade: getGrade(s.average),
+          }));
+
+          // ✅ FIX: Proper total calculation
+          const total = subjectEntries.reduce(
+            (sum, s) => sum + (s.average || 0),
+            0
+          );
+
+          const average =
+            subjectEntries.length > 0
+              ? total / subjectEntries.length
+              : 0;
 
           return {
             id: student.studentId,
             name: student.student || student.name,
-            subjects: (student.subjects || []).map((s) => ({
-              subject: s.subject,
-              score: s.average,
-              average: s.average,
-              grade: getGrade(s.average),
-            })),
-            total: student.total || student.overallAverage || 0,
-            average: student.average || student.overallAverage || 0,
+            subjects: subjectEntries,
+            total,
+            average,
           };
-        }),
-      };
+        });
 
-      console.log("🧠 FINAL TRANSFORMED DATA:", transformed);
+        // ✅ FIX: Do NOT fake class name
+        const transformed = {
+          class: {
+            id: classId,
+            name: data[0]?.className || `Class ${classId}`, // fallback only
+          },
+          term,
+          status: "draft",
+          subjects,
+          students,
+        };
 
-      setReport(transformed);
+        console.log("🧠 FINAL TRANSFORMED DATA:", transformed);
 
-    } catch (err) {
-      console.error("❌ FETCH ERROR:", err);
+        setReport(transformed);
+      } catch (err) {
+        console.error("❌ FETCH ERROR:", err);
 
-      if (err.response) {
-        console.error("❌ ERROR RESPONSE:", err.response.data);
-        console.error("❌ STATUS:", err.response.status);
+        if (err.response?.status === 404) {
+          setError("No submitted assessments found for this class and term.");
+        } else if (err.response?.status === 403) {
+          setError("You are not authorized to view this report.");
+        } else {
+          setError("Failed to load report card data.");
+        }
+      } finally {
+        setLoading(false);
       }
-
-      if (err.response?.status === 404) {
-        setError("No submitted assessments found for this class and term.");
-      } else if (err.response?.status === 403) {
-        setError("You are not authorized to view this report.");
-      } else {
-        setError("Failed to load report card data.");
-      }
-    } finally {
-      setLoading(false);
     }
-  }
 
-  fetchReport();
-}, [classId, term]);
+    fetchReport();
+  }, [classId, term]);
 
   async function handlePublish() {
     const confirmed = window.confirm(
@@ -107,6 +116,7 @@ useEffect(() => {
 
     try {
       setPublishing(true);
+
       await api.post(
         `/report-cards/teacher/${classId}/${term}/publish`
       );
@@ -224,11 +234,11 @@ useEffect(() => {
                 })}
 
                 <td className="py-2 px-2 font-semibold">
-                  {student.total}
+                  {student.total.toFixed(1)}
                 </td>
 
                 <td className="py-2 px-2">
-                  {student.average}
+                  {student.average.toFixed(1)}
                 </td>
 
                 <td className="py-2 px-2 font-bold">

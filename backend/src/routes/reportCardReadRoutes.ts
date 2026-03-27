@@ -38,7 +38,6 @@ router.get(
         return res.status(400).json({ message: "Invalid classId" });
       }
 
-      // 🔍 Normalize term input (term1 → term 1)
       const normalizedTermName = termName
         .toLowerCase()
         .replace("term", "term ")
@@ -59,7 +58,6 @@ router.get(
         return res.status(404).json({ message: "Term not found" });
       }
 
-      // ✅ Get students
       const students = await prisma.student.findMany({
         where: {
           classId,
@@ -70,12 +68,10 @@ router.get(
 
       console.log("👨‍🎓 STUDENTS:", students);
 
-      // ✅ Get assessments WITH SUBJECT + SCORES
       const assessments = await prisma.assessment.findMany({
         where: {
           classId,
           termId: term.id,
-          // 🔥 FIX APPLIED HERE
           status: {
             in: ["SUBMITTED", "DRAFT"],
           },
@@ -87,24 +83,14 @@ router.get(
       });
 
       console.log("📊 ASSESSMENTS:", assessments);
-      console.log("📊 ASSESSMENTS COUNT:", assessments.length);
 
-      // ✅ Compute report
       const report = students.map((student) => {
         const subjectMap: Record<string, { total: number; count: number }> = {};
 
         assessments.forEach((assessment) => {
-          console.log("➡️ CHECKING ASSESSMENT:", {
-            assessmentId: assessment.id,
-            subjectId: assessment.subjectId,
-            scores: assessment.scores,
-          });
-
           const score = assessment.scores.find(
             (s) => s.studentId === student.id
           );
-
-          console.log("➡️ MATCHED SCORE:", score);
 
           if (!score) return;
 
@@ -149,6 +135,77 @@ router.get(
     } catch (err) {
       console.error("🔥 REPORT CARD ERROR:", err);
       res.status(500).json({ message: "Failed to load report cards" });
+    }
+  }
+);
+
+/**
+ * ============================================================
+ * ✅ NEW: TEACHER — PUBLISH REPORT CARDS
+ * POST /api/report-cards/teacher/:classId/:term/publish
+ * ============================================================
+ */
+router.post(
+  "/teacher/:classId/:term/publish",
+  authenticate,
+  requireRole([Role.TEACHER]),
+  async (req, res) => {
+    console.log("🚀 PUBLISH ROUTE HIT");
+
+    try {
+      const classId = Number(req.params.classId);
+      const termParam = req.params.term;
+
+      if (Number.isNaN(classId)) {
+        return res.status(400).json({ message: "Invalid classId" });
+      }
+
+      // ✅ FIX: Handle string | string[]
+      if (Array.isArray(termParam)) {
+        return res.status(400).json({ message: "Invalid term parameter" });
+      }
+
+      const normalizedTermName = termParam
+        .toLowerCase()
+        .replace("term", "term ")
+        .trim();
+
+      const term = await prisma.term.findFirst({
+        where: {
+          name: {
+            equals: normalizedTermName,
+            mode: "insensitive",
+          },
+        },
+      });
+
+      if (!term) {
+        return res.status(404).json({ message: "Term not found" });
+      }
+
+      // ✅ Publish report cards
+      const result = await prisma.reportCard.updateMany({
+        where: {
+          classId,
+          termId: term.id,
+        },
+        data: {
+          status: "PUBLISHED",
+        },
+      });
+
+      console.log("✅ PUBLISHED COUNT:", result.count);
+
+      return res.json({
+        message: "Report cards published successfully",
+        updated: result.count,
+      });
+
+    } catch (err) {
+      console.error("❌ PUBLISH ERROR:", err);
+      return res.status(500).json({
+        message: "Failed to publish report cards",
+      });
     }
   }
 );
