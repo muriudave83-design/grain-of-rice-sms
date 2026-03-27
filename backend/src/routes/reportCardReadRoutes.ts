@@ -61,7 +61,10 @@ router.get(
 
       // ✅ Get students
       const students = await prisma.student.findMany({
-        where: { classId },
+        where: {
+          classId,
+          isArchived: false,
+        },
         include: { user: true },
       });
 

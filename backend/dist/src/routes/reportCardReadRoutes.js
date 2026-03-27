@@ -49,7 +49,10 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
         }
         // ✅ Get students
         const students = await client_1.prisma.student.findMany({
-            where: { classId },
+            where: {
+                classId,
+                isArchived: false,
+            },
             include: { user: true },
         });
         console.log("👨‍🎓 STUDENTS:", students);
