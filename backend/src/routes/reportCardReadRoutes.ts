@@ -4,6 +4,7 @@ import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
 import { Role } from "@prisma/client";
 import { AssessmentStatus } from "@prisma/client";
+import { ReportCardStatus } from "@prisma/client";
 
 const router = Router();
 

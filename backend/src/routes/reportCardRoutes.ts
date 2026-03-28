@@ -4,6 +4,7 @@ import { Router } from "express";
 import { prisma } from "../prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
 import { Role } from "@prisma/client";
+import { ReportCardStatus } from "@prisma/client";
 
 // ✅ CONTROLLER IMPORT
 import {

@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import { prisma } from "../../prisma/client";
+import { ReportCardStatus } from "@prisma/client";
 
 /**
  * Phase-8 v1.1 â€” Report Card PDF Generator

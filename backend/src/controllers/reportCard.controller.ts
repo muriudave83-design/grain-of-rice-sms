@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
+import { ReportCardStatus } from "@prisma/client";
 
 import * as ReportCardService from "../services/reportCard.service";
 
