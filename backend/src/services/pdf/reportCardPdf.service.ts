@@ -31,7 +31,7 @@ export async function generateReportCardPdf(
     throw new Error("Report card not found");
   }
 
-  if (reportCard.status !== "PUBLISHED") {
+  if (reportCard.status !== ReportCardStatus.PUBLISHED) {
     throw new Error("Report card is not published");
   }
 

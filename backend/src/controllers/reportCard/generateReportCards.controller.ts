@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "../../prisma/client";
+import { ReportCardStatus } from "@prisma/client";
+
 import {
   fetchGradeInputs,
   computeSubjectFinalScore,
@@ -73,7 +75,7 @@ export async function generateReportCards(req: Request, res: Response) {
         where: {
           termId: Number(termId),
           classId: Number(classId),
-          status: "GENERATED",
+          status: ReportCardStatus.GENERATED,
         },
       });
     } else {
@@ -81,7 +83,7 @@ export async function generateReportCards(req: Request, res: Response) {
         where: {
           termId: Number(termId),
           classId: Number(classId),
-          status: "GENERATED",
+          status: ReportCardStatus.GENERATED,
         },
       });
 
@@ -208,7 +210,7 @@ export async function generateReportCards(req: Request, res: Response) {
             classId: Number(classId),
             total: totals.total ?? 0,
             average: totals.average ?? 0,
-            status: "GENERATED",
+            status: ReportCardStatus.GENERATED,
           },
         });
 
@@ -236,7 +238,7 @@ export async function generateReportCards(req: Request, res: Response) {
         where: {
           termId: Number(termId),
           classId: Number(classId),
-          status: "GENERATED",
+          status: ReportCardStatus.GENERATED,
         },
         select: {
           id: true,

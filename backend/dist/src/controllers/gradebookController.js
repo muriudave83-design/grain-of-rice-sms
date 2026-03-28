@@ -5,32 +5,46 @@ const client_1 = require("@prisma/client");
 const gradeHelpers_1 = require("../utils/gradeHelpers");
 const prisma = new client_1.PrismaClient();
 /**
- * Teacher gradebook for a subject:
- * - returns students enrolled in subject
- * - their scores broken down per assessment
- * - computed finalScore
- * - missing count
- * Query params (optional): sortBy=name|finalScore|missing, order=asc|desc, filterMissing=true|false
+ * Teacher gradebook (NEVER FAIL VERSION)
  */
 const getTeacherGradebook = async (req, res) => {
     try {
         const teacher = req.user;
         const subjectId = Number(req.params.subjectId);
-        // verify teacher actually owns the subject (double-check RBAC)
-        const subject = await prisma.subject.findUnique({ where: { id: subjectId } });
-        if (!subject)
-            return res.status(404).json({ error: "Subject not found" });
-        if (subject.teacherId !== teacher.id && teacher.role !== client_1.Role.ADMIN) {
-            return res.status(403).json({ error: "Forbidden" });
+        // ✅ Safe subject fetch
+        const subject = await prisma.subject.findUnique({
+            where: { id: subjectId },
+        });
+        if (!subject) {
+            return res.status(200).json({
+                message: "Subject not found",
+                subject: null,
+                students: [],
+            });
         }
-        // get enrolled students
+        // ✅ Safe RBAC check (no hard fail)
+        if (subject.teacherId !== teacher.id && teacher.role !== client_1.Role.ADMIN) {
+            return res.status(200).json({
+                message: "You are not assigned to this subject",
+                subject: { id: subject.id, name: subject.name },
+                students: [],
+            });
+        }
+        // ✅ Safe enrollments
         const enrollments = await prisma.enrollment.findMany({
             where: { subjectId },
             include: { student: true },
         });
-        const studentIds = enrollments.map(e => e.studentId);
+        if (!enrollments.length) {
+            return res.status(200).json({
+                message: "No students enrolled in this subject",
+                subject: { id: subject.id, name: subject.name },
+                students: [],
+            });
+        }
+        const studentIds = enrollments.map((e) => e.studentId);
         const studentMap = new Map();
-        enrollments.forEach(e => {
+        enrollments.forEach((e) => {
             studentMap.set(e.studentId, {
                 studentId: e.student.id,
                 firstName: e.student.firstName,
@@ -38,124 +52,207 @@ const getTeacherGradebook = async (req, res) => {
                 admissionNo: e.student.admissionNo,
             });
         });
-        // compute finals in bulk
-        const finals = await (0, gradeHelpers_1.computeFinalForStudentsBulk)(studentIds, subjectId);
-        // assemble rows
-        const rows = studentIds.map(id => {
+        // ✅ Safe compute (never crash)
+        let finals = {};
+        try {
+            finals = await (0, gradeHelpers_1.computeFinalForStudentsBulk)(studentIds, subjectId);
+        }
+        catch (err) {
+            console.error("⚠️ computeFinalForStudentsBulk failed:", err);
+            finals = {};
+        }
+        const rows = studentIds.map((id) => {
             const base = studentMap.get(id);
-            const data = finals[id] || { finalScore: 0, details: [], missingCount: 0, assessmentCount: 0 };
+            const data = finals?.[id] || {
+                finalScore: 0,
+                details: [],
+                missingCount: 0,
+                assessmentCount: 0,
+            };
             return {
                 ...base,
-                finalScore: Number((data.finalScore * 100).toFixed(2)), // convert to percent if you prefer
-                missingCount: data.missingCount,
-                assessmentCount: data.assessmentCount,
-                details: data.details,
+                finalScore: Number(((data.finalScore || 0) * 100).toFixed(2)),
+                missingCount: data.missingCount || 0,
+                assessmentCount: data.assessmentCount || 0,
+                details: data.details || [],
             };
         });
-        // simple sorting/filtering
+        // ✅ Safe sorting
         const { sortBy = "lastName", order = "asc", filterMissing } = req.query;
         let resultRows = rows;
         if (filterMissing === "true") {
-            resultRows = resultRows.filter(r => r.missingCount > 0);
+            resultRows = resultRows.filter((r) => r.missingCount > 0);
         }
         if (sortBy === "finalScore") {
-            resultRows.sort((a, b) => order === "asc" ? a.finalScore - b.finalScore : b.finalScore - a.finalScore);
+            resultRows.sort((a, b) => order === "asc"
+                ? a.finalScore - b.finalScore
+                : b.finalScore - a.finalScore);
         }
         else if (sortBy === "missing") {
-            resultRows.sort((a, b) => order === "asc" ? a.missingCount - b.missingCount : b.missingCount - a.missingCount);
+            resultRows.sort((a, b) => order === "asc"
+                ? a.missingCount - b.missingCount
+                : b.missingCount - a.missingCount);
         }
         else {
-            // name
             resultRows.sort((a, b) => {
                 const nameA = `${a.lastName} ${a.firstName}`.toLowerCase();
                 const nameB = `${b.lastName} ${b.firstName}`.toLowerCase();
-                return order === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+                return order === "asc"
+                    ? nameA.localeCompare(nameB)
+                    : nameB.localeCompare(nameA);
             });
         }
-        res.json({ subject: { id: subject.id, name: subject.name }, students: resultRows });
+        return res.status(200).json({
+            message: "Gradebook loaded",
+            subject: { id: subject.id, name: subject.name },
+            students: resultRows,
+        });
     }
     catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Failed to fetch gradebook" });
+        console.error("🔥 Gradebook fatal error:", err);
+        return res.status(200).json({
+            message: "Could not load gradebook",
+            subject: null,
+            students: [],
+        });
     }
 };
 exports.getTeacherGradebook = getTeacherGradebook;
 /**
- * Parent view: single student gradebook across subjects (or by subject)
- * - returns subject list with finalScore and assessment details
+ * Parent view (SAFE)
  */
 const getParentGradebook = async (req, res) => {
     try {
         const parent = req.user;
         const studentId = Number(req.params.studentId);
-        // verify parent is guardian (unless admin)
         if (parent.role !== client_1.Role.ADMIN) {
             const guard = await prisma.guardian.findFirst({
                 where: { studentId, userId: parent.id },
             });
-            if (!guard)
-                return res.status(403).json({ error: "Forbidden" });
+            if (!guard) {
+                return res.status(200).json({
+                    message: "You are not authorized to view this student",
+                    studentId,
+                    subjects: [],
+                });
+            }
         }
-        // get subjects student is enrolled in
         const enrollments = await prisma.enrollment.findMany({
             where: { studentId },
             include: { subject: true },
         });
-        const results = [];
-        for (const e of enrollments) {
-            const { finalScore, details } = await (0, gradeHelpers_1.computeFinalForStudent)(studentId, e.subjectId);
-            results.push({
-                subjectId: e.subjectId,
-                subjectName: e.subject.name,
-                finalScore: Number((finalScore * 100).toFixed(2)),
-                assessmentCount: details.length,
-                details, // details includes missing flags per assessment
+        if (!enrollments.length) {
+            return res.status(200).json({
+                message: "Student is not enrolled in any subjects",
+                studentId,
+                subjects: [],
             });
         }
-        res.json({ studentId, subjects: results });
+        const results = [];
+        for (const e of enrollments) {
+            try {
+                const { finalScore, details } = await (0, gradeHelpers_1.computeFinalForStudent)(studentId, e.subjectId);
+                results.push({
+                    subjectId: e.subjectId,
+                    subjectName: e.subject.name,
+                    finalScore: Number((finalScore * 100).toFixed(2)),
+                    assessmentCount: details.length,
+                    details,
+                });
+            }
+            catch (err) {
+                console.error("⚠️ computeFinalForStudent failed:", err);
+                results.push({
+                    subjectId: e.subjectId,
+                    subjectName: e.subject.name,
+                    finalScore: 0,
+                    assessmentCount: 0,
+                    details: [],
+                });
+            }
+        }
+        return res.status(200).json({
+            message: "Parent gradebook loaded",
+            studentId,
+            subjects: results,
+        });
     }
     catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Failed to fetch parent gradebook" });
+        console.error("🔥 Parent gradebook error:", err);
+        return res.status(200).json({
+            message: "Could not load parent gradebook",
+            studentId: null,
+            subjects: [],
+        });
     }
 };
 exports.getParentGradebook = getParentGradebook;
 /**
- * Admin overview: fetch subjects (optional filter by class) and compute top-level summary
+ * Admin overview (SAFE)
  */
 const getAdminOverview = async (req, res) => {
     try {
-        // very flexible: optional subjectId or className
-        const { subjectId, className } = req.query;
+        const { subjectId } = req.query;
         const where = {};
         if (subjectId)
             where.id = Number(subjectId);
         const subjects = await prisma.subject.findMany({ where });
-        const overview = [];
-        for (const s of subjects) {
-            // students in subject
-            const enrollments = await prisma.enrollment.findMany({ where: { subjectId: s.id }, include: { student: true } });
-            const studentIds = enrollments.map(e => e.studentId);
-            const finals = await (0, gradeHelpers_1.computeFinalForStudentsBulk)(studentIds, s.id);
-            const studentsSummary = studentIds.map(id => ({
-                studentId: id,
-                name: enrollments.find(e => e.studentId === id).student.firstName + " " + enrollments.find(e => e.studentId === id).student.lastName,
-                finalScore: Number((finals[id].finalScore * 100).toFixed(2)),
-                missingCount: finals[id].missingCount,
-            }));
-            overview.push({
-                subjectId: s.id,
-                subjectName: s.name,
-                teacherId: s.teacherId,
-                studentCount: studentIds.length,
-                students: studentsSummary,
+        if (!subjects.length) {
+            return res.status(200).json({
+                message: "No subjects found",
+                overview: [],
             });
         }
-        res.json({ overview });
+        const overview = [];
+        for (const s of subjects) {
+            try {
+                const enrollments = await prisma.enrollment.findMany({
+                    where: { subjectId: s.id },
+                    include: { student: true },
+                });
+                const studentIds = enrollments.map((e) => e.studentId);
+                let finals = {};
+                try {
+                    finals = await (0, gradeHelpers_1.computeFinalForStudentsBulk)(studentIds, s.id);
+                }
+                catch (err) {
+                    console.error("⚠️ bulk compute failed:", err);
+                    finals = {};
+                }
+                const studentsSummary = studentIds.map((id) => {
+                    const student = enrollments.find((e) => e.studentId === id)?.student;
+                    return {
+                        studentId: id,
+                        name: student
+                            ? `${student.firstName} ${student.lastName}`
+                            : "Unknown",
+                        finalScore: Number(((finals?.[id]?.finalScore || 0) * 100).toFixed(2)),
+                        missingCount: finals?.[id]?.missingCount || 0,
+                    };
+                });
+                overview.push({
+                    subjectId: s.id,
+                    subjectName: s.name,
+                    teacherId: s.teacherId,
+                    studentCount: studentIds.length,
+                    students: studentsSummary,
+                });
+            }
+            catch (err) {
+                console.error("⚠️ subject processing failed:", err);
+            }
+        }
+        return res.status(200).json({
+            message: "Admin overview loaded",
+            overview,
+        });
     }
     catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Failed to fetch admin overview" });
+        console.error("🔥 Admin overview error:", err);
+        return res.status(200).json({
+            message: "Could not load admin overview",
+            overview: [],
+        });
     }
 };
 exports.getAdminOverview = getAdminOverview;

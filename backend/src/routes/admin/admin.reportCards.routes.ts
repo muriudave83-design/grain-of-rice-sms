@@ -3,6 +3,7 @@ import { prisma } from "../../prisma/client";
 import { authenticate } from "../../middlewares/authMiddleware";
 import { requireRole } from "../../middlewares/rolesMiddleware";
 import { Role } from "@prisma/client";
+import { ReportCardStatus } from "@prisma/client";
 
 const router = Router();
 
@@ -39,7 +40,7 @@ router.post(
 
     await prisma.reportCard.updateMany({
       where: { classId, termId },
-      data: { status: "PUBLISHED" },
+      data: { status: ReportCardStatus.PUBLISHED },
     });
 
     await prisma.auditLog.create({
@@ -77,7 +78,7 @@ router.post(
       where: {
         classId,
         termId,
-        status: "PUBLISHED",
+        status: ReportCardStatus.PUBLISHED,
       },
     });
 
@@ -89,7 +90,7 @@ router.post(
 
     await prisma.reportCard.updateMany({
       where: { classId, termId },
-      data: { status: "GENERATED" },
+      data: { status: ReportCardStatus.GENERATED },
     });
 
     await prisma.auditLog.create({

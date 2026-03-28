@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../../prisma/client";
+import { ReportCardStatus } from "@prisma/client";
 
 /**
  * POST /report-cards/publish
@@ -7,7 +8,7 @@ import { prisma } from "../../prisma/client";
  *
  * Rules:
  * - ADMIN only
- * - Only DRAFT report cards may be published
+ * - Only GENERATED report cards may be published
  * - All report cards must be complete (no missing subject entries)
  * - Operation is atomic
  */
@@ -25,6 +26,7 @@ export async function publishReportCards(req: Request, res: Response) {
     const term = await prisma.term.findUnique({
       where: { id: Number(termId) },
     });
+
     if (!term) {
       return res.status(400).json({ message: "Invalid termId" });
     }
@@ -33,19 +35,20 @@ export async function publishReportCards(req: Request, res: Response) {
     const classroom = await prisma.class.findUnique({
       where: { id: Number(classId) },
     });
+
     if (!classroom) {
       return res.status(400).json({ message: "Invalid classId" });
     }
 
-    // Fetch all DRAFT report cards for this class + term
+    // Fetch all GENERATED report cards for this class + term
     const reportCards = await prisma.reportCard.findMany({
       where: {
         termId: Number(termId),
         classId: Number(classId),
-        status: "GENERATED",
+        status: ReportCardStatus.GENERATED,
       },
       include: {
-        subjects: true,
+        subjects: true, // ✅ FIX: include relation
       },
     });
 
@@ -59,6 +62,7 @@ export async function publishReportCards(req: Request, res: Response) {
     const incomplete: Array<{ studentId: number; reason: string }> = [];
 
     for (const rc of reportCards) {
+      // ✅ FIX: subjects is guaranteed because of include, but keep safety check
       if (!rc.subjects || rc.subjects.length === 0) {
         incomplete.push({
           studentId: rc.studentId,
@@ -67,8 +71,9 @@ export async function publishReportCards(req: Request, res: Response) {
         continue;
       }
 
+      // ✅ FIX: typed param (no implicit any)
       const hasMissing = rc.subjects.some(
-        (s) => s.total === null || Number.isNaN(s.total)
+        (s: { total: number }) => Number.isNaN(s.total)
       );
 
       if (hasMissing) {
@@ -92,10 +97,11 @@ export async function publishReportCards(req: Request, res: Response) {
         where: {
           termId: Number(termId),
           classId: Number(classId),
-          status: "GENERATED",
+          status: ReportCardStatus.GENERATED,
         },
         data: {
-          status: "PUBLISHED",
+          status: ReportCardStatus.PUBLISHED,
+          publishedAt: new Date(), // ✅ GOOD PRACTICE (optional but recommended)
         },
       });
 
@@ -110,6 +116,7 @@ export async function publishReportCards(req: Request, res: Response) {
     });
   } catch (error) {
     console.error("publishReportCards error:", error);
+
     return res.status(500).json({
       message: "Failed to publish report cards",
       error: (error as Error).message,

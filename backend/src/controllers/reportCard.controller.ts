@@ -84,7 +84,7 @@ export const downloadReportCardPdf = async (
         return res.status(403).json({ message: "Forbidden" });
       }
 
-      if (reportCard.status !== "PUBLISHED") {
+      if (reportCard.status !== ReportCardStatus.PUBLISHED) {
         return res
           .status(403)
           .json({ message: "Report card not PUBLISHED" });
@@ -105,7 +105,7 @@ export const downloadReportCardPdf = async (
         return res.status(403).json({ message: "Forbidden" });
       }
 
-      if (reportCard.status !== "PUBLISHED") {
+      if (reportCard.status !== ReportCardStatus.PUBLISHED) {
         return res
           .status(403)
           .json({ message: "Report card not PUBLISHED" });
@@ -174,7 +174,7 @@ export const getParentReportCards = async (
     const reportCards = await prisma.reportCard.findMany({
       where: {
         studentId: { in: studentIds },
-        status: "PUBLISHED",
+        status: ReportCardStatus.PUBLISHED,
       },
       include: {
         term: true,

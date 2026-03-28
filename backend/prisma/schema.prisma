@@ -336,6 +336,7 @@ enum AssessmentType {
 
 enum ReportCardStatus {
   DRAFT
+  GENERATED
   PUBLISHED
 }
 

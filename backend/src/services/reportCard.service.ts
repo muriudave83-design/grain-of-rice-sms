@@ -1,4 +1,5 @@
 import { prisma } from "../prisma/client";
+import { ReportCardStatus } from "@prisma/client";
 
 type GenerateReportCardsInput = {
   classId: number;
@@ -88,7 +89,7 @@ export async function generateReportCardsForClass({
         },
       });
 
-      if (existing && existing.status === "PUBLISHED") {
+      if (existing && existing.status === ReportCardStatus.PUBLISHED) {
         console.log(`⚠️ Report card already published for student ${student.id}`);
         continue;
       }
@@ -116,7 +117,7 @@ export async function generateReportCardsForClass({
         update: {
           total,
           average,
-          status: "GENERATED",
+          status: ReportCardStatus.GENERATED,
         },
         create: {
           studentId: student.id,
@@ -124,7 +125,7 @@ export async function generateReportCardsForClass({
           termId,
           total,
           average,
-          status: "GENERATED",
+          status: ReportCardStatus.GENERATED,
         },
       });
 

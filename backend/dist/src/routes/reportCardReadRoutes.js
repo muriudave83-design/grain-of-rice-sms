@@ -30,7 +30,6 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
         if (Number.isNaN(classId)) {
             return res.status(400).json({ message: "Invalid classId" });
         }
-        // 🔍 Normalize term input (term1 → term 1)
         const normalizedTermName = termName
             .toLowerCase()
             .replace("term", "term ")
@@ -47,7 +46,6 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
         if (!term) {
             return res.status(404).json({ message: "Term not found" });
         }
-        // ✅ Get students
         const students = await client_1.prisma.student.findMany({
             where: {
                 classId,
@@ -56,12 +54,10 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
             include: { user: true },
         });
         console.log("👨‍🎓 STUDENTS:", students);
-        // ✅ Get assessments WITH SUBJECT + SCORES
         const assessments = await client_1.prisma.assessment.findMany({
             where: {
                 classId,
                 termId: term.id,
-                // 🔥 FIX APPLIED HERE
                 status: {
                     in: ["SUBMITTED", "DRAFT"],
                 },
@@ -72,18 +68,10 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
             },
         });
         console.log("📊 ASSESSMENTS:", assessments);
-        console.log("📊 ASSESSMENTS COUNT:", assessments.length);
-        // ✅ Compute report
         const report = students.map((student) => {
             const subjectMap = {};
             assessments.forEach((assessment) => {
-                console.log("➡️ CHECKING ASSESSMENT:", {
-                    assessmentId: assessment.id,
-                    subjectId: assessment.subjectId,
-                    scores: assessment.scores,
-                });
                 const score = assessment.scores.find((s) => s.studentId === student.id);
-                console.log("➡️ MATCHED SCORE:", score);
                 if (!score)
                     return;
                 const subjectName = assessment.subject?.name || `Subject ${assessment.subjectId}`;
@@ -116,6 +104,75 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
     catch (err) {
         console.error("🔥 REPORT CARD ERROR:", err);
         res.status(500).json({ message: "Failed to load report cards" });
+    }
+});
+/**
+ * ============================================================
+ * ✅ NEW: TEACHER — PUBLISH REPORT CARDS
+ * POST /api/report-cards/teacher/:classId/:term/publish
+ * ============================================================
+ */
+router.post("/teacher/:classId/:term/publish", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.TEACHER]), async (req, res) => {
+    console.log("🚀 PUBLISH ROUTE HIT");
+    try {
+        const classId = Number(req.params.classId);
+        const termParam = req.params.term;
+        if (Number.isNaN(classId)) {
+            return res.status(400).json({ message: "Invalid classId" });
+        }
+        // ✅ FIX: Handle string | string[]
+        if (Array.isArray(termParam)) {
+            return res.status(400).json({ message: "Invalid term parameter" });
+        }
+        const normalizedTermName = termParam
+            .toLowerCase()
+            .replace("term", "term ")
+            .trim();
+        const term = await client_1.prisma.term.findFirst({
+            where: {
+                name: {
+                    equals: normalizedTermName,
+                    mode: "insensitive",
+                },
+            },
+        });
+        if (!term) {
+            return res.status(404).json({ message: "Term not found" });
+        }
+        // ✅ Publish report cards
+        const result = await client_1.prisma.reportCard.updateMany({
+            where: {
+                classId,
+                termId: term.id,
+            },
+            data: {
+                status: "PUBLISHED",
+            },
+        });
+        // ✅ ALSO update assessments (🔥 FIX FOR "Waiting publish")
+        const assessmentsUpdated = await client_1.prisma.assessment.updateMany({
+            where: {
+                classId,
+                termId: term.id,
+                status: "SUBMITTED",
+            },
+            data: {
+                status: "PUBLISHED" // ✅ FIXED (no enum conflict)
+            },
+        });
+        console.log("✅ REPORT CARDS PUBLISHED:", result.count);
+        console.log("✅ ASSESSMENTS UPDATED:", assessmentsUpdated.count);
+        return res.json({
+            message: "Report cards published successfully",
+            updated: result.count,
+            assessmentsUpdated: assessmentsUpdated.count,
+        });
+    }
+    catch (err) {
+        console.error("❌ PUBLISH ERROR:", err);
+        return res.status(500).json({
+            message: "Failed to publish report cards",
+        });
     }
 });
 /**

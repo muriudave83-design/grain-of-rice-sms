@@ -1,4 +1,5 @@
 import { prisma } from "../prisma/client";
+import { ReportCardStatus } from "@prisma/client";
 
 export async function generateReportCards(termId: number, classId: number) {
 
@@ -20,7 +21,7 @@ export async function generateReportCards(termId: number, classId: number) {
         studentId: student.id,
         termId: termId,
         classId: classId,
-        status: "GENERATED",
+        status: ReportCardStatus.GENERATED,
         average: 0,
         total: 0,
         },

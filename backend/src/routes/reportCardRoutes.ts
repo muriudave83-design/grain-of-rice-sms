@@ -246,7 +246,7 @@ router.get(
         where: {
           studentId,
           termId,
-          status: "PUBLISHED",
+          status: ReportCardStatus.PUBLISHED,
         },
         include: {
           student: true,

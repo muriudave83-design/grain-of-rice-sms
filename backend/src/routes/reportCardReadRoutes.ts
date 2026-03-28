@@ -3,7 +3,7 @@ import { prisma } from "../prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
 import { Role } from "@prisma/client";
-import { ReportCardStatus } from "@prisma/client";
+import { AssessmentStatus } from "@prisma/client";
 
 const router = Router();
 
@@ -191,7 +191,7 @@ router.post(
           termId: term.id,
         },
         data: {
-          status: "PUBLISHED",
+          status: ReportCardStatus.PUBLISHED,
         },
       });
 
@@ -203,7 +203,7 @@ router.post(
           status: "SUBMITTED",
         },
         data: {
-          status: "PUBLISHED" as any // ✅ FIXED (no enum conflict)
+          status: "SUBMITTED"
         },
       });
 
@@ -274,7 +274,7 @@ router.get(
       },
     });
 
-    if (!reportCard || reportCard.status !== "PUBLISHED") {
+    if (!reportCard || reportCard.status !== ReportCardStatus.PUBLISHED) {
       return res.status(404).json({
         message: "Report card not available",
       });
@@ -310,7 +310,7 @@ router.get(
     const reportCards = await prisma.reportCard.findMany({
       where: {
         studentId: { in: studentIds },
-        status: "PUBLISHED",
+        status: ReportCardStatus.PUBLISHED,
       },
       include: {
         student: true,
@@ -354,7 +354,7 @@ router.get(
       },
     });
 
-    if (!reportCard || reportCard.status !== "PUBLISHED") {
+    if (!reportCard || reportCard.status !== ReportCardStatus.PUBLISHED) {
       return res.status(404).json({
         message: "Report card not available",
       });
