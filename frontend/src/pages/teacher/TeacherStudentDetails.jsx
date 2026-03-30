@@ -8,6 +8,12 @@ export default function TeacherStudentDetails() {
 
   const [data, setData] = useState([]);
 
+  // 🆕 Modal state
+  const [showModal, setShowModal] = useState(false);
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState("ASSIGNMENT");
+  const [maxScore, setMaxScore] = useState(100);
+
   useEffect(() => {
     fetchData();
   }, [id]);
@@ -22,14 +28,34 @@ export default function TeacherStudentDetails() {
     }
   };
 
-  // 🔥 Average
-  const average =
+  // 🆕 Create assignment
+        const handleCreate = async () => {
+    try {
+        await api.post(`/teacher/student/${id}/assignment`, {
+        title,
+        type,
+        maxScore,
+        });
+
+        setShowModal(false);
+        setTitle("");
+        setType("ASSIGNMENT");
+        setMaxScore(100);
+
+        fetchData();
+    } catch (err) {
+        console.error(err);
+    }
+    };
+
+  // 🔥 Average (FIXED)
+  const avgRaw =
     data.length > 0
-      ? (
-          data.reduce((sum, item) => sum + (item.score || 0), 0) /
-          data.length
-        ).toFixed(1)
+      ? data.reduce((sum, item) => sum + (item.score || 0), 0) /
+        data.length
       : 0;
+
+  const average = avgRaw.toFixed(1);
 
   // 🎨 Score color
   const getScoreColor = (score) => {
@@ -75,15 +101,18 @@ export default function TeacherStudentDetails() {
           </p>
         </div>
 
-        {/* 🔵 Floating summary badge */}
+        {/* 🆕 Create Button */}
+        <button style={createBtn} onClick={() => setShowModal(true)}>
+          + Create Assignment
+        </button>
+
+        {/* 🔵 Floating summary */}
         {data.length > 0 && (
-          <div style={floatingBadge}>
-            Avg: {average}
-          </div>
+          <div style={floatingBadge}>Avg: {average}</div>
         )}
       </div>
 
-      {/* 📊 Summary Cards */}
+      {/* 📊 Summary */}
       {data.length > 0 && (
         <div style={cards}>
           <div style={card}>
@@ -93,14 +122,14 @@ export default function TeacherStudentDetails() {
 
           <div style={card}>
             <div style={label}>Average</div>
-            <div style={{ ...value, color: getScoreColor(average) }}>
+            <div style={{ ...value, color: getScoreColor(avgRaw) }}>
               {average}
             </div>
           </div>
 
           <div style={card}>
             <div style={label}>Grade</div>
-            <div style={value}>{getGrade(average)}</div>
+            <div style={value}>{getGrade(avgRaw)}</div>
           </div>
         </div>
       )}
@@ -150,7 +179,6 @@ export default function TeacherStudentDetails() {
                           {item.score}
                         </span>
 
-                        {/* Progress */}
                         <div style={progress}>
                           <div
                             style={{
@@ -174,6 +202,48 @@ export default function TeacherStudentDetails() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* 🆕 MODAL */}
+      {showModal && (
+        <div style={modalOverlay}>
+          <div style={modal}>
+            <h3>Create Assignment</h3>
+
+            <input
+              style={input}
+              placeholder="Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+
+            <select
+              style={input}
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+            >
+              <option value="ASSIGNMENT">Assignment</option>
+              <option value="PROJECT">Project</option>
+              <option value="TEST">Test</option>
+            </select>
+
+            <input
+              style={input}
+              type="number"
+              value={maxScore}
+              onChange={(e) => setMaxScore(e.target.value)}
+            />
+
+            <div style={modalActions}>
+              <button style={createBtn} onClick={handleCreate}>
+                Create
+              </button>
+              <button style={cancelBtn} onClick={() => setShowModal(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -211,15 +281,8 @@ const header = {
   marginBottom: "20px",
 };
 
-const title = {
-  margin: 0,
-  color: "#111827",
-};
-
-const subtitle = {
-  color: "#6b7280",
-  marginTop: "5px",
-};
+const title = { margin: 0, color: "#111827" };
+const subtitle = { color: "#6b7280", marginTop: "5px" };
 
 const floatingBadge = {
   backgroundColor: "#111827",
@@ -227,6 +290,23 @@ const floatingBadge = {
   padding: "8px 12px",
   borderRadius: "20px",
   fontSize: "13px",
+};
+
+const createBtn = {
+  backgroundColor: "#2563eb",
+  color: "#fff",
+  border: "none",
+  padding: "10px 14px",
+  borderRadius: "6px",
+  cursor: "pointer",
+};
+
+const cancelBtn = {
+  backgroundColor: "#e5e7eb",
+  border: "none",
+  padding: "10px 14px",
+  borderRadius: "6px",
+  cursor: "pointer",
 };
 
 const cards = {
@@ -243,15 +323,8 @@ const card = {
   boxShadow: "0 4px 10px rgba(0,0,0,0.06)",
 };
 
-const label = {
-  fontSize: "13px",
-  color: "#6b7280",
-};
-
-const value = {
-  fontSize: "22px",
-  fontWeight: "600",
-};
+const label = { fontSize: "13px", color: "#6b7280" };
+const value = { fontSize: "22px", fontWeight: "600" };
 
 const tableWrapper = {
   borderRadius: "10px",
@@ -265,24 +338,10 @@ const table = {
   backgroundColor: "#fff",
 };
 
-const thead = {
-  backgroundColor: "#111827",
-  color: "#fff",
-};
-
-const th = {
-  padding: "14px",
-  textAlign: "left",
-};
-
-const td = {
-  padding: "12px",
-  borderBottom: "1px solid #eee",
-};
-
-const row = {
-  transition: "0.2s",
-};
+const thead = { backgroundColor: "#111827", color: "#fff" };
+const th = { padding: "14px", textAlign: "left" };
+const td = { padding: "12px", borderBottom: "1px solid #eee" };
+const row = { transition: "0.2s" };
 
 const scoreRow = {
   display: "flex",
@@ -328,4 +387,38 @@ const empty = {
   borderRadius: "10px",
   textAlign: "center",
   color: "#6b7280",
+};
+
+const modalOverlay = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0,0,0,0.5)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const modal = {
+  background: "#fff",
+  padding: "20px",
+  borderRadius: "10px",
+  width: "300px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "10px",
+};
+
+const input = {
+  padding: "10px",
+  borderRadius: "6px",
+  border: "1px solid #ccc",
+};
+
+const modalActions = {
+  display: "flex",
+  justifyContent: "space-between",
+  marginTop: "10px",
 };

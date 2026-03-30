@@ -140,4 +140,53 @@ router.get(
   }
 );
 
+/**
+ * 🆕 Create assignment FOR a specific student (quick fix)
+ */
+router.post(
+  "/teacher/student/:id/assignment",
+  authenticate,
+  requireRole([Role.TEACHER]),
+  async (req: any, res) => {
+    try {
+      const studentId = Number(req.params.id);
+      const { title, type, maxScore } = req.body;
+
+      // 1. Get student (to know class)
+      const student = await prisma.student.findUnique({
+        where: { id: studentId },
+      });
+
+      if (!student) {
+        return res.status(200).json({ message: "Student not found" });
+      }
+
+      // 2. Create assessment (class-based)
+      const assessment = await prisma.assessment.create({
+        data: {
+          title,
+          type,
+          maxScore,
+          classId: student.classId,
+          term: "term1", // temp default
+        },
+      });
+
+      // 3. Create score for THIS student
+      await prisma.assessmentScore.create({
+        data: {
+          studentId,
+          assessmentId: assessment.id,
+          score: 0,
+        },
+      });
+
+      return res.status(200).json({ message: "Created" });
+    } catch (err) {
+      console.error("Error creating assignment:", err);
+      return res.status(200).json({});
+    }
+  }
+);
+
 export default router;
