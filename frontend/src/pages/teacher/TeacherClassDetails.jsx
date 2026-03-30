@@ -7,6 +7,7 @@ export default function TeacherClassDetails() {
   const navigate = useNavigate();
 
   const [students, setStudents] = useState([]);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetchStudents();
@@ -21,6 +22,13 @@ export default function TeacherClassDetails() {
       setStudents([]);
     }
   };
+
+  // 🔍 Filter students (live search)
+  const filteredStudents = students.filter((student) => {
+    const fullName =
+      `${student.firstName} ${student.lastName}`.toLowerCase();
+    return fullName.includes(search.toLowerCase());
+  });
 
   return (
     <div
@@ -55,8 +63,24 @@ export default function TeacherClassDetails() {
         </p>
       </div>
 
+      {/* 🔍 Search */}
+      <input
+        type="text"
+        placeholder="Search students..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        style={{
+          marginBottom: "20px",
+          padding: "10px",
+          width: "100%",
+          maxWidth: "400px",
+          borderRadius: "6px",
+          border: "1px solid #ccc",
+        }}
+      />
+
       {/* 📋 Table */}
-      {students.length === 0 ? (
+      {filteredStudents.length === 0 ? (
         <div
           style={{
             padding: "20px",
@@ -66,7 +90,7 @@ export default function TeacherClassDetails() {
             color: "#888",
           }}
         >
-          No students in this class
+          No students found
         </div>
       ) : (
         <div
@@ -96,13 +120,17 @@ export default function TeacherClassDetails() {
             </thead>
 
             <tbody>
-              {students.map((student, index) => (
+              {filteredStudents.map((student, index) => (
                 <tr
                   key={student.id}
                   style={{
                     borderBottom: "1px solid #eee",
+                    cursor: "pointer",
                     transition: "background 0.2s",
                   }}
+                  onClick={() =>
+                    navigate(`/teacher/student/${student.id}`)
+                  }
                   onMouseEnter={(e) =>
                     (e.currentTarget.style.backgroundColor = "#f9fafb")
                   }
@@ -118,11 +146,10 @@ export default function TeacherClassDetails() {
 
                   <td style={{ padding: "12px" }}>
                     <button
-                      onClick={() =>
-                        navigate(
-                          `/teacher/class/${id}/student/${student.id}`
-                        )
-                      }
+                      onClick={(e) => {
+                        e.stopPropagation(); // 🔥 prevents double trigger
+                        navigate(`/teacher/student/${student.id}`);
+                      }}
                       style={{
                         padding: "6px 12px",
                         backgroundColor: "#2563eb",

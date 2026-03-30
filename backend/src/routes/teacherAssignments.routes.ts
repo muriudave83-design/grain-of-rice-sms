@@ -58,7 +58,6 @@ router.get(
         },
       });
 
-      // ✅ Extract unique classes safely
       const uniqueClassesMap = new Map<number, any>();
 
       teacherSubjects.forEach((ts) => {
@@ -94,13 +93,47 @@ router.get(
       const students = await prisma.student.findMany({
         where: {
           classId: classId,
-          isArchived: false, // ✅ optional safety (based on your schema)
+          isArchived: false,
         },
       });
 
       return res.status(200).json(students);
     } catch (error) {
       console.error("Error fetching class students:", error);
+
+      return res.status(200).json([]);
+    }
+  }
+);
+
+/**
+ * 📊 Get student gradebook (assignments + scores)
+ */
+router.get(
+  "/teacher/student/:id/gradebook",
+  authenticate,
+  requireRole([Role.TEACHER]),
+  async (req: any, res) => {
+    try {
+      const studentId = Number(req.params.id);
+
+      const scores = await prisma.assessmentScore.findMany({
+        where: {
+          studentId: studentId,
+        },
+        include: {
+          assessment: true,
+        },
+      });
+
+      const result = scores.map((s) => ({
+        title: s.assessment.title,
+        score: s.score,
+      }));
+
+      return res.status(200).json(result);
+    } catch (error) {
+      console.error("Error fetching gradebook:", error);
 
       return res.status(200).json([]);
     }
