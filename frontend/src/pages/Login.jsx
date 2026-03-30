@@ -85,7 +85,7 @@ export default function Login() {
       if (normalizedRole === "ADMIN") {
         navigate("/admin", { replace: true });
       } else if (normalizedRole === "TEACHER") {
-        navigate("/teacher/assessments", { replace: true });
+        navigate("/teacher/classes", { replace: true });
       } else if (normalizedRole === "PARENT") {
         navigate("/parent", { replace: true });
       } else if (normalizedRole === "STUDENT") {

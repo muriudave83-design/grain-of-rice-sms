@@ -32,6 +32,17 @@ export default function TeacherLayout() {
         </div>
 
         <nav className="p-2 space-y-1">
+
+          {/* ✅ NEW: My Classes (replaces Gradebook as main entry) */}
+          <Link
+            to="/teacher/classes"
+            className={`block px-3 py-2 rounded ${isActive(
+              "/teacher/classes"
+            )}`}
+          >
+            My Classes
+          </Link>
+
           <Link
             to="/teacher/assessments"
             className={`block px-3 py-2 rounded ${isActive(
@@ -41,6 +52,7 @@ export default function TeacherLayout() {
             Assessments
           </Link>
 
+          {/* (Optional: keep gradebook if still used elsewhere) */}
           <Link
             to="/teacher/gradebook"
             className={`block px-3 py-2 rounded ${isActive(

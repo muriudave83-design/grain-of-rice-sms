@@ -45,7 +45,7 @@ import TeacherAttendanceClass from "../pages/teacher/attendance/TeacherAttendanc
 import TeacherAttendanceSession from "../pages/teacher/attendance/TeacherAttendanceSession";
 import CreateHomework from "../pages/teacher/homework/CreateHomework";
 import ClassReportCards from "../pages/teacher/report-cards/ClassReportCards";
-
+import TeacherClasses from "../pages/teacher/TeacherClasses";
 // =======================
 // PARENT PAGES
 // =======================
@@ -247,7 +247,12 @@ export default function AppRoutes() {
 
             <Route
               path="/teacher"
-              element={<Navigate to="/teacher/assessments" replace />}
+                element={<Navigate to="/teacher/classes" replace />}
+            />
+
+            <Route
+              path="/teacher/classes"
+              element={<TeacherClasses />}
             />
 
             <Route

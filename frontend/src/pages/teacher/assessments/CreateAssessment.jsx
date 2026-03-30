@@ -6,13 +6,14 @@ export default function CreateAssessment() {
   const navigate = useNavigate();
 
   const [assignments, setAssignments] = useState([]);
-  const [categories, setCategories] = useState([]); // ✅ ADDED
+  const [categories, setCategories] = useState([]);
 
   const [form, setForm] = useState({
     title: "",
+    teacherSubjectId: "",
     classId: "",
     subjectId: "",
-    categoryId: "",
+    categoryId: null,
     maxScore: "",
     termId: "",
     date: "",
@@ -22,7 +23,7 @@ export default function CreateAssessment() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // LOAD ASSIGNMENTS + CATEGORIES
+  // LOAD DATA
   useEffect(() => {
     async function loadAssignments() {
       try {
@@ -53,22 +54,39 @@ export default function CreateAssessment() {
     }
 
     loadAssignments();
-    fetchCategories(); // ✅ ADDED
+    fetchCategories();
   }, []);
 
-  // DERIVE UNIQUE CLASSES
-  const classes = [
-    ...new Map(assignments.map((a) => [a.class.id, a.class])).values(),
-  ];
+  // HANDLE ASSIGNMENT SELECT
+  function handleAssignmentChange(e) {
+    const teacherSubjectId = e.target.value;
 
-  // FORM HANDLER
+    const assignment = assignments.find(
+      (a) => a.id === Number(teacherSubjectId)
+    );
+
+    if (!assignment) return;
+
+    // SAFE ACCESS (handles BOTH backend shapes)
+    const classId =
+      assignment.class?.id ?? assignment.classId;
+    const subjectId =
+      assignment.subject?.id ?? assignment.subjectId;
+
+    setForm((prev) => ({
+      ...prev,
+      teacherSubjectId,
+      classId,
+      subjectId,
+    }));
+  }
+
   function handleChange(e) {
     const { name, value } = e.target;
 
     setForm((prev) => ({
       ...prev,
       [name]: value,
-      ...(name === "classId" ? { subjectId: "" } : {}),
     }));
   }
 
@@ -77,14 +95,70 @@ export default function CreateAssessment() {
     setLoading(true);
     setError(null);
 
+    // PARSE NUMBERS
+    const parsedCategoryId = parseInt(form.categoryId, 10);
+    const parsedTermId = parseInt(form.termId, 10);
+    const parsedMaxScore = parseInt(form.maxScore, 10);
+    const parsedClassId = parseInt(form.classId, 10);
+    const parsedSubjectId = parseInt(form.subjectId, 10);
+
+    // VALIDATION
+    if (!form.teacherSubjectId) {
+      setError("Please select class and subject");
+      setLoading(false);
+      return;
+    }
+
+    if (isNaN(parsedClassId) || isNaN(parsedSubjectId)) {
+      setError("Invalid class or subject");
+      setLoading(false);
+      return;
+    }
+
+    if (isNaN(parsedCategoryId)) {
+      setError("Please select a valid category");
+      setLoading(false);
+      return;
+    }
+
+    if (isNaN(parsedTermId)) {
+      setError("Please enter a valid term");
+      setLoading(false);
+      return;
+    }
+
+    if (isNaN(parsedMaxScore)) {
+      setError("Please enter valid total marks");
+      setLoading(false);
+      return;
+    }
+
+    // ✅ VALIDATE TYPE AGAINST ENUM
+    const validTypes = ["EXAM", "TEST", "QUIZ", "ASSIGNMENT", "HOMEWORK"];
+    if (!validTypes.includes(form.type)) {
+      setError("Invalid assessment type selected");
+      setLoading(false);
+      return;
+    }
+
     try {
+      console.log("SENDING CLEAN:", {
+        title: form.title,
+        classId: parsedClassId,
+        subjectId: parsedSubjectId,
+        categoryId: parsedCategoryId,
+        termId: parsedTermId,
+        maxScore: parsedMaxScore,
+        type: form.type,
+      });
+
       await api.post("/assessments", {
         title: form.title,
-        classId: Number(form.classId),
-        subjectId: Number(form.subjectId),
-        categoryId: Number(form.categoryId), // ✅ FIXED
-        termId: Number(form.termId),
-        maxScore: Number(form.maxScore),
+        classId: parsedClassId,
+        subjectId: parsedSubjectId,
+        categoryId: parsedCategoryId,
+        termId: parsedTermId,
+        maxScore: parsedMaxScore,
         date: form.date || null,
         type: form.type,
       });
@@ -102,12 +176,10 @@ export default function CreateAssessment() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-      {/* Breadcrumb */}
       <div className="text-sm text-gray-600 mb-2">
         Teacher / Assessments / Create
       </div>
 
-      {/* Back Button */}
       <button
         onClick={() => navigate("/teacher/assessments")}
         className="mb-4 px-3 py-1 border rounded"
@@ -126,55 +198,30 @@ export default function CreateAssessment() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Class */}
+        {/* Assignment */}
         <div>
           <label className="block text-sm mb-1 font-medium">
-            Class
+            Class & Subject
           </label>
 
           <select
-            name="classId"
+            value={form.teacherSubjectId}
+            onChange={handleAssignmentChange}
             required
-            value={form.classId}
-            onChange={handleChange}
             className="w-full border p-2 rounded"
           >
-            <option value="">Select class</option>
+            <option value="">Select class & subject</option>
 
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
+            {assignments.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.subject?.name || "Unknown Subject"} —{" "}
+                {a.class?.name || "Unknown Class"}
               </option>
             ))}
           </select>
         </div>
 
-        {/* Subject */}
-        <div>
-          <label className="block text-sm mb-1 font-medium">
-            Subject
-          </label>
-
-          <select
-            name="subjectId"
-            required
-            value={form.subjectId}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          >
-            <option value="">Select subject</option>
-
-            {assignments
-              .filter((a) => a.class.id === Number(form.classId))
-              .map((a) => (
-                <option key={a.subject.id} value={a.subject.id}>
-                  {a.subject.name}
-                </option>
-              ))}
-          </select>
-        </div>
-
-        {/* Category ✅ ADDED */}
+        {/* Category */}
         <div>
           <label className="block text-sm mb-1 font-medium">
             Category
@@ -183,7 +230,7 @@ export default function CreateAssessment() {
           <select
             name="categoryId"
             required
-            value={form.categoryId}
+            value={form.categoryId || ""}
             onChange={handleChange}
             className="w-full border p-2 rounded"
           >
@@ -197,101 +244,68 @@ export default function CreateAssessment() {
           </select>
         </div>
 
-        {/* Type */}
-        <div>
-          <label className="block text-sm mb-1 font-medium">
-            Type
-          </label>
-
-          <select
-            name="type"
-            required
-            value={form.type}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          >
-            <option value="ASSIGNMENT">Assignment</option>
-            <option value="PROJECT">Project</option>
-            <option value="TEST">Test</option>
-          </select>
-        </div>
+        {/* ✅ FIXED TYPE (ENUM SAFE) */}
+        <select
+          name="type"
+          value={form.type}
+          onChange={handleChange}
+          className="w-full border p-2 rounded"
+        >
+          <option value="ASSIGNMENT">Assignment</option>
+          <option value="TEST">Test</option>
+          <option value="EXAM">Exam</option>
+          <option value="QUIZ">Quiz</option>
+          <option value="HOMEWORK">Homework</option>
+        </select>
 
         {/* Title */}
-        <div>
-          <label className="block text-sm mb-1 font-medium">
-            Assignment Title
-          </label>
-
-          <input
-            name="title"
-            required
-            value={form.title}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            placeholder="e.g Mid Term CAT 1"
-          />
-        </div>
+        <input
+          name="title"
+          value={form.title}
+          onChange={handleChange}
+          className="w-full border p-2 rounded"
+          placeholder="Assignment Title"
+          required
+        />
 
         {/* Max Score */}
-        <div>
-          <label className="block text-sm mb-1 font-medium">
-            Total Marks
-          </label>
-
-          <input
-            type="number"
-            name="maxScore"
-            min="1"
-            required
-            value={form.maxScore}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            placeholder="e.g 100"
-          />
-        </div>
+        <input
+          type="number"
+          name="maxScore"
+          value={form.maxScore}
+          onChange={handleChange}
+          className="w-full border p-2 rounded"
+          placeholder="Total Marks"
+          required
+        />
 
         {/* Term */}
-        <div>
-          <label className="block text-sm mb-1 font-medium">
-            Term
-          </label>
-
-          <input
-            type="number"
-            name="termId"
-            min="1"
-            required
-            value={form.termId}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            placeholder="e.g 1"
-          />
-        </div>
+        <input
+          type="number"
+          name="termId"
+          value={form.termId}
+          onChange={handleChange}
+          className="w-full border p-2 rounded"
+          placeholder="Term"
+          required
+        />
 
         {/* Date */}
-        <div>
-          <label className="block text-sm mb-1 font-medium">
-            Date (optional)
-          </label>
+        <input
+          type="date"
+          name="date"
+          value={form.date}
+          onChange={handleChange}
+          className="w-full border p-2 rounded"
+        />
 
-          <input
-            type="date"
-            name="date"
-            value={form.date}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-          />
-        </div>
-
-        {/* Submit */}
         <button
           disabled={
             loading ||
-            !form.classId ||
-            !form.subjectId ||
-            !form.categoryId // ✅ FIXED
+            !form.teacherSubjectId ||
+            !form.categoryId
           }
-          className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="bg-blue-600 text-white px-6 py-2 rounded"
         >
           {loading ? "Creating..." : "Create Assignment"}
         </button>
