@@ -152,7 +152,7 @@ router.post(
       const studentId = Number(req.params.id);
       const { title, type, maxScore } = req.body;
 
-      // 1. Get student (to know class)
+      // 1. Get student
       const student = await prisma.student.findUnique({
         where: { id: studentId },
       });
@@ -161,18 +161,39 @@ router.post(
         return res.status(200).json({ message: "Student not found" });
       }
 
-      // 2. Create assessment (class-based)
+      // 2. Get a subject (REQUIRED FIX)
+      const teacherSubject = await prisma.teacherSubject.findFirst({
+        where: {
+          classId: student.classId,
+        },
+      });
+
+      if (!teacherSubject) {
+        return res.status(200).json({ message: "No subject found" });
+      }
+
+      // 3. Get a term (REQUIRED FIX)
+      const term = await prisma.term.findFirst();
+
+      if (!term) {
+        return res.status(200).json({ message: "No term found" });
+      }
+
+      // 4. Create assessment (FULLY FIXED)
       const assessment = await prisma.assessment.create({
         data: {
           title,
           type,
-          maxScore,
+          maxScore: Number(maxScore),
           classId: student.classId,
-          term: "term1", // temp default
+          subjectId: teacherSubject.subjectId,
+          termId: term.id,
+          date: new Date(),
+          weight: 1,
         },
       });
 
-      // 3. Create score for THIS student
+      // 5. Create score for THIS student
       await prisma.assessmentScore.create({
         data: {
           studentId,
