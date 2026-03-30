@@ -112,15 +112,9 @@ export default function TeacherAssessments() {
             to="/teacher/assessments/create"
             className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
           >
-            Create Assessment
+            Create Assignment
           </Link>
 
-          <Link
-            to="/teacher/homework/create"
-            className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-          >
-            Create Homework
-          </Link>
         </div>
       </div>
 

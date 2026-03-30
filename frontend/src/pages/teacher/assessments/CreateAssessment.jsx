@@ -6,17 +6,17 @@ export default function CreateAssessment() {
   const navigate = useNavigate();
 
   const [assignments, setAssignments] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState([]); // ✅ ADDED
 
   const [form, setForm] = useState({
     title: "",
-    teacherSubjectId: "",
     classId: "",
     subjectId: "",
     categoryId: "",
     maxScore: "",
     termId: "",
     date: "",
+    type: "ASSIGNMENT",
   });
 
   const [loading, setLoading] = useState(false);
@@ -38,7 +38,7 @@ export default function CreateAssessment() {
         setAssignments([]);
         setError(
           err.response?.data?.message ||
-          "Failed to load teaching assignments."
+            "Failed to load teaching assignments."
         );
       }
     }
@@ -53,32 +53,22 @@ export default function CreateAssessment() {
     }
 
     loadAssignments();
-    fetchCategories();
+    fetchCategories(); // ✅ ADDED
   }, []);
 
-  // FORM HANDLERS
+  // DERIVE UNIQUE CLASSES
+  const classes = [
+    ...new Map(assignments.map((a) => [a.class.id, a.class])).values(),
+  ];
+
+  // FORM HANDLER
   function handleChange(e) {
     const { name, value } = e.target;
+
     setForm((prev) => ({
       ...prev,
       [name]: value,
-    }));
-  }
-
-  function handleAssignmentChange(e) {
-    const teacherSubjectId = e.target.value;
-
-    const assignment = assignments.find(
-      (a) => a.id === Number(teacherSubjectId)
-    );
-
-    if (!assignment) return;
-
-    setForm((prev) => ({
-      ...prev,
-      teacherSubjectId,
-      classId: assignment.classId,
-      subjectId: assignment.subjectId,
+      ...(name === "classId" ? { subjectId: "" } : {}),
     }));
   }
 
@@ -92,19 +82,18 @@ export default function CreateAssessment() {
         title: form.title,
         classId: Number(form.classId),
         subjectId: Number(form.subjectId),
-        categoryId: Number(form.categoryId),
+        categoryId: Number(form.categoryId), // ✅ FIXED
         termId: Number(form.termId),
         maxScore: Number(form.maxScore),
         date: form.date || null,
-        type: "EXAM",
+        type: form.type,
       });
 
       navigate("/teacher/assessments");
-
     } catch (err) {
       setError(
         err.response?.data?.message ||
-        "You are not allowed to create this assessment."
+          "You are not allowed to create this assessment."
       );
     } finally {
       setLoading(false);
@@ -113,7 +102,6 @@ export default function CreateAssessment() {
 
   return (
     <div className="max-w-3xl mx-auto p-6">
-
       {/* Breadcrumb */}
       <div className="text-sm text-gray-600 mb-2">
         Teacher / Assessments / Create
@@ -128,7 +116,7 @@ export default function CreateAssessment() {
       </button>
 
       <h1 className="text-2xl font-semibold mb-6">
-        Create Assessment
+        Create Assignment
       </h1>
 
       {error && (
@@ -138,28 +126,55 @@ export default function CreateAssessment() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-
+        {/* Class */}
         <div>
           <label className="block text-sm mb-1 font-medium">
-            Teaching Assignment
+            Class
           </label>
 
           <select
+            name="classId"
             required
-            value={form.teacherSubjectId}
-            onChange={handleAssignmentChange}
+            value={form.classId}
+            onChange={handleChange}
             className="w-full border p-2 rounded"
           >
-            <option value="">Select assignment</option>
+            <option value="">Select class</option>
 
-            {assignments.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.subject.name} — {a.class.name}
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
               </option>
             ))}
           </select>
         </div>
 
+        {/* Subject */}
+        <div>
+          <label className="block text-sm mb-1 font-medium">
+            Subject
+          </label>
+
+          <select
+            name="subjectId"
+            required
+            value={form.subjectId}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          >
+            <option value="">Select subject</option>
+
+            {assignments
+              .filter((a) => a.class.id === Number(form.classId))
+              .map((a) => (
+                <option key={a.subject.id} value={a.subject.id}>
+                  {a.subject.name}
+                </option>
+              ))}
+          </select>
+        </div>
+
+        {/* Category ✅ ADDED */}
         <div>
           <label className="block text-sm mb-1 font-medium">
             Category
@@ -182,9 +197,29 @@ export default function CreateAssessment() {
           </select>
         </div>
 
+        {/* Type */}
         <div>
           <label className="block text-sm mb-1 font-medium">
-            Assessment Title
+            Type
+          </label>
+
+          <select
+            name="type"
+            required
+            value={form.type}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+          >
+            <option value="ASSIGNMENT">Assignment</option>
+            <option value="PROJECT">Project</option>
+            <option value="TEST">Test</option>
+          </select>
+        </div>
+
+        {/* Title */}
+        <div>
+          <label className="block text-sm mb-1 font-medium">
+            Assignment Title
           </label>
 
           <input
@@ -197,6 +232,7 @@ export default function CreateAssessment() {
           />
         </div>
 
+        {/* Max Score */}
         <div>
           <label className="block text-sm mb-1 font-medium">
             Total Marks
@@ -214,6 +250,7 @@ export default function CreateAssessment() {
           />
         </div>
 
+        {/* Term */}
         <div>
           <label className="block text-sm mb-1 font-medium">
             Term
@@ -231,6 +268,7 @@ export default function CreateAssessment() {
           />
         </div>
 
+        {/* Date */}
         <div>
           <label className="block text-sm mb-1 font-medium">
             Date (optional)
@@ -245,17 +283,18 @@ export default function CreateAssessment() {
           />
         </div>
 
+        {/* Submit */}
         <button
           disabled={
             loading ||
-            !form.teacherSubjectId ||
-            !form.categoryId
+            !form.classId ||
+            !form.subjectId ||
+            !form.categoryId // ✅ FIXED
           }
           className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
         >
-          {loading ? "Creating..." : "Create Assessment"}
+          {loading ? "Creating..." : "Create Assignment"}
         </button>
-
       </form>
     </div>
   );
