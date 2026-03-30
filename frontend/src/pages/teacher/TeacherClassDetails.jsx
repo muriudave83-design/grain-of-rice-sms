@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import api from "../../api";
+import api from "../../api/apiClient";
 
 export default function TeacherClassDetails() {
   const { id } = useParams();
@@ -29,7 +29,7 @@ export default function TeacherClassDetails() {
       ) : (
         students.map((student) => (
           <div key={student.id}>
-            {student.name}
+            {student.firstName} {student.lastName}
           </div>
         ))
       )}
