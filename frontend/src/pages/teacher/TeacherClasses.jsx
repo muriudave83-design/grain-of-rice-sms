@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../api/apiClient";
 
 export default function TeacherClasses() {
   const [classes, setClasses] = useState([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchClasses();
@@ -34,9 +36,7 @@ export default function TeacherClasses() {
               marginBottom: "10px",
               cursor: "pointer",
             }}
-            onClick={() =>
-              (window.location.href = `/teacher/class/${cls.id}`)
-            }
+            onClick={() => navigate(`/teacher/class/${cls.id}`)}
           >
             {cls.name}
           </div>

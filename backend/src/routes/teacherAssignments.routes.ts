@@ -80,4 +80,31 @@ router.get(
   }
 );
 
+/**
+ * 👨‍🎓 Get students in a class (for teacher)
+ */
+router.get(
+  "/teacher/class/:id/students",
+  authenticate,
+  requireRole([Role.TEACHER]),
+  async (req: any, res) => {
+    try {
+      const classId = Number(req.params.id);
+
+      const students = await prisma.student.findMany({
+        where: {
+          classId: classId,
+          isArchived: false, // ✅ optional safety (based on your schema)
+        },
+      });
+
+      return res.status(200).json(students);
+    } catch (error) {
+      console.error("Error fetching class students:", error);
+
+      return res.status(200).json([]);
+    }
+  }
+);
+
 export default router;
