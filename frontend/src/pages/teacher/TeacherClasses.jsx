@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import api from "../../api.js";
+import api from "../../api/apiClient";
 
 export default function TeacherClasses() {
   const [classes, setClasses] = useState([]);
