@@ -47,7 +47,7 @@ import CreateHomework from "../pages/teacher/homework/CreateHomework";
 import ClassReportCards from "../pages/teacher/report-cards/ClassReportCards";
 import TeacherClasses from "../pages/teacher/TeacherClasses";
 import TeacherClassDetails from "../pages/teacher/TeacherClassDetails";
-import TeacherStudentDetails from "./pages/teacher/TeacherStudentDetails";
+import TeacherStudentDetails from "../pages/teacher/TeacherStudentDetails";
 
 // =======================
 // PARENT PAGES
@@ -262,7 +262,7 @@ export default function AppRoutes() {
               path="/teacher/class/:id" 
               element={<TeacherClassDetails />} 
             />
-            
+
             <Route 
               path="/teacher/student/:id" 
               element={<TeacherStudentDetails />} 
