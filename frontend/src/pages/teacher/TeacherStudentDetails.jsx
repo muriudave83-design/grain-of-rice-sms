@@ -78,10 +78,12 @@ export default function TeacherStudentDetails() {
 
   return (
     <div style={page}>
+      {/* Back */}
       <button onClick={() => navigate(-1)} style={backBtn}>
         ← Back
       </button>
 
+      {/* Breadcrumb */}
       <div style={breadcrumb}>
         Teacher / Classes / Students /{" "}
         <span style={{ color: "#111", fontWeight: 600 }}>
@@ -89,9 +91,10 @@ export default function TeacherStudentDetails() {
         </span>
       </div>
 
+      {/* Header */}
       <div style={header}>
         <div>
-          <h2 style={title}>Student Performance</h2>
+          <h2 style={titleStyle}>Student Performance</h2>
           <p style={subtitle}>
             Detailed assignment scores and insights
           </p>
@@ -105,7 +108,9 @@ export default function TeacherStudentDetails() {
           <div style={floatingBadge}>Avg: {average}</div>
         )}
       </div>
-            {data.length > 0 && (
+
+      {/* Summary Cards */}
+      {data.length > 0 && (
         <div style={cards}>
           <div style={card}>
             <div style={label}>Assignments</div>
@@ -126,6 +131,7 @@ export default function TeacherStudentDetails() {
         </div>
       )}
 
+      {/* Table */}
       {data.length === 0 ? (
         <div style={empty}>No assignments found</div>
       ) : (
@@ -197,6 +203,7 @@ export default function TeacherStudentDetails() {
         </div>
       )}
 
+      {/* Modal */}
       {showModal && (
         <div style={modalOverlay}>
           <div style={modal}>
@@ -240,3 +247,176 @@ export default function TeacherStudentDetails() {
     </div>
   );
 }
+
+/* STYLES */
+
+const page = {
+  padding: "30px",
+  background: "linear-gradient(to right, #eef2f7, #f8fafc)",
+  minHeight: "100vh",
+};
+
+const backBtn = {
+  marginBottom: "15px",
+  padding: "10px 14px",
+  backgroundColor: "#111827",
+  color: "#fff",
+  border: "none",
+  borderRadius: "6px",
+  cursor: "pointer",
+};
+
+const breadcrumb = {
+  marginBottom: "10px",
+  fontSize: "14px",
+  color: "#6b7280",
+};
+
+const header = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "20px",
+};
+
+const titleStyle = { margin: 0, color: "#111827" };
+const subtitle = { color: "#6b7280", marginTop: "5px" };
+
+const floatingBadge = {
+  backgroundColor: "#111827",
+  color: "#fff",
+  padding: "8px 12px",
+  borderRadius: "20px",
+  fontSize: "13px",
+};
+
+const createBtn = {
+  backgroundColor: "#2563eb",
+  color: "#fff",
+  border: "none",
+  padding: "10px 14px",
+  borderRadius: "6px",
+  cursor: "pointer",
+};
+
+const cancelBtn = {
+  backgroundColor: "#e5e7eb",
+  border: "none",
+  padding: "10px 14px",
+  borderRadius: "6px",
+  cursor: "pointer",
+};
+
+const cards = {
+  display: "flex",
+  gap: "20px",
+  marginBottom: "25px",
+};
+
+const card = {
+  flex: 1,
+  backgroundColor: "#fff",
+  padding: "15px",
+  borderRadius: "10px",
+  boxShadow: "0 4px 10px rgba(0,0,0,0.06)",
+};
+
+const label = { fontSize: "13px", color: "#6b7280" };
+const value = { fontSize: "22px", fontWeight: "600" };
+
+const tableWrapper = {
+  borderRadius: "10px",
+  overflow: "hidden",
+  boxShadow: "0 6px 16px rgba(0,0,0,0.08)",
+};
+
+const table = {
+  width: "100%",
+  borderCollapse: "collapse",
+  backgroundColor: "#fff",
+};
+
+const thead = { backgroundColor: "#111827", color: "#fff" };
+const th = { padding: "14px", textAlign: "left" };
+const td = { padding: "12px", borderBottom: "1px solid #eee" };
+const row = { transition: "0.2s" };
+
+const scoreRow = {
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+};
+
+const scoreBadge = {
+  padding: "6px 10px",
+  borderRadius: "20px",
+  color: "#fff",
+  fontSize: "12px",
+  fontWeight: "600",
+};
+
+const gradeBadge = {
+  padding: "5px 10px",
+  borderRadius: "6px",
+  backgroundColor: "#e5e7eb",
+  fontWeight: "600",
+};
+
+const topBadge = {
+  marginLeft: "10px",
+  backgroundColor: "#10b981",
+  color: "#fff",
+  fontSize: "10px",
+  padding: "3px 6px",
+  borderRadius: "6px",
+};
+
+const progress = {
+  width: "120px",
+  height: "6px",
+  backgroundColor: "#e5e7eb",
+  borderRadius: "4px",
+  overflow: "hidden",
+};
+
+const empty = {
+  padding: "25px",
+  backgroundColor: "#fff",
+  borderRadius: "10px",
+  textAlign: "center",
+  color: "#6b7280",
+};
+
+const modalOverlay = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0,0,0,0.5)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const modal = {
+  background: "#fff",
+  padding: "20px",
+  borderRadius: "10px",
+  width: "300px",
+  display: "flex",
+  flexDirection: "column",
+  gap: "10px",
+};
+
+const input = {
+  padding: "10px",
+  borderRadius: "6px",
+  border: "1px solid #ccc",
+};
+
+const modalActions = {
+  display: "flex",
+  justifyContent: "space-between",
+  marginTop: "10px",
+};
