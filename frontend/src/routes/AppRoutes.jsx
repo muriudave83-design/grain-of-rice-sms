@@ -325,7 +325,7 @@ export default function AppRoutes() {
             {/* Attendance Redirect */}
             <Route
               path="/teacher/attendance"
-              element={<Navigate to="/teacher/attendance/class/1" replace />}
+              element={<TeacherAttendanceClass />}
             />
 
             {/* Attendance by Class */}
