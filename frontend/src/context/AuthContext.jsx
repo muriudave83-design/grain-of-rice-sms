@@ -12,10 +12,15 @@ export function AuthProvider({ children }) {
     const storedUser = localStorage.getItem("user");
 
     // ❌ No token OR no user → no session
-    if (!token || !storedUser) {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("role");
+// ✅ Only block if NO token
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+
+    // ⚠️ If user missing, DO NOT wipe session
+    if (!storedUser) {
+      console.warn("⚠️ No stored user, but token exists — keeping session");
       setLoading(false);
       return;
     }
