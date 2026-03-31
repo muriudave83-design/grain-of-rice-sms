@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
-import { Role } from "@prisma/client";
+import { Role, AssessmentType } from "@prisma/client";
 
 const router = Router();
 
@@ -153,7 +153,6 @@ router.post(
       const classId = Number(req.params.id);
       const { title, type, maxScore } = req.body;
 
-      // ✅ 1. Verify teacher owns this class
       const teacherSubject = await prisma.teacherSubject.findFirst({
         where: {
           teacherId,
@@ -167,7 +166,6 @@ router.post(
         });
       }
 
-      // ✅ 2. Get students
       const students = await prisma.student.findMany({
         where: {
           classId,
@@ -181,7 +179,6 @@ router.post(
         });
       }
 
-      // ✅ 3. Get term
       const term = await prisma.term.findFirst();
 
       if (!term) {
@@ -190,11 +187,11 @@ router.post(
         });
       }
 
-      // ✅ 4. Create ONE assessment
+      // ✅ FIXED HERE
       const assessment = await prisma.assessment.create({
         data: {
           title,
-          type,
+          type: AssessmentType[type as keyof typeof AssessmentType],
           maxScore: Number(maxScore),
           classId,
           subjectId: teacherSubject.subjectId,
@@ -204,7 +201,6 @@ router.post(
         },
       });
 
-      // ✅ 5. Create scores for ALL students
       const scoreData = students.map((s) => ({
         studentId: s.id,
         assessmentId: assessment.id,
@@ -264,10 +260,11 @@ router.post(
         return res.status(200).json({ message: "No term found" });
       }
 
+      // ✅ FIXED HERE TOO
       const assessment = await prisma.assessment.create({
         data: {
           title,
-          type,
+          type: AssessmentType[type as keyof typeof AssessmentType],
           maxScore: Number(maxScore),
           classId: student.classId,
           subjectId: teacherSubject.subjectId,

@@ -330,6 +330,7 @@ enum AssessmentType {
   EXAM
   TEST
   QUIZ
+  PROJECT
   ASSIGNMENT
   HOMEWORK
 }
