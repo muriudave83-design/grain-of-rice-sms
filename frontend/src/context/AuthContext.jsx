@@ -3,16 +3,19 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
+  console.log("🧠 AuthProvider INIT");
+
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // 🔁 Restore session on refresh (FIXED)
   useEffect(() => {
+    console.log("🔁 Auth restore running");
+
     const token = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
 
-    // ❌ No token OR no user → no session
-// ✅ Only block if NO token
+    // ✅ Only block if NO token
     if (!token) {
       setLoading(false);
       return;
