@@ -41,18 +41,33 @@ export default function TeacherStudentDetails() {
     updated[index].score = Number(value);
     setData(updated);
 
-    // auto-save
     updateScore(updated[index]);
   };
 
-  // SAFE calculations
-  const avgRaw =
-    data.length > 0
-      ? data.reduce((sum, item) => sum + (Number(item.score) || 0), 0) /
-        data.length
-      : 0;
+  // ✅ NEW: LIVE AVERAGE
+  const calculateAverage = (data) => {
+    if (!data.length) return 0;
+    const total = data.reduce((sum, item) => sum + (Number(item.score) || 0), 0);
+    return Number((total / data.length).toFixed(1));
+  };
 
-  const average = avgRaw.toFixed(1);
+  // ✅ NEW: LIVE GRADE (FROM AVG)
+  const calculateGrade = (avg) => {
+    if (avg >= 80) return "A";
+    if (avg >= 70) return "B";
+    if (avg >= 60) return "C";
+    if (avg >= 50) return "D";
+    return "F";
+  };
+
+  // existing per-score grade (kept)
+  const getGrade = (score) => {
+    if (score >= 80) return "A";
+    if (score >= 70) return "B";
+    if (score >= 60) return "C";
+    if (score >= 50) return "D";
+    return "F";
+  };
 
   const getScoreColor = (score) => {
     if (score >= 80) return "#16a34a";
@@ -61,13 +76,7 @@ export default function TeacherStudentDetails() {
     return "#dc2626";
   };
 
-  const getGrade = (score) => {
-    if (score >= 80) return "A";
-    if (score >= 65) return "B";
-    if (score >= 50) return "C";
-    if (score >= 40) return "D";
-    return "F";
-  };
+  const avg = calculateAverage(data);
 
   const topScore =
     data.length > 0
@@ -99,7 +108,9 @@ export default function TeacherStudentDetails() {
         </div>
 
         {data.length > 0 && (
-          <div style={floatingBadge}>Avg: {average}</div>
+          <div style={floatingBadge}>
+            Avg: {calculateAverage(data)}
+          </div>
         )}
       </div>
 
@@ -113,14 +124,16 @@ export default function TeacherStudentDetails() {
 
           <div style={card}>
             <div style={label}>Average</div>
-            <div style={{ ...value, color: getScoreColor(avgRaw) }}>
-              {average}
+            <div style={{ ...value, color: getScoreColor(avg) }}>
+              {calculateAverage(data)}
             </div>
           </div>
 
           <div style={card}>
             <div style={label}>Grade</div>
-            <div style={value}>{getGrade(avgRaw)}</div>
+            <div style={value}>
+              {calculateGrade(calculateAverage(data))}
+            </div>
           </div>
         </div>
       )}
@@ -160,7 +173,6 @@ export default function TeacherStudentDetails() {
                       {isTop && <span style={topBadge}>Top</span>}
                     </td>
 
-                    {/* ✅ INLINE EDIT INPUT */}
                     <td style={td}>
                       <input
                         type="number"

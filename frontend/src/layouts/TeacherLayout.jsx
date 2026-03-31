@@ -10,10 +10,7 @@ export default function TeacherLayout() {
       : "text-gray-700";
 
   const handleLogout = () => {
-    // Remove authentication token
     localStorage.removeItem("token");
-
-    // Redirect safely (removes previous route from history)
     navigate("/login", { replace: true });
   };
 
@@ -33,7 +30,7 @@ export default function TeacherLayout() {
 
         <nav className="p-2 space-y-1">
 
-          {/* ✅ NEW: My Classes (replaces Gradebook as main entry) */}
+          {/* ✅ My Classes (MAIN ENTRY) */}
           <Link
             to="/teacher/classes"
             className={`block px-3 py-2 rounded ${isActive(
@@ -43,26 +40,7 @@ export default function TeacherLayout() {
             My Classes
           </Link>
 
-          <Link
-            to="/teacher/assessments"
-            className={`block px-3 py-2 rounded ${isActive(
-              "/teacher/assessments"
-            )}`}
-          >
-            Assessments
-          </Link>
-
-          {/* (Optional: keep gradebook if still used elsewhere) */}
-          <Link
-            to="/teacher/gradebook"
-            className={`block px-3 py-2 rounded ${isActive(
-              "/teacher/gradebook"
-            )}`}
-          >
-            Gradebook
-          </Link>
-
-          {/* Attendance */}
+          {/* ✅ Attendance */}
           <Link
             to="/teacher/attendance"
             className={`block px-3 py-2 rounded ${isActive(
