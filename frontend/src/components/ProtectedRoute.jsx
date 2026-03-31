@@ -21,19 +21,20 @@ export default function ProtectedRoute({ allowedRoles }) {
   // ✅ Prefer context, fallback to storage
   const effectiveUser = user ?? storedUser;
 
-  // 🧪 DEBUG (TEMP — remove later)
-  console.log("🔍 ProtectedRoute check:", {
-    user,
-    storedUser,
-    effectiveUser,
-    token,
-    loading,
-  });
-
   // ⏳ Wait for auth restoration
   if (loading) {
     return <div>Loading...</div>;
   }
+
+  // 🧪 DEBUG (CRITICAL — THIS IS THE ONE WE NEED)
+  console.log("AUTH DEBUG:", {
+    token,
+    user,
+    storedUser,
+    effectiveUser,
+    loading,
+    path: location.pathname,
+  });
 
   // 🔒 STRICT AUTH CHECK (but stable)
   if (!token) {
@@ -68,15 +69,15 @@ export default function ProtectedRoute({ allowedRoles }) {
     return <Navigate to="/change-password" replace />;
   }
 
-// 🚫 ROLE CHECK (WITH DEBUG)
-// if (allowedRoles && !allowedRoles.includes(effectiveUser.role)) {
-//   console.warn("🚫 Role mismatch", {
-//     required: allowedRoles,
-//     actual: effectiveUser.role,
-//   });
+  // 🚫 ROLE CHECK (TEMP DISABLED)
+  // if (allowedRoles && !allowedRoles.includes(effectiveUser.role)) {
+  //   console.warn("🚫 Role mismatch", {
+  //     required: allowedRoles,
+  //     actual: effectiveUser.role,
+  //   });
+  //
+  //   return <Navigate to="/login" replace />;
+  // }
 
-//   return <Navigate to="/login" replace />;
-// }
-
-return <Outlet />;
+  return <Outlet />;
 }
