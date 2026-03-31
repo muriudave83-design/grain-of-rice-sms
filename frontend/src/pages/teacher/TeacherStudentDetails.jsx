@@ -8,12 +8,6 @@ export default function TeacherStudentDetails() {
 
   const [data, setData] = useState([]);
 
-  // Modal state
-  const [showModal, setShowModal] = useState(false);
-  const [title, setTitle] = useState("");
-  const [type, setType] = useState("ASSIGNMENT");
-  const [maxScore, setMaxScore] = useState(100);
-
   useEffect(() => {
     fetchData();
   }, [id]);
@@ -28,23 +22,27 @@ export default function TeacherStudentDetails() {
     }
   };
 
-  const handleCreate = async () => {
+  // ✅ UPDATE SCORE API
+  const updateScore = async (item) => {
     try {
-      await api.post(`/teacher/student/${id}/assignment`, {
-        title,
-        type,
-        maxScore,
+      await api.put("/teacher/score", {
+        assessmentId: item.assessmentId,
+        studentId: Number(id),
+        score: item.score,
       });
-
-      setShowModal(false);
-      setTitle("");
-      setType("ASSIGNMENT");
-      setMaxScore(100);
-
-      fetchData();
     } catch (err) {
-      console.error(err);
+      console.error("Update failed:", err);
     }
+  };
+
+  // ✅ HANDLE INPUT CHANGE
+  const handleScoreChange = (index, value) => {
+    const updated = [...data];
+    updated[index].score = Number(value);
+    setData(updated);
+
+    // auto-save
+    updateScore(updated[index]);
   };
 
   // SAFE calculations
@@ -99,10 +97,6 @@ export default function TeacherStudentDetails() {
             Detailed assignment scores and insights
           </p>
         </div>
-
-        <button style={createBtn} onClick={() => setShowModal(true)}>
-          + Create Assignment
-        </button>
 
         {data.length > 0 && (
           <div style={floatingBadge}>Avg: {average}</div>
@@ -166,27 +160,32 @@ export default function TeacherStudentDetails() {
                       {isTop && <span style={topBadge}>Top</span>}
                     </td>
 
+                    {/* ✅ INLINE EDIT INPUT */}
                     <td style={td}>
-                      <div style={scoreRow}>
-                        <span
-                          style={{
-                            ...scoreBadge,
-                            backgroundColor: getScoreColor(score),
-                          }}
-                        >
-                          {score}
-                        </span>
+                      <input
+                        type="number"
+                        value={score}
+                        onChange={(e) =>
+                          handleScoreChange(index, e.target.value)
+                        }
+                        style={{
+                          width: "70px",
+                          padding: "6px",
+                          borderRadius: "6px",
+                          border: "1px solid #ccc",
+                          marginRight: "10px",
+                        }}
+                      />
 
-                        <div style={progress}>
-                          <div
-                            style={{
-                              width: `${Math.min(score, 100)}%`,
-                              height: "100%",
-                              backgroundColor: getScoreColor(score),
-                              transition: "width 0.4s ease",
-                            }}
-                          />
-                        </div>
+                      <div style={progress}>
+                        <div
+                          style={{
+                            width: `${Math.min(score, 100)}%`,
+                            height: "100%",
+                            backgroundColor: getScoreColor(score),
+                            transition: "width 0.4s ease",
+                          }}
+                        />
                       </div>
                     </td>
 
@@ -200,48 +199,6 @@ export default function TeacherStudentDetails() {
               })}
             </tbody>
           </table>
-        </div>
-      )}
-
-      {/* Modal */}
-      {showModal && (
-        <div style={modalOverlay}>
-          <div style={modal}>
-            <h3>Create Assignment</h3>
-
-            <input
-              style={input}
-              placeholder="Title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-
-            <select
-              style={input}
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-            >
-              <option value="ASSIGNMENT">Assignment</option>
-              <option value="PROJECT">Project</option>
-              <option value="TEST">Test</option>
-            </select>
-
-            <input
-              style={input}
-              type="number"
-              value={maxScore}
-              onChange={(e) => setMaxScore(e.target.value)}
-            />
-
-            <div style={modalActions}>
-              <button style={createBtn} onClick={handleCreate}>
-                Create
-              </button>
-              <button style={cancelBtn} onClick={() => setShowModal(false)}>
-                Cancel
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>
@@ -290,23 +247,6 @@ const floatingBadge = {
   fontSize: "13px",
 };
 
-const createBtn = {
-  backgroundColor: "#2563eb",
-  color: "#fff",
-  border: "none",
-  padding: "10px 14px",
-  borderRadius: "6px",
-  cursor: "pointer",
-};
-
-const cancelBtn = {
-  backgroundColor: "#e5e7eb",
-  border: "none",
-  padding: "10px 14px",
-  borderRadius: "6px",
-  cursor: "pointer",
-};
-
 const cards = {
   display: "flex",
   gap: "20px",
@@ -341,20 +281,6 @@ const th = { padding: "14px", textAlign: "left" };
 const td = { padding: "12px", borderBottom: "1px solid #eee" };
 const row = { transition: "0.2s" };
 
-const scoreRow = {
-  display: "flex",
-  alignItems: "center",
-  gap: "10px",
-};
-
-const scoreBadge = {
-  padding: "6px 10px",
-  borderRadius: "20px",
-  color: "#fff",
-  fontSize: "12px",
-  fontWeight: "600",
-};
-
 const gradeBadge = {
   padding: "5px 10px",
   borderRadius: "6px",
@@ -385,38 +311,4 @@ const empty = {
   borderRadius: "10px",
   textAlign: "center",
   color: "#6b7280",
-};
-
-const modalOverlay = {
-  position: "fixed",
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: "rgba(0,0,0,0.5)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
-
-const modal = {
-  background: "#fff",
-  padding: "20px",
-  borderRadius: "10px",
-  width: "300px",
-  display: "flex",
-  flexDirection: "column",
-  gap: "10px",
-};
-
-const input = {
-  padding: "10px",
-  borderRadius: "6px",
-  border: "1px solid #ccc",
-};
-
-const modalActions = {
-  display: "flex",
-  justifyContent: "space-between",
-  marginTop: "10px",
 };

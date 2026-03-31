@@ -126,9 +126,11 @@ router.get(
         },
       });
 
+      // ✅ FIXED: include assessmentId
       const result = scores.map((s) => ({
         title: s.assessment.title,
         score: s.score,
+        assessmentId: s.assessmentId, // 🔥 REQUIRED for inline editing
       }));
 
       return res.status(200).json(result);
@@ -187,7 +189,6 @@ router.post(
         });
       }
 
-      // ✅ FIXED HERE
       const assessment = await prisma.assessment.create({
         data: {
           title,
@@ -260,7 +261,6 @@ router.post(
         return res.status(200).json({ message: "No term found" });
       }
 
-      // ✅ FIXED HERE TOO
       const assessment = await prisma.assessment.create({
         data: {
           title,
@@ -286,6 +286,35 @@ router.post(
     } catch (err) {
       console.error("Error creating assignment:", err);
       return res.status(200).json({});
+    }
+  }
+);
+
+/**
+ * ✏️ NEW: Update score (INLINE EDITING)
+ */
+router.put(
+  "/teacher/score",
+  authenticate,
+  requireRole([Role.TEACHER]),
+  async (req: any, res) => {
+    try {
+      const { studentId, assessmentId, score } = req.body;
+
+      await prisma.assessmentScore.updateMany({
+        where: {
+          studentId: Number(studentId),
+          assessmentId: Number(assessmentId),
+        },
+        data: {
+          score: Number(score),
+        },
+      });
+
+      return res.status(200).json({ message: "Updated" });
+    } catch (err) {
+      console.error("Error updating score:", err);
+      return res.status(500).json({});
     }
   }
 );
