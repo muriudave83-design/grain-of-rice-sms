@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "../../../services/apiClient";
 
 export default function TeacherAttendanceClass() {
   const { classId } = useParams();
+  const navigate = useNavigate();
+
   const [sessions, setSessions] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -16,6 +18,7 @@ export default function TeacherAttendanceClass() {
         // Remove duplicate sessions by date (keep latest)
         const unique = [];
         const seenDates = new Set();
+
         res.data
           .sort((a, b) => new Date(b.date) - new Date(a.date))
           .forEach((s) => {
@@ -25,6 +28,7 @@ export default function TeacherAttendanceClass() {
               unique.push(s);
             }
           });
+
         setSessions(unique);
         setLoading(false);
       })
@@ -37,10 +41,12 @@ export default function TeacherAttendanceClass() {
   const startNewSession = async () => {
     try {
       const res = await api.post("/attendance/sessions", { classId });
-      window.location.href = `/teacher/attendance/session/${res.data.id}`;
+
+      // ✅ FIX: use React Router navigation (NO reload)
+      navigate(`/teacher/attendance/session/${res.data.id}`);
+
     } catch (err) {
       if (err.response?.status === 409) {
-        // Friendly message when today's session already exists
         setFriendlyMessage(
           "Attendance for today already exists. You can view or continue the session until tomorrow."
         );
@@ -56,7 +62,9 @@ export default function TeacherAttendanceClass() {
   return (
     <div className="space-y-6 p-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Attendance Sessions — Class {classId}</h2>
+        <h2 className="text-2xl font-bold">
+          Attendance Sessions — Class {classId}
+        </h2>
         <button
           onClick={startNewSession}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -72,7 +80,9 @@ export default function TeacherAttendanceClass() {
       )}
 
       {sessions.length === 0 ? (
-        <p className="mt-4 text-gray-600">No attendance sessions yet.</p>
+        <p className="mt-4 text-gray-600">
+          No attendance sessions yet.
+        </p>
       ) : (
         <div className="overflow-x-auto mt-4">
           <table className="min-w-full border border-gray-200 rounded">
