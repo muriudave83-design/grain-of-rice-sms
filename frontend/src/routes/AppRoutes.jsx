@@ -135,14 +135,14 @@ export default function AppRoutes() {
         const isExpired = payload.exp * 1000 < Date.now();
 
         if (isExpired) {
-          console.warn("⛔ App load: token expired → clearing");
+          console.warn("⛔ Token expired → clearing");
 
           localStorage.removeItem("token");
           localStorage.removeItem("user");
           localStorage.removeItem("role");
         }
-      } catch {
-        localStorage.clear();
+      } catch (err) {
+        console.warn("⚠️ Token parse failed — NOT clearing storage");
       }
     })();
     
