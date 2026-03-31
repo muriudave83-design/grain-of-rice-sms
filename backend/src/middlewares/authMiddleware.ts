@@ -18,9 +18,11 @@ export async function authenticate(
   const tokenFromHeader = req.headers.authorization?.split(" ")[1];
   const token = tokenFromCookie || tokenFromHeader;
 
+  // ✅ STRICT: No token → reject
   if (!token) {
+    console.warn("❌ No token provided");
     return res.status(401).json({
-      message: "Access denied. No token provided.",
+      message: "Authentication required",
     });
   }
 
@@ -40,9 +42,11 @@ export async function authenticate(
       },
     });
 
+    // ✅ STRICT: User must exist
     if (!user) {
+      console.warn("❌ User not found");
       return res.status(401).json({
-        message: "User not found",
+        message: "Invalid user",
       });
     }
 
@@ -52,15 +56,13 @@ export async function authenticate(
       role: user.role,
     };
 
-    // 🎓 STUDENT CONTEXT
+    // 🎓 STUDENT CONTEXT (non-blocking, but logged)
     if (user.role === Role.STUDENT) {
       if (!user.studentProfile) {
-        return res.status(403).json({
-          message: "Student account not linked",
-        });
+        console.warn("⚠️ Student has no profile linked");
+      } else {
+        authUser.studentId = user.studentProfile.id;
       }
-
-      authUser.studentId = user.studentProfile.id;
     }
 
     // 👨‍👩‍👧 PARENT CONTEXT
@@ -71,9 +73,11 @@ export async function authenticate(
     }
 
     req.user = authUser;
-    next();
+    return next();
+
   } catch (error) {
-    return res.status(403).json({
+    console.warn("❌ Invalid or expired token");
+    return res.status(401).json({
       message: "Invalid or expired token",
     });
   }

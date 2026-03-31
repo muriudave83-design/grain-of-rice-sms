@@ -7,6 +7,18 @@ export async function getAttendanceSession(req: Request, res: Response) {
   try {
     const sessionId = Number(req.params.id);
 
+    // ✅ Validate sessionId early
+    if (isNaN(sessionId)) {
+      console.warn("⚠️ Invalid session ID");
+
+      return res.status(200).json({
+        session: null,
+        students: [],
+        entries: [],
+        message: "Invalid session ID",
+      });
+    }
+
     const session = await prisma.attendanceSession.findUnique({
       where: { id: sessionId },
       include: {
@@ -15,8 +27,16 @@ export async function getAttendanceSession(req: Request, res: Response) {
       },
     });
 
+    // ✅ FAIL-SAFE: No session → return empty, not error
     if (!session) {
-      return res.status(404).json({ message: "Session not found" });
+      console.warn(`⚠️ Session not found: ${sessionId}`);
+
+      return res.status(200).json({
+        session: null,
+        students: [],
+        entries: [],
+        message: "No session found",
+      });
     }
 
     const students = await prisma.student.findMany({
@@ -27,13 +47,20 @@ export async function getAttendanceSession(req: Request, res: Response) {
       ]
     });
 
-    return res.json({
+    return res.status(200).json({
       session,
       students,
       entries: session.entries,
     });
+
   } catch (error) {
-    return res.status(500).json({
+    console.error("❌ Attendance session error:", error);
+
+    // ✅ FAIL-SAFE: Never crash UI
+    return res.status(200).json({
+      session: null,
+      students: [],
+      entries: [],
       message: "Failed to load attendance session",
     });
   }
