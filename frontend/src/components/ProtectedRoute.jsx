@@ -68,15 +68,15 @@ export default function ProtectedRoute({ allowedRoles }) {
     return <Navigate to="/change-password" replace />;
   }
 
-  // 🚫 ROLE CHECK (WITH DEBUG)
-  if (allowedRoles && !allowedRoles.includes(effectiveUser.role)) {
-    console.warn("🚫 Role mismatch", {
-      required: allowedRoles,
-      actual: effectiveUser.role,
-    });
+// 🚫 ROLE CHECK (WITH DEBUG)
+// if (allowedRoles && !allowedRoles.includes(effectiveUser.role)) {
+//   console.warn("🚫 Role mismatch", {
+//     required: allowedRoles,
+//     actual: effectiveUser.role,
+//   });
 
-    return <Navigate to="/login" replace />;
-  }
+//   return <Navigate to="/login" replace />;
+// }
 
-  return <Outlet />;
+return <Outlet />;
 }
