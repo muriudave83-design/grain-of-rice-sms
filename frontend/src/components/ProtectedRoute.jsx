@@ -38,7 +38,7 @@ export default function ProtectedRoute({ allowedRoles }) {
 
   // 🔒 ONLY redirect if COMPLETELY unauthenticated
   if (!token && !effectiveUser) {
-    console.warn("❌ No session → redirecting");
+      console.error("🚨 REDIRECT TRIGGERED FROM:", location.pathname);
 
     return (
       <Navigate
