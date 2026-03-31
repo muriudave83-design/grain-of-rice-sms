@@ -12,10 +12,16 @@ export default function TeacherAttendanceClass() {
   const [friendlyMessage, setFriendlyMessage] = useState("");
 
   useEffect(() => {
+    // ✅ FIX: Prevent undefined classId API calls
+    if (!classId) {
+      console.warn("⚠️ No classId — skipping API call");
+      setLoading(false);
+      return;
+    }
+
     api
       .get(`/attendance/classes/${classId}`)
       .then((res) => {
-        // Remove duplicate sessions by date (keep latest)
         const unique = [];
         const seenDates = new Set();
 
@@ -33,18 +39,24 @@ export default function TeacherAttendanceClass() {
         setLoading(false);
       })
       .catch((err) => {
+        console.error("API ERROR:", err);
         setError(err.response?.status);
         setLoading(false);
       });
   }, [classId]);
 
   const startNewSession = async () => {
+    // ✅ Prevent creating session without classId
+    if (!classId) {
+      alert("No class selected.");
+      return;
+    }
+
     try {
       const res = await api.post("/attendance/sessions", { classId });
 
-      // ✅ FIX: use React Router navigation (NO reload)
+      // ✅ Safe navigation (no reload)
       navigate(`/teacher/attendance/session/${res.data.id}`);
-
     } catch (err) {
       if (err.response?.status === 409) {
         setFriendlyMessage(
@@ -55,6 +67,27 @@ export default function TeacherAttendanceClass() {
       }
     }
   };
+
+  // ✅ Handle missing classId UI (IMPORTANT)
+  if (!classId) {
+    return (
+      <div className="p-4">
+        <h2 className="text-xl font-semibold mb-2">
+          Attendance
+        </h2>
+        <p className="text-gray-600 mb-4">
+          No class selected.
+        </p>
+
+        <button
+          onClick={() => navigate("/teacher/classes")}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+          Go to Classes
+        </button>
+      </div>
+    );
+  }
 
   if (loading) return <p>Loading attendance sessions...</p>;
   if (error === 403) return <p>Forbidden</p>;
