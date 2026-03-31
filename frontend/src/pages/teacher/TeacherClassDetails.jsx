@@ -9,6 +9,12 @@ export default function TeacherClassDetails() {
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState("");
 
+  // ✅ NEW STATE (Phase 2)
+  const [showModal, setShowModal] = useState(false);
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState("ASSIGNMENT");
+  const [maxScore, setMaxScore] = useState(100);
+
   useEffect(() => {
     fetchStudents();
   }, [id]);
@@ -23,7 +29,28 @@ export default function TeacherClassDetails() {
     }
   };
 
-  // 🔍 Filter students (live search)
+  // ✅ CREATE ASSIGNMENT
+  const handleCreate = async () => {
+    try {
+      await api.post(`/teacher/class/${id}/assignment`, {
+        title,
+        type,
+        maxScore,
+      });
+
+      // reset form
+      setTitle("");
+      setType("ASSIGNMENT");
+      setMaxScore(100);
+
+      setShowModal(false);
+      fetchStudents(); // refresh
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  // 🔍 Filter students
   const filteredStudents = students.filter((student) => {
     const fullName =
       `${student.firstName} ${student.lastName}`.toLowerCase();
@@ -55,12 +82,38 @@ export default function TeacherClassDetails() {
         ← Back to Classes
       </button>
 
-      {/* 📘 Header */}
-      <div style={{ marginBottom: "20px" }}>
-        <h2 style={{ margin: 0, color: "#333" }}>Class Students</h2>
-        <p style={{ color: "#777", marginTop: "5px" }}>
-          View and manage students in this class
-        </p>
+      {/* 📘 Header + Create Button */}
+      <div
+        style={{
+          marginBottom: "20px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <div>
+          <h2 style={{ margin: 0, color: "#333" }}>Class Students</h2>
+          <p style={{ color: "#777", marginTop: "5px" }}>
+            View and manage students in this class
+          </p>
+        </div>
+
+        {/* ✅ NEW BUTTON */}
+        <button
+          onClick={() => setShowModal(true)}
+          style={{
+            padding: "10px 16px",
+            backgroundColor: "#16a34a",
+            color: "#fff",
+            border: "none",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontSize: "14px",
+            fontWeight: "500",
+          }}
+        >
+          + Create Assignment
+        </button>
       </div>
 
       {/* 🔍 Search */}
@@ -147,7 +200,7 @@ export default function TeacherClassDetails() {
                   <td style={{ padding: "12px" }}>
                     <button
                       onClick={(e) => {
-                        e.stopPropagation(); // 🔥 prevents double trigger
+                        e.stopPropagation();
                         navigate(`/teacher/student/${student.id}`);
                       }}
                       style={{
@@ -167,6 +220,112 @@ export default function TeacherClassDetails() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ✅ MODAL */}
+      {showModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            backgroundColor: "rgba(0,0,0,0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "25px",
+              borderRadius: "10px",
+              width: "400px",
+              boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+            }}
+          >
+            <h3 style={{ marginBottom: "15px" }}>
+              Create Assignment
+            </h3>
+
+            <input
+              placeholder="Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                marginBottom: "10px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+              }}
+            />
+
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                marginBottom: "10px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+              }}
+            >
+              <option value="ASSIGNMENT">Assignment</option>
+              <option value="PROJECT">Project</option>
+              <option value="TEST">Test</option>
+            </select>
+
+            <input
+              type="number"
+              value={maxScore}
+              onChange={(e) => setMaxScore(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                marginBottom: "15px",
+                borderRadius: "6px",
+                border: "1px solid #ccc",
+              }}
+            />
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                onClick={handleCreate}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  backgroundColor: "#16a34a",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                }}
+              >
+                Create
+              </button>
+
+              <button
+                onClick={() => setShowModal(false)}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  backgroundColor: "#6b7280",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

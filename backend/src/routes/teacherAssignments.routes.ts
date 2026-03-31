@@ -141,7 +141,95 @@ router.get(
 );
 
 /**
- * 🆕 Create assignment FOR a specific student (quick fix)
+ * 🚀 NEW: Create assignment FOR A CLASS (Phase 2 CORE)
+ */
+router.post(
+  "/teacher/class/:id/assignment",
+  authenticate,
+  requireRole([Role.TEACHER]),
+  async (req: any, res) => {
+    try {
+      const teacherId = req.user?.id;
+      const classId = Number(req.params.id);
+      const { title, type, maxScore } = req.body;
+
+      // ✅ 1. Verify teacher owns this class
+      const teacherSubject = await prisma.teacherSubject.findFirst({
+        where: {
+          teacherId,
+          classId,
+        },
+      });
+
+      if (!teacherSubject) {
+        return res.status(403).json({
+          message: "Unauthorized for this class",
+        });
+      }
+
+      // ✅ 2. Get students
+      const students = await prisma.student.findMany({
+        where: {
+          classId,
+          isArchived: false,
+        },
+      });
+
+      if (students.length === 0) {
+        return res.status(200).json({
+          message: "No students in class",
+        });
+      }
+
+      // ✅ 3. Get term
+      const term = await prisma.term.findFirst();
+
+      if (!term) {
+        return res.status(200).json({
+          message: "No term found",
+        });
+      }
+
+      // ✅ 4. Create ONE assessment
+      const assessment = await prisma.assessment.create({
+        data: {
+          title,
+          type,
+          maxScore: Number(maxScore),
+          classId,
+          subjectId: teacherSubject.subjectId,
+          termId: term.id,
+          date: new Date(),
+          weight: 1,
+        },
+      });
+
+      // ✅ 5. Create scores for ALL students
+      const scoreData = students.map((s) => ({
+        studentId: s.id,
+        assessmentId: assessment.id,
+        score: 0,
+      }));
+
+      await prisma.assessmentScore.createMany({
+        data: scoreData,
+      });
+
+      return res.status(200).json({
+        message: "Assignment created for class",
+      });
+    } catch (err) {
+      console.error("Error creating class assignment:", err);
+
+      return res.status(500).json({
+        message: "Failed to create assignment",
+      });
+    }
+  }
+);
+
+/**
+ * ⚠️ OLD: Create assignment FOR a specific student (TO BE REMOVED)
  */
 router.post(
   "/teacher/student/:id/assignment",
@@ -152,7 +240,6 @@ router.post(
       const studentId = Number(req.params.id);
       const { title, type, maxScore } = req.body;
 
-      // 1. Get student
       const student = await prisma.student.findUnique({
         where: { id: studentId },
       });
@@ -161,7 +248,6 @@ router.post(
         return res.status(200).json({ message: "Student not found" });
       }
 
-      // 2. Get a subject (REQUIRED FIX)
       const teacherSubject = await prisma.teacherSubject.findFirst({
         where: {
           classId: student.classId,
@@ -172,14 +258,12 @@ router.post(
         return res.status(200).json({ message: "No subject found" });
       }
 
-      // 3. Get a term (REQUIRED FIX)
       const term = await prisma.term.findFirst();
 
       if (!term) {
         return res.status(200).json({ message: "No term found" });
       }
 
-      // 4. Create assessment (FULLY FIXED)
       const assessment = await prisma.assessment.create({
         data: {
           title,
@@ -193,7 +277,6 @@ router.post(
         },
       });
 
-      // 5. Create score for THIS student
       await prisma.assessmentScore.create({
         data: {
           studentId,
