@@ -12,9 +12,9 @@ export default function TeacherAttendanceClass() {
   const [friendlyMessage, setFriendlyMessage] = useState("");
 
   useEffect(() => {
-    // ✅ FIX: Prevent undefined classId API calls
+    // ✅ CRITICAL FIX: prevent invalid API call
     if (!classId) {
-      console.warn("⚠️ No classId — skipping API call");
+      console.warn("⚠️ No classId → skipping API call");
       setLoading(false);
       return;
     }
@@ -39,23 +39,21 @@ export default function TeacherAttendanceClass() {
         setLoading(false);
       })
       .catch((err) => {
-        console.error("API ERROR:", err);
+        console.error("❌ Attendance API error:", err);
         setError(err.response?.status);
         setLoading(false);
       });
   }, [classId]);
 
   const startNewSession = async () => {
-    // ✅ Prevent creating session without classId
     if (!classId) {
-      alert("No class selected.");
+      alert("No class selected");
       return;
     }
 
     try {
       const res = await api.post("/attendance/sessions", { classId });
 
-      // ✅ Safe navigation (no reload)
       navigate(`/teacher/attendance/session/${res.data.id}`);
     } catch (err) {
       if (err.response?.status === 409) {
@@ -68,20 +66,16 @@ export default function TeacherAttendanceClass() {
     }
   };
 
-  // ✅ Handle missing classId UI (IMPORTANT)
+  // ✅ UI for missing class
   if (!classId) {
     return (
       <div className="p-4">
-        <h2 className="text-xl font-semibold mb-2">
-          Attendance
-        </h2>
-        <p className="text-gray-600 mb-4">
-          No class selected.
-        </p>
+        <h2 className="text-2xl font-bold">Attendance</h2>
+        <p className="mt-2 text-gray-600">No class selected.</p>
 
         <button
           onClick={() => navigate("/teacher/classes")}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          className="mt-4 px-4 py-2 bg-yellow-500 text-black rounded"
         >
           Go to Classes
         </button>
@@ -98,6 +92,7 @@ export default function TeacherAttendanceClass() {
         <h2 className="text-2xl font-bold">
           Attendance Sessions — Class {classId}
         </h2>
+
         <button
           onClick={startNewSession}
           className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
