@@ -26,7 +26,7 @@ export default function ProtectedRoute({ allowedRoles }) {
     return <div>Loading...</div>;
   }
 
-  // 🧪 DEBUG (CRITICAL — THIS IS THE ONE WE NEED)
+  // 🧪 DEBUG
   console.log("AUTH DEBUG:", {
     token,
     user,
@@ -36,9 +36,9 @@ export default function ProtectedRoute({ allowedRoles }) {
     path: location.pathname,
   });
 
-  // 🔒 STRICT AUTH CHECK (but stable)
-  if (!token) {
-    console.warn("❌ No token → redirecting");
+  // 🔒 ONLY redirect if COMPLETELY unauthenticated
+  if (!token && !effectiveUser) {
+    console.warn("❌ No session → redirecting");
 
     return (
       <Navigate
@@ -49,35 +49,30 @@ export default function ProtectedRoute({ allowedRoles }) {
     );
   }
 
-  if (!effectiveUser) {
-    console.warn("❌ No user → redirecting");
-
-    return (
-      <Navigate
-        to="/login"
-        replace
-        state={{ from: location }}
-      />
-    );
+  // ⚠️ Token exists but user not ready yet → WAIT (CRITICAL FIX)
+  if (token && !effectiveUser) {
+    console.warn("⏳ Token exists but user not ready — waiting");
+    return <div>Restoring session...</div>;
   }
 
   // 🔐 FORCE PASSWORD CHANGE
   if (
-    effectiveUser.forcePasswordChange &&
+    effectiveUser?.forcePasswordChange &&
     location.pathname !== "/change-password"
   ) {
     return <Navigate to="/change-password" replace />;
   }
 
-  // 🚫 ROLE CHECK (TEMP DISABLED)
-  // if (allowedRoles && !allowedRoles.includes(effectiveUser.role)) {
-  //   console.warn("🚫 Role mismatch", {
-  //     required: allowedRoles,
-  //     actual: effectiveUser.role,
-  //   });
-  //
-  //   return <Navigate to="/login" replace />;
-  // }
+  // 🚫 ROLE CHECK (SAFE VERSION)
+  if (allowedRoles && !allowedRoles.includes(effectiveUser?.role)) {
+    console.warn("🚫 Role mismatch", {
+      required: allowedRoles,
+      actual: effectiveUser?.role,
+    });
+
+    // ✅ DO NOT hard redirect — show safe fallback
+    return <div>Access restricted</div>;
+  }
 
   return <Outlet />;
 }
