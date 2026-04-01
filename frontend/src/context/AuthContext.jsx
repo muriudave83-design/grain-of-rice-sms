@@ -6,36 +6,28 @@ export function AuthProvider({ children }) {
   console.log("🧠 AuthProvider INIT");
 
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null); // ✅ NEW
   const [loading, setLoading] = useState(true);
 
   // 🔁 Restore session on refresh (FIXED)
   useEffect(() => {
     console.log("🔁 Auth restore running");
 
-    const token = localStorage.getItem("token");
+    const storedToken = localStorage.getItem("token");
     const storedUser = localStorage.getItem("user");
 
-    // ✅ Only block if NO token
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
-    // ⚠️ If user missing, DO NOT wipe session
-    if (!storedUser) {
-      console.warn("⚠️ No stored user, but token exists — keeping session");
+    if (!storedToken) {
       setLoading(false);
       return;
     }
 
     try {
-      // 🔥 DECODE TOKEN
-      const payload = JSON.parse(atob(token.split(".")[1]));
-
+      // 🔥 Decode token
+      const payload = JSON.parse(atob(storedToken.split(".")[1]));
       const isExpired = payload.exp * 1000 < Date.now();
 
       if (isExpired) {
-        console.warn("⛔ Token expired on load → clearing session");
+        console.warn("⛔ Token expired → clearing session");
 
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -45,16 +37,23 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      // ✅ VALID TOKEN → restore user
-      const parsed = JSON.parse(storedUser);
+      // ✅ Set token FIRST
+      setToken(storedToken);
 
-      setUser({
-        id: parsed.id,
-        name: parsed.name,
-        email: parsed.email,
-        role: parsed.role,
-        forcePasswordChange: parsed.forcePasswordChange || false,
-      });
+      // ✅ Restore user if exists
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+
+        setUser({
+          id: parsed.id,
+          name: parsed.name,
+          email: parsed.email,
+          role: parsed.role,
+          forcePasswordChange: parsed.forcePasswordChange || false,
+        });
+      } else {
+        console.warn("⚠️ Token exists but no user found");
+      }
 
     } catch (err) {
       console.error("⚠️ Corrupt session → clearing:", err);
@@ -67,21 +66,29 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
-  // 🔐 Login
+  // 🔐 Login (FIXED)
   const login = (data) => {
+    console.log("🔥 LOGIN DATA RECEIVED:", data);
+
     const userData = {
-      id: data.id,
-      name: data.name,
-      email: data.email,
-      role: data.role,
-      forcePasswordChange: data.forcePasswordChange || false,
+      id: data.user.id,
+      name: data.user.name,
+      email: data.user.email,
+      role: data.user.role,
+      forcePasswordChange: data.user.forcePasswordChange || false,
     };
 
-    setUser(userData);
-
+    // ✅ CRITICAL: store token HERE (no race conditions)
+    localStorage.setItem("token", data.token);
     localStorage.setItem("user", JSON.stringify(userData));
 
-    console.log("🔐 AuthContext.login → stored user:", userData);
+    setToken(data.token);
+    setUser(userData);
+
+    console.log("🔐 AuthContext.login → stored:", {
+      token: data.token,
+      user: userData,
+    });
   };
 
   // 🚪 Logout (HARD RESET)
@@ -93,6 +100,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("user");
 
     setUser(null);
+    setToken(null);
 
     window.location.href = "/login";
   };
@@ -110,12 +118,13 @@ export function AuthProvider({ children }) {
     localStorage.setItem("user", JSON.stringify(updatedUser));
   };
 
-  const isAuthenticated = !!user;
+  const isAuthenticated = !!token; // ✅ FIXED (was user before)
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        token, // ✅ expose token
         isAuthenticated,
         loading,
         login,

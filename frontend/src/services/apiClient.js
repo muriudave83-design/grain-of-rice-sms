@@ -28,27 +28,35 @@ apiClient.interceptors.request.use(
 );
 
 // ==============================
-// 🚨 RESPONSE INTERCEPTOR (FIXED)
+// 🚨 RESPONSE INTERCEPTOR (SAFE VERSION)
 // ==============================
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     console.error("❌ API ERROR:", error.response || error.message);
 
-    // 🔥 CRITICAL FIX — HANDLE EXPIRED / INVALID TOKEN
     if (error.response) {
       const status = error.response.status;
 
-      if (status === 401 || status === 403) {
-        console.warn("⚠️ Session invalid or expired. Logging out...");
+      // 🔥 ONLY logout if token exists AND clearly invalid
+      const token = localStorage.getItem("token");
 
-        // 🧹 CLEAR ALL AUTH DATA
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        localStorage.removeItem("role");
+      if ((status === 401 || status === 403) && token) {
+        console.warn("⚠️ Possible session issue detected");
 
-        // 🚫 PREVENT LOOP
-        if (window.location.pathname !== "/login") {
+        // ⚠️ DO NOT instantly logout (prevents login race bug)
+        // Instead, allow ProtectedRoute to handle auth state
+
+        // OPTIONAL: only logout if NOT during app init
+        const isOnLoginPage = window.location.pathname === "/login";
+
+        if (!isOnLoginPage) {
+          console.warn("🔁 Redirecting to login (safe)");
+
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("role");
+
           window.location.href = "/login";
         }
       }
