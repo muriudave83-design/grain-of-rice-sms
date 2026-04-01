@@ -54,7 +54,7 @@ export default function TeacherAttendance() {
 
         console.log("SELECTED CLASS:", selectedClass);
 
-        await startAttendance(selectedClass.id, true);
+        await startAttendance(selectedClass.id);
 
       } catch (err) {
         console.error("Auto attendance error:", err);
@@ -98,12 +98,11 @@ export default function TeacherAttendance() {
     </div>
   );
 
-  // ✅ START ATTENDANCE (manual + auto)
-  async function startAttendance(classId, isAuto = false) {
+  // ✅ START / RESUME ATTENDANCE (FINAL LOGIC)
+  async function startAttendance(classId) {
     try {
-      const res = await api.post("/attendance/sessions", {
-        classId
-      });
+      // Try creating session
+      const res = await api.post("/attendance/sessions", { classId });
 
       const sessionId = res.data.id;
 
@@ -112,19 +111,28 @@ export default function TeacherAttendance() {
       navigate(`/teacher/attendance/session/${sessionId}`);
 
     } catch (err) {
+      if (err.response?.status === 409) {
+        console.log("🔁 Session exists, fetching today's session...");
 
-      // 🔥 SAFE FALLBACK (no broken endpoint)
-      if (err?.response?.status === 409) {
-        console.warn("Session already exists — but no recovery endpoint");
+        try {
+          const res = await api.get(`/attendance/sessions/today/${classId}`);
 
-        if (!isAuto) {
-          alert("Attendance already started today.\nPlease refresh or contact admin.");
+          const sessionId = res.data.id;
+
+          localStorage.setItem("lastAttendanceClassId", classId);
+
+          // ✅ RESUME existing session
+          navigate(`/teacher/attendance/session/${sessionId}`);
+
+        } catch (fetchErr) {
+          console.error("❌ Could not recover session", fetchErr);
+          alert("Could not resume attendance session.");
         }
 
-        return;
+      } else {
+        console.error("Start attendance error:", err);
+        alert("Failed to start attendance.");
       }
-
-      console.error("Start attendance error:", err);
     }
   }
 }
