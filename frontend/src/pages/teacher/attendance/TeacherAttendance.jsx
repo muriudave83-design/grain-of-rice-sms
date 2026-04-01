@@ -1,32 +1,58 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../services/apiClient";
 
 export default function TeacherAttendance() {
+  console.log("🚀 Attendance page mounted");
+
   const [classes, setClasses] = useState([]);
   const navigate = useNavigate();
 
-  // ✅ Fetch classes
+  // ✅ Prevent double autoStart (React Strict Mode fix)
+  const hasAutoStarted = useRef(false);
+
+  // ✅ Fetch classes (WITH DEBUG)
   useEffect(() => {
-    api.get("/classes/my")
-      .then(res => setClasses(res.data))
-      .catch(() => {});
+    api.get("/teacher/classes")
+      .then(res => {
+        console.log("CLASSES RESPONSE:", res);
+
+        const data = res.data || [];
+        console.log("CLASSES ARRAY:", data);
+
+        setClasses(data);
+      })
+      .catch((err) => {
+        console.error("CLASSES FETCH ERROR:", err);
+      });
   }, []);
 
   // ✅ AUTO START ATTENDANCE (ThinkWave UX)
   useEffect(() => {
-    if (classes.length === 0) return;
+    if (classes.length === 0) {
+      console.warn("No classes found, staying on page");
+      return;
+    }
+
+    // 🚫 Prevent double execution (STRICT MODE FIX)
+    if (hasAutoStarted.current) return;
+    hasAutoStarted.current = true;
 
     const autoStart = async () => {
       try {
         const lastClassId = localStorage.getItem("lastAttendanceClassId");
 
-        // ✅ Validate last class
+        console.log("LAST CLASS ID:", lastClassId);
+
         const validClass = classes.find(
           (c) => String(c.id) === String(lastClassId)
         );
 
+        console.log("VALID CLASS:", validClass);
+
         const selectedClass = validClass || classes[0];
+
+        console.log("SELECTED CLASS:", selectedClass);
 
         await startAttendance(selectedClass.id, true);
 
@@ -57,14 +83,12 @@ export default function TeacherAttendance() {
               <td className="p-2 border">{c.name}</td>
 
               <td className="p-2 border">
-
                 <button
                   onClick={() => startAttendance(c.id)}
                   className="bg-blue-600 text-white px-3 py-1 rounded"
                 >
                   Start Attendance
                 </button>
-
               </td>
             </tr>
           ))}
@@ -83,30 +107,24 @@ export default function TeacherAttendance() {
 
       const sessionId = res.data.id;
 
-      // ✅ Save last used class (ONLY here — correct place)
       localStorage.setItem("lastAttendanceClassId", classId);
 
       navigate(`/teacher/attendance/session/${sessionId}`);
 
     } catch (err) {
 
-      // ✅ If session already exists, try to recover instead of failing
-      if (err?.response?.status === 400) {
-        try {
-          const existing = await api.get(`/attendance/sessions/today/${classId}`);
-          const sessionId = existing.data.id;
+      // 🔥 SAFE FALLBACK (no broken endpoint)
+      if (err?.response?.status === 409) {
+        console.warn("Session already exists — but no recovery endpoint");
 
-          localStorage.setItem("lastAttendanceClassId", classId);
+        if (!isAuto) {
+          alert("Attendance already started today.\nPlease refresh or contact admin.");
+        }
 
-          navigate(`/teacher/attendance/session/${sessionId}`);
-          return;
-        } catch {}
+        return;
       }
 
-      if (!isAuto) {
-        alert("Attendance session already exists today");
-      }
-
+      console.error("Start attendance error:", err);
     }
   }
 }

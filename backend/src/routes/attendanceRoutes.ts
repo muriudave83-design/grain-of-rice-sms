@@ -10,6 +10,9 @@ import { getAttendanceByClass } from "../controllers/attendance/getAttendanceByC
 import { getParentAttendanceSummary } from "../controllers/attendance/getParentAttendanceSummary.controller";
 import { getParentAttendance, getStudentAttendanceSummary } from "../controllers/attendance.controller";
 
+// ✅ NEW IMPORT
+import { getTodaySession } from "../controllers/attendance/getTodaySession.controller";
+
 const router = Router();
 
 // CREATE attendance session
@@ -29,6 +32,18 @@ router.post("/sessions/:id/submit", authenticate, async (req, res) => {
   } catch (err) {
     console.error("Submit attendance error:", err);
     return res.status(200).json({ message: "Fallback: session submitted" });
+  }
+});
+
+// GET today's session for a class ✅ ADDED
+router.get("/sessions/today/:classId", authenticate, async (req, res) => {
+  try {
+    return await getTodaySession(req, res);
+  } catch (err) {
+    console.error("Get today session error:", err);
+    return res.status(500).json({
+      message: "Could not fetch today's session",
+    });
   }
 });
 

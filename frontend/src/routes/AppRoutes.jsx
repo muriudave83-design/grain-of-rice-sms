@@ -48,6 +48,7 @@ import ClassReportCards from "../pages/teacher/report-cards/ClassReportCards";
 import TeacherClasses from "../pages/teacher/TeacherClasses";
 import TeacherClassDetails from "../pages/teacher/TeacherClassDetails";
 import TeacherStudentDetails from "../pages/teacher/TeacherStudentDetails";
+import TeacherAttendance from "../pages/teacher/attendance/TeacherAttendance";
 
 // =======================
 // PARENT PAGES
@@ -325,7 +326,7 @@ export default function AppRoutes() {
             {/* Attendance Redirect */}
             <Route
               path="/teacher/attendance"
-                element={<Navigate to="/teacher/classes" replace />}
+                element={<TeacherAttendance />}
             />
 
             {/* Attendance by Class */}
