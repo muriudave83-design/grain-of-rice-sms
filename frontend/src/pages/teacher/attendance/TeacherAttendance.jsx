@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../services/apiClient";
 
@@ -7,9 +7,6 @@ export default function TeacherAttendance() {
 
   const [classes, setClasses] = useState([]);
   const navigate = useNavigate();
-
-  // ✅ Prevent double autoStart (React Strict Mode fix)
-  const hasAutoStarted = useRef(false);
 
   // ✅ Fetch classes (WITH DEBUG)
   useEffect(() => {
@@ -26,43 +23,6 @@ export default function TeacherAttendance() {
         console.error("CLASSES FETCH ERROR:", err);
       });
   }, []);
-
-  // ✅ AUTO START ATTENDANCE (ThinkWave UX)
-  useEffect(() => {
-    if (classes.length === 0) {
-      console.warn("No classes found, staying on page");
-      return;
-    }
-
-    // 🚫 Prevent double execution (STRICT MODE FIX)
-    if (hasAutoStarted.current) return;
-    hasAutoStarted.current = true;
-
-    const autoStart = async () => {
-      try {
-        const lastClassId = localStorage.getItem("lastAttendanceClassId");
-
-        console.log("LAST CLASS ID:", lastClassId);
-
-        const validClass = classes.find(
-          (c) => String(c.id) === String(lastClassId)
-        );
-
-        console.log("VALID CLASS:", validClass);
-
-        const selectedClass = validClass || classes[0];
-
-        console.log("SELECTED CLASS:", selectedClass);
-
-        await startAttendance(selectedClass.id);
-
-      } catch (err) {
-        console.error("Auto attendance error:", err);
-      }
-    };
-
-    autoStart();
-  }, [classes]);
 
   return (
     <div className="space-y-6">
@@ -98,10 +58,27 @@ export default function TeacherAttendance() {
     </div>
   );
 
-  // ✅ START / RESUME ATTENDANCE (FINAL LOGIC)
+  // ✅ START / RESUME ATTENDANCE (ONLY ON CLICK)
   async function startAttendance(classId) {
     try {
-      // Try creating session
+      // STEP 1: Check if session already exists
+      const existing = await api.get(`/attendance/sessions/today/${classId}`);
+
+      if (existing.data) {
+        console.log("🔁 Resuming existing session");
+
+        localStorage.setItem("lastAttendanceClassId", classId);
+
+        navigate(`/teacher/attendance/session/${existing.data.id}`);
+        return;
+      }
+
+    } catch (err) {
+      // ✅ 404 = no session → continue to create
+    }
+
+    try {
+      // STEP 2: Create new session
       const res = await api.post("/attendance/sessions", { classId });
 
       const sessionId = res.data.id;
@@ -111,28 +88,8 @@ export default function TeacherAttendance() {
       navigate(`/teacher/attendance/session/${sessionId}`);
 
     } catch (err) {
-      if (err.response?.status === 409) {
-        console.log("🔁 Session exists, fetching today's session...");
-
-        try {
-          const res = await api.get(`/attendance/sessions/today/${classId}`);
-
-          const sessionId = res.data.id;
-
-          localStorage.setItem("lastAttendanceClassId", classId);
-
-          // ✅ RESUME existing session
-          navigate(`/teacher/attendance/session/${sessionId}`);
-
-        } catch (fetchErr) {
-          console.error("❌ Could not recover session", fetchErr);
-          alert("Could not resume attendance session.");
-        }
-
-      } else {
-        console.error("Start attendance error:", err);
-        alert("Failed to start attendance.");
-      }
+      console.error("Start attendance error:", err);
+      alert("Could not start attendance");
     }
   }
 }
