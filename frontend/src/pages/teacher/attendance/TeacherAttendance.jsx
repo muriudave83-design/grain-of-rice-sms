@@ -1,15 +1,42 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../../services/apiClient";
 
 export default function TeacherAttendance() {
-
   const [classes, setClasses] = useState([]);
+  const navigate = useNavigate();
 
+  // ✅ Fetch classes
   useEffect(() => {
     api.get("/classes/my")
       .then(res => setClasses(res.data))
       .catch(() => {});
   }, []);
+
+  // ✅ AUTO START ATTENDANCE (ThinkWave UX)
+  useEffect(() => {
+    if (classes.length === 0) return;
+
+    const autoStart = async () => {
+      try {
+        const lastClassId = localStorage.getItem("lastAttendanceClassId");
+
+        // ✅ Validate last class
+        const validClass = classes.find(
+          (c) => String(c.id) === String(lastClassId)
+        );
+
+        const selectedClass = validClass || classes[0];
+
+        await startAttendance(selectedClass.id, true);
+
+      } catch (err) {
+        console.error("Auto attendance error:", err);
+      }
+    };
+
+    autoStart();
+  }, [classes]);
 
   return (
     <div className="space-y-6">
@@ -47,25 +74,39 @@ export default function TeacherAttendance() {
     </div>
   );
 
-  async function startAttendance(classId) {
-
+  // ✅ START ATTENDANCE (manual + auto)
+  async function startAttendance(classId, isAuto = false) {
     try {
-
       const res = await api.post("/attendance/sessions", {
         classId
       });
 
       const sessionId = res.data.id;
 
-      window.location.href =
-        `/teacher/attendance/session/${sessionId}`;
+      // ✅ Save last used class (ONLY here — correct place)
+      localStorage.setItem("lastAttendanceClassId", classId);
 
-    } catch {
+      navigate(`/teacher/attendance/session/${sessionId}`);
 
-      alert("Attendance session already exists today");
+    } catch (err) {
+
+      // ✅ If session already exists, try to recover instead of failing
+      if (err?.response?.status === 400) {
+        try {
+          const existing = await api.get(`/attendance/sessions/today/${classId}`);
+          const sessionId = existing.data.id;
+
+          localStorage.setItem("lastAttendanceClassId", classId);
+
+          navigate(`/teacher/attendance/session/${sessionId}`);
+          return;
+        } catch {}
+      }
+
+      if (!isAuto) {
+        alert("Attendance session already exists today");
+      }
 
     }
-
   }
-
 }

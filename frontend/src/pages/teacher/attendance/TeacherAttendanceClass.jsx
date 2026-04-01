@@ -11,6 +11,13 @@ export default function TeacherAttendanceClass() {
   const [loading, setLoading] = useState(true);
   const [friendlyMessage, setFriendlyMessage] = useState("");
 
+  // ✅ STEP A — Save last attendance class (CORRECT)
+  useEffect(() => {
+    if (classId) {
+      localStorage.setItem("lastAttendanceClassId", classId);
+    }
+  }, [classId]);
+
   useEffect(() => {
     // ✅ CRITICAL FIX: prevent invalid API call
     if (!classId) {
