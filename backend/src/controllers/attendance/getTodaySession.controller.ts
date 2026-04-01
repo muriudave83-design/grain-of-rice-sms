@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { prisma } from "../../prisma"; // ✅ correct for your project
+import prisma from "../../prisma";
 
 export const getTodaySession = async (req: Request, res: Response) => {
   try {
