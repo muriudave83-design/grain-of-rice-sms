@@ -14,14 +14,6 @@ export default function Login() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    //console.log("🧹 Clearing stale session on login page");
-
-    //localStorage.removeItem("token");
-    //localStorage.removeItem("role");
-    //localStorage.removeItem("user");
-  }, []);
-
-  useEffect(() => {
     console.log("✅ Login component mounted");
     console.log("🔁 Redirect from:", location.state?.from);
   }, [location.state]);
@@ -47,30 +39,34 @@ export default function Login() {
 
       console.log("✅ LOGIN RESPONSE:", res.data);
 
-      const {
-        token,
-        role,
-        mustChangePassword,
-        user = {},
-      } = res.data;
+      const { token, role, mustChangePassword, user } = res.data;
+
+      // 🚨 HARD VALIDATION (CRITICAL)
+      if (!token || !user || !user.id) {
+        console.error("🚨 Invalid login response:", res.data);
+        throw new Error("Invalid server response. Please contact admin.");
+      }
 
       console.log("🔥 TOKEN BEFORE SAVE:", token);
       console.log("👉 ROLE:", role);
       console.log("🔐 mustChangePassword:", mustChangePassword);
       console.log("👤 USER:", user);
 
-      // Persist token
+      // ✅ ALWAYS CLEAR FIRST (prevents corruption)
+      localStorage.clear();
+
+      // ✅ STORE TOKEN FIRST
       localStorage.setItem("token", token);
-      localStorage.setItem("role", role); 
+      localStorage.setItem("role", role);
       localStorage.setItem("user", JSON.stringify(user));
 
-      // Store user in AuthContext
+      // ✅ SAFE LOGIN
       login({
         id: user.id,
         name: user.name,
         email: user.email,
         role: role,
-        forcePasswordChange: mustChangePassword,
+        forcePasswordChange: mustChangePassword || false,
       });
 
       // 🔐 PASSWORD ENFORCEMENT
@@ -79,7 +75,7 @@ export default function Login() {
         return;
       }
 
-      // ✅ ROLE-BASED REDIRECT (FIXED)
+      // ✅ ROLE-BASED REDIRECT
       const normalizedRole = role?.toUpperCase();
 
       if (normalizedRole === "ADMIN") {
@@ -91,11 +87,16 @@ export default function Login() {
       } else if (normalizedRole === "STUDENT") {
         navigate("/student/dashboard", { replace: true });
       } else {
+        console.warn("⚠️ Unknown role, redirecting to home");
         navigate("/", { replace: true });
       }
 
     } catch (err) {
       console.error("❌ LOGIN ERROR:", err);
+
+      // 🚨 ENSURE NO PARTIAL STATE
+      localStorage.clear();
+
       setError(
         err?.response?.data?.message ||
         err?.message ||
@@ -127,6 +128,7 @@ export default function Login() {
           <input
             type="email"
             required
+            autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full border rounded px-3 py-2"

@@ -32,16 +32,13 @@ export default function UsersPage() {
     password: "",
   });
 
-  // Existing filters
   const teachers = users.filter((u) => u.role === "TEACHER");
   const parents = users.filter((u) => u.role === "PARENT");
   const studentUsers = users.filter((u) => u.role === "STUDENT");
-
-  // ✅ NEW: Admin filter
   const admins = users.filter((u) => u.role === "ADMIN");
 
   const counts = {
-    admins: admins.length, // ✅ added
+    admins: admins.length,
     teachers: teachers.length,
     students: studentUsers.length,
     parents: parents.length,
@@ -120,12 +117,15 @@ export default function UsersPage() {
   async function submitForm(e) {
     e.preventDefault();
 
+    console.log("🚀 SUBMIT FORM:", form);
+
     try {
       if (editingUser) {
         await apiClient.put(`/admin/users/${editingUser.id}`, form);
       } else {
         if (form.role === "STUDENT") {
           await apiClient.post("/admin/users/student", {
+            name: `${form.firstName} ${form.lastName}`, // ✅ FIXED
             firstName: form.firstName,
             lastName: form.lastName,
             admissionNo: form.admissionNo,
@@ -152,12 +152,18 @@ export default function UsersPage() {
       setShowForm(false);
       fetchUsers();
     } catch (err) {
-      console.error("Failed to save user", err);
-      alert(err?.response?.data?.message || "Failed to save user");
+      console.error("❌ CREATE USER ERROR FULL:", err);
+      console.error("❌ RESPONSE DATA:", err?.response?.data);
+      console.error("❌ STATUS:", err?.response?.status);
+
+      alert(
+        JSON.stringify(err?.response?.data, null, 2) ||
+          err.message ||
+          "Failed to save user"
+      );
     }
   }
 
-  // Archive User
   async function handleArchive(userId) {
     if (!window.confirm("Are you sure you want to archive this user?"))
       return;
@@ -171,7 +177,6 @@ export default function UsersPage() {
     }
   }
 
-  // Reset Password
   async function resetPassword(user) {
     if (!window.confirm(`Reset password for ${user.email}?`)) return;
 
@@ -207,7 +212,6 @@ export default function UsersPage() {
         counts={counts}
       />
 
-      {/* ✅ NEW: Admin Panel */}
       {activeTab === "admins" && (
         <TeachersPanel
           teachers={admins}
@@ -277,6 +281,20 @@ export default function UsersPage() {
               }
               disabled={!!editingUser}
             />
+
+            {/* ✅ FIXED: Password for parent & teacher */}
+            {form.role !== "STUDENT" && (
+              <input
+                required
+                type="password"
+                placeholder="Temporary Password"
+                className="w-full mb-3 p-2 border rounded"
+                value={form.password}
+                onChange={(e) =>
+                  setForm({ ...form, password: e.target.value })
+                }
+              />
+            )}
 
             <select
               className="w-full mb-3 p-2 border rounded"

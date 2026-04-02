@@ -6,42 +6,38 @@ export function AuthProvider({ children }) {
   console.log("🧠 AuthProvider INIT");
 
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null); // ✅ NEW
   const [loading, setLoading] = useState(true);
 
-  // 🔁 Restore session on refresh (FIXED)
-  useEffect(() => {
-    console.log("🔁 Auth restore running");
+  // 🔁 Restore session on refresh
+    useEffect(() => {
+      console.log("🔁 Auth restore running");
 
-    const storedToken = localStorage.getItem("token");
-    const storedUser = localStorage.getItem("user");
+      const token = localStorage.getItem("token");
+      const storedUser = localStorage.getItem("user");
 
-    if (!storedToken) {
-      setLoading(false);
-      return;
-    }
+      // 🚨 HARD RULE: both must exist
+      if (!token || !storedUser) {
+        console.warn("⚠️ Incomplete auth state → clearing");
 
-    try {
-      // 🔥 Decode token
-      const payload = JSON.parse(atob(storedToken.split(".")[1]));
-      const isExpired = payload.exp * 1000 < Date.now();
-
-      if (isExpired) {
-        console.warn("⛔ Token expired → clearing session");
-
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        localStorage.removeItem("role");
-
+        localStorage.clear();
+        setUser(null);
         setLoading(false);
         return;
       }
 
-      // ✅ Set token FIRST
-      setToken(storedToken);
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        const isExpired = payload.exp * 1000 < Date.now();
 
-      // ✅ Restore user if exists
-      if (storedUser) {
+        if (isExpired) {
+          console.warn("⛔ Token expired → clearing");
+
+          localStorage.clear();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
         const parsed = JSON.parse(storedUser);
 
         setUser({
@@ -51,47 +47,47 @@ export function AuthProvider({ children }) {
           role: parsed.role,
           forcePasswordChange: parsed.forcePasswordChange || false,
         });
-      } else {
-        console.warn("⚠️ Token exists but no user found");
+
+      } catch (err) {
+        console.error("⚠️ Corrupt session → clearing:", err);
+
+        localStorage.clear();
+        setUser(null);
       }
 
-    } catch (err) {
-      console.error("⚠️ Corrupt session → clearing:", err);
+      setLoading(false);
+    }, []);
 
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("role");
-    }
-
-    setLoading(false);
-  }, []);
-
-  // 🔐 Login (FIXED)
+  // 🔐 LOGIN (🔥 BULLETPROOF FIX)
   const login = (data) => {
     console.log("🔥 LOGIN DATA RECEIVED:", data);
 
+    // ✅ HANDLE BOTH CASES:
+    // login(response.data)
+    // login(response.data.user)
+    const safeUser = data?.user ?? data;
+
+    if (!safeUser || !safeUser.id) {
+      console.error("❌ INVALID LOGIN DATA:", data);
+      throw new Error("Invalid login data structure");
+    }
+
     const userData = {
-      id: data.user.id,
-      name: data.user.name,
-      email: data.user.email,
-      role: data.user.role,
-      forcePasswordChange: data.user.forcePasswordChange || false,
+      id: safeUser.id,
+      name: safeUser.name,
+      email: safeUser.email,
+      role: safeUser.role,
+      forcePasswordChange: safeUser.forcePasswordChange || false,
     };
 
-    // ✅ CRITICAL: store token HERE (no race conditions)
-    localStorage.setItem("token", data.token);
-    localStorage.setItem("user", JSON.stringify(userData));
-
-    setToken(data.token);
     setUser(userData);
 
-    console.log("🔐 AuthContext.login → stored:", {
-      token: data.token,
-      user: userData,
-    });
+    localStorage.setItem("user", JSON.stringify(userData));
+
+    console.log("🔐 AuthContext.login → stored user:", userData);
   };
 
-  // 🚪 Logout (HARD RESET)
+  // 🚪 Logout
   const logout = () => {
     console.log("🚪 Logging out...");
 
@@ -100,7 +96,6 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("user");
 
     setUser(null);
-    setToken(null);
 
     window.location.href = "/login";
   };
@@ -118,13 +113,12 @@ export function AuthProvider({ children }) {
     localStorage.setItem("user", JSON.stringify(updatedUser));
   };
 
-  const isAuthenticated = !!token; // ✅ FIXED (was user before)
+  const isAuthenticated = !!user;
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        token, // ✅ expose token
         isAuthenticated,
         loading,
         login,

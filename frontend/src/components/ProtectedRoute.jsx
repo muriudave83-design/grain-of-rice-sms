@@ -2,8 +2,10 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function ProtectedRoute({ allowedRoles }) {
-  const { user, token, loading } = useAuth(); // ✅ USE CONTEXT ONLY
+  const { user, loading } = useAuth(); // 🔥 token not from context
   const location = useLocation();
+
+  const token = localStorage.getItem("token"); // ✅ single source of truth
 
   // ⏳ Wait for auth restoration
   if (loading) {
@@ -18,9 +20,11 @@ export default function ProtectedRoute({ allowedRoles }) {
     path: location.pathname,
   });
 
-  // 🔒 NOT AUTHENTICATED
-  if (!token) {
-    console.error("🚨 REDIRECT TO LOGIN FROM:", location.pathname);
+  // 🚨 CRITICAL: INVALID AUTH STATE (MOST IMPORTANT FIX)
+  if (!token || !user) {
+    console.error("🚨 Invalid auth state → forcing logout from:", location.pathname);
+
+    localStorage.clear();
 
     return (
       <Navigate
@@ -31,25 +35,19 @@ export default function ProtectedRoute({ allowedRoles }) {
     );
   }
 
-  // ⚠️ Token exists but user not ready → WAIT
-  if (token && !user) {
-    console.warn("⏳ Token exists but user not ready — waiting");
-    return <div>Restoring session...</div>;
-  }
-
   // 🔐 FORCE PASSWORD CHANGE
   if (
-    user?.forcePasswordChange &&
+    user.forcePasswordChange &&
     location.pathname !== "/change-password"
   ) {
     return <Navigate to="/change-password" replace />;
   }
 
   // 🚫 ROLE CHECK
-  if (allowedRoles && !allowedRoles.includes(user?.role)) {
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
     console.warn("🚫 Role mismatch", {
       required: allowedRoles,
-      actual: user?.role,
+      actual: user.role,
     });
 
     return <div>Access restricted</div>;

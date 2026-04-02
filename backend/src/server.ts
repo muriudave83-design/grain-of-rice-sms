@@ -31,7 +31,7 @@ import adminSubjectsRoutes from "./routes/admin/admin.subjects.routes";
 import adminStudentsRoutes from "./routes/admin/admin.students.routes";
 import adminClassStudentsRoutes from "./routes/admin/admin.class.students.routes";
 import adminClassSubjectsRoutes from "./routes/admin/admin.classSubjects.routes";
-import adminAttendanceRoutes from "./routes/adminAttendance.routes"
+import adminAttendanceRoutes from "./routes/adminAttendance.routes";
 
 // ✅ NEW: Teacher ↔ Subject assignments (ADMIN)
 import teacherSubjectsRoutes from "./routes/admin/admin.teacherSubjects.routes";
@@ -54,6 +54,9 @@ import attendanceRoutes from "./routes/attendanceRoutes";
 
 // ✅ Teacher-visible classes
 import classesRoutes from "./routes/classes";
+
+// ✅ 🆕 NEW: Admin Parents Routes
+import adminParentsRoutes from "./routes/admin/admin.parents.routes";
 
 const app = express();
 
@@ -120,7 +123,7 @@ app.use("/api/classes", classesRoutes);
 app.use("/api/gradebook", gradebookRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/assignment-categories", assignmentCategoryRoutes);
-app.use("/api/admin/attendance", adminAttendanceRoutes)
+app.use("/api/admin/attendance", adminAttendanceRoutes);
 
 // ✅ STANDARDIZED TERMS ROUTE
 app.use("/api/terms", termRoutes);
@@ -152,6 +155,9 @@ app.use("/api/admin", adminClassesRoutes);
 app.use("/api/admin", adminSubjectsRoutes);
 app.use("/api/admin", adminClassStudentsRoutes);
 app.use("/api/admin", adminClassSubjectsRoutes);
+
+// ✅ 🆕 NEW: Parents route (THIS IS THE KEY ADD)
+app.use("/api/admin/parents", adminParentsRoutes);
 
 // ✅ NEW: Teacher Subject Assignments (ADMIN)
 app.use("/api/admin", teacherSubjectsRoutes);
