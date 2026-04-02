@@ -53,18 +53,16 @@ export const createParent = async (req: Request, res: Response) => {
       lastName,
       email,
       password,
-      phone, // optional (not stored in schema currently)
+      phone,
       childrenIds,
     } = req.body;
 
-    // 1. VALIDATION
     if (!firstName || !lastName || !email || !password) {
       return res.status(400).json({
         message: "Missing required fields",
       });
     }
 
-    // 2. CHECK EXISTING USER
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -75,10 +73,23 @@ export const createParent = async (req: Request, res: Response) => {
       });
     }
 
-    // 3. HASH PASSWORD
+    if (childrenIds && childrenIds.length > 0) {
+      const students = await prisma.student.findMany({
+        where: {
+          id: { in: childrenIds },
+          isArchived: false,
+        },
+      });
+
+      if (students.length !== childrenIds.length) {
+        return res.status(400).json({
+          message: "One or more students are invalid or archived",
+        });
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 4. CREATE USER (PARENT ROLE)
     const newParent = await prisma.user.create({
       data: {
         name: `${firstName} ${lastName}`,
@@ -88,7 +99,6 @@ export const createParent = async (req: Request, res: Response) => {
       },
     });
 
-    // 5. LINK TO STUDENTS
     if (childrenIds && childrenIds.length > 0) {
       await prisma.parentStudent.createMany({
         data: childrenIds.map((studentId: number) => ({
@@ -99,7 +109,6 @@ export const createParent = async (req: Request, res: Response) => {
       });
     }
 
-    // 6. FETCH WITH CHILDREN
     const parentWithChildren = await prisma.user.findUnique({
       where: { id: newParent.id },
       include: {
@@ -111,10 +120,22 @@ export const createParent = async (req: Request, res: Response) => {
       },
     });
 
-    // 7. CLEAN RESPONSE FORMAT
+    if (!parentWithChildren) {
+      return res.status(404).json({ message: "Parent not found after creation" });
+    }
+
+    const { password: _, parentStudents, ...safeParent } = parentWithChildren;
+
     const formatted = {
-      ...parentWithChildren,
-      children: parentWithChildren?.parentStudents.map((ps) => ps.student),
+      id: safeParent.id,
+      name: safeParent.name,
+      email: safeParent.email,
+      role: safeParent.role,
+      children: parentStudents.map((ps) => ({
+        id: ps.student.id,
+        firstName: ps.student.firstName,
+        lastName: ps.student.lastName,
+      })),
     };
 
     return res.status(201).json(formatted);
@@ -122,6 +143,183 @@ export const createParent = async (req: Request, res: Response) => {
     console.error("CREATE PARENT ERROR:", error);
     return res.status(500).json({
       message: "Failed to create parent",
+    });
+  }
+};
+
+/**
+ * Get Parents
+ */
+export const getParents = async (req: Request, res: Response) => {
+  try {
+    const parents = await prisma.user.findMany({
+      where: {
+        role: "PARENT",
+        isArchived: false,
+      },
+      include: {
+        parentStudents: {
+          include: {
+            student: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    const formatted = parents.map((parent) => ({
+      id: parent.id,
+      name: parent.name,
+      email: parent.email,
+      role: parent.role,
+      children: parent.parentStudents.map((ps) => ({
+        id: ps.student.id,
+        firstName: ps.student.firstName,
+        lastName: ps.student.lastName,
+      })),
+    }));
+
+    return res.json(formatted);
+  } catch (error) {
+    console.error("GET PARENTS ERROR:", error);
+    return res.status(500).json({
+      message: "Failed to fetch parents",
+    });
+  }
+};
+
+/**
+ * Update Parent
+ */
+export const updateParent = async (req: Request, res: Response) => {
+  try {
+    const parentId = Number(req.params.id);
+    const { firstName, lastName, email, childrenIds } = req.body;
+
+    // 1. FIND USER
+    const existingUser = await prisma.user.findUnique({
+      where: { id: parentId },
+    });
+
+    if (!existingUser || existingUser.role !== "PARENT") {
+      return res.status(404).json({ message: "Parent not found" });
+    }
+
+    // 2. VALIDATE STUDENTS
+    if (childrenIds && childrenIds.length > 0) {
+      const students = await prisma.student.findMany({
+        where: {
+          id: { in: childrenIds },
+          isArchived: false,
+        },
+      });
+
+      if (students.length !== childrenIds.length) {
+        return res.status(400).json({
+          message: "One or more students are invalid or archived",
+        });
+      }
+    }
+
+    // 3. UPDATE USER
+    await prisma.user.update({
+      where: { id: parentId },
+      data: {
+        email: email ?? existingUser.email,
+        name:
+          firstName && lastName
+            ? `${firstName} ${lastName}`
+            : existingUser.name,
+      },
+    });
+
+    // 4. RESET RELATIONSHIPS
+    await prisma.parentStudent.deleteMany({
+      where: { parentId },
+    });
+
+    if (childrenIds && childrenIds.length > 0) {
+      await prisma.parentStudent.createMany({
+        data: childrenIds.map((studentId: number) => ({
+          parentId,
+          studentId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    // 5. RETURN UPDATED DATA
+    const updatedParent = await prisma.user.findUnique({
+      where: { id: parentId },
+      include: {
+        parentStudents: {
+          include: {
+            student: true,
+          },
+        },
+      },
+    });
+
+    if (!updatedParent) {
+      return res.status(404).json({ message: "Parent not found after update" });
+    }
+
+    const { password: _, parentStudents, ...safeParent } = updatedParent;
+
+    const formatted = {
+      id: safeParent.id,
+      name: safeParent.name,
+      email: safeParent.email,
+      role: safeParent.role,
+      children: parentStudents.map((ps) => ({
+        id: ps.student.id,
+        firstName: ps.student.firstName,
+        lastName: ps.student.lastName,
+      })),
+    };
+
+    return res.json(formatted);
+  } catch (err) {
+    console.error("UPDATE PARENT ERROR:", err);
+    return res.status(500).json({
+      message: "Failed to update parent",
+    });
+  }
+};
+
+/**
+ * Archive (Deactivate) Parent
+ */
+export const archiveParent = async (req: Request, res: Response) => {
+  try {
+    const parentId = Number(req.params.id);
+
+    // 1. FIND USER
+    const existingUser = await prisma.user.findUnique({
+      where: { id: parentId },
+    });
+
+    if (!existingUser || existingUser.role !== "PARENT") {
+      return res.status(404).json({ message: "Parent not found" });
+    }
+
+    // 2. ARCHIVE USER
+    await prisma.user.update({
+      where: { id: parentId },
+      data: {
+        isArchived: true,
+      },
+    });
+
+    return res.json({
+      message: "Parent archived successfully",
+    });
+  } catch (err) {
+    console.error("ARCHIVE PARENT ERROR:", err);
+    return res.status(500).json({
+      message: "Failed to archive parent",
     });
   }
 };

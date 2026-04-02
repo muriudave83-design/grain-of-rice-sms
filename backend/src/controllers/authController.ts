@@ -39,7 +39,6 @@ export const registerUser = async (req: Request, res: Response) => {
       });
     }
 
-    // 🔥 ALWAYS USE DEFAULT PASSWORD (ignore incoming password)
     const hashedPassword = await hashPassword(DEFAULT_PASSWORD);
 
     const user = await prisma.user.create({
@@ -48,15 +47,15 @@ export const registerUser = async (req: Request, res: Response) => {
         email,
         password: hashedPassword,
         role,
-        isActive: true,           // ✅ ALWAYS ACTIVE
-        isArchived: false,        // ✅ SAFETY
-        mustChangePassword: true, // ✅ FORCE PASSWORD RESET
+        isActive: true,
+        isArchived: false,
+        mustChangePassword: true,
       },
     });
 
     res.status(201).json({
       message: "User registered successfully",
-      defaultPassword: DEFAULT_PASSWORD, // ✅ Optional: helps admin communicate login
+      defaultPassword: DEFAULT_PASSWORD,
       user: {
         id: user.id,
         name: user.name,
@@ -95,20 +94,22 @@ export const loginUser = async (req: Request, res: Response) => {
       });
     }
 
+    // ✅ INCLUDE PARENT RELATIONS
     const user = await prisma.user.findUnique({
       where: { email },
+      include: {
+        parentStudents: {
+          include: {
+            student: true,
+          },
+        },
+      },
     });
 
-    if (!user) {
-      return res.status(400).json({
-        message: "Invalid email or password",
-      });
-    }
-
-    // 🛡️ BLOCK ARCHIVED ACCOUNTS
-    if (user.isArchived) {
-      return res.status(403).json({
-        message: "Account is archived. Contact administrator.",
+    // ✅ BLOCK INVALID OR ARCHIVED USERS (CRITICAL)
+    if (!user || user.isArchived) {
+      return res.status(401).json({
+        message: "Invalid credentials",
       });
     }
 
@@ -125,8 +126,8 @@ export const loginUser = async (req: Request, res: Response) => {
     );
 
     if (!validPassword) {
-      return res.status(400).json({
-        message: "Invalid email or password",
+      return res.status(401).json({
+        message: "Invalid credentials",
       });
     }
 
@@ -150,17 +151,26 @@ export const loginUser = async (req: Request, res: Response) => {
       maxAge: 60 * 60 * 1000,
     });
 
-    res.json({
-      message: "Login successful",
+    // ✅ FORMAT CHILDREN (FOR PARENTS)
+    let children: any[] = [];
+
+    if (user.role === "PARENT") {
+      children = user.parentStudents.map((ps) => ({
+        id: ps.student.id,
+        firstName: ps.student.firstName,
+        lastName: ps.student.lastName,
+      }));
+    }
+
+    // ✅ CLEAN USER OBJECT
+    const { password: _, parentStudents, ...safeUser } = user;
+
+    // ✅ FINAL RESPONSE SHAPE (STANDARDIZED)
+    return res.json({
+      ...safeUser,
+      children,
       token,
       mustChangePassword: user.mustChangePassword,
-      role: user.role,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
     });
   } catch (err: any) {
     console.error("🔥 LOGIN ERROR:", err);
