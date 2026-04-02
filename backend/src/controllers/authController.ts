@@ -167,11 +167,14 @@ export const loginUser = async (req: Request, res: Response) => {
 
     // ✅ FINAL RESPONSE SHAPE (STANDARDIZED)
     return res.json({
-      ...safeUser,
-      children,
       token,
       mustChangePassword: user.mustChangePassword,
+      user: {
+        ...safeUser,
+        children,
+      },
     });
+
   } catch (err: any) {
     console.error("🔥 LOGIN ERROR:", err);
 
