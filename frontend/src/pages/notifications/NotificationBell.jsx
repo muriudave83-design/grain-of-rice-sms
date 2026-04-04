@@ -7,8 +7,10 @@ export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // ✅ DISABLED (no backend support yet)
   useEffect(() => {
-    fetchNotifications();
+    console.log("🔕 Notifications disabled (not in this backend version)");
+    setLoading(false);
   }, []);
 
   async function fetchNotifications() {

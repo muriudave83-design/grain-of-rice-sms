@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import AdminLayout from "../../components/layout/AdminLayout";
+import apiClient from "../../services/apiClient"; // ✅ added
 
 export default function AttendancePage() {
 
@@ -7,10 +8,23 @@ export default function AttendancePage() {
 
   useEffect(() => {
 
+    // ✅ EXISTING CALL (unchanged)
     fetch(`${import.meta.env.VITE_API_URL}/admin/attendance/by-class`)
       .then(res => res.json())
       .then(data => setClasses(data))
       .catch(err => console.error("Failed to load attendance", err));
+
+    // ✅ NEW SAFE TEST CALL (DO NOT TOUCH ANYTHING ELSE)
+    const fetchSummary = async () => {
+      try {
+        const res = await apiClient.get("/admin/attendance/summary");
+        console.log("ATTENDANCE SUMMARY:", res.data);
+      } catch (err) {
+        console.error("Failed to fetch summary:", err);
+      }
+    };
+
+    fetchSummary();
 
   }, []);
 
