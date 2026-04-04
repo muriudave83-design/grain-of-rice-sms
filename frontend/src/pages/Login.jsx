@@ -39,35 +39,25 @@ export default function Login() {
 
       console.log("✅ LOGIN RESPONSE:", res.data);
 
-      const { token, role, mustChangePassword, user } = res.data;
+      // ✅ CORRECT STRUCTURE
+      const { token, user, mustChangePassword } = res.data;
 
-      // 🚨 HARD VALIDATION (CRITICAL)
+      // 🚨 HARD VALIDATION
       if (!token || !user || !user.id) {
         console.error("🚨 Invalid login response:", res.data);
         throw new Error("Invalid server response. Please contact admin.");
       }
 
       console.log("🔥 TOKEN BEFORE SAVE:", token);
-      console.log("👉 ROLE:", role);
-      console.log("🔐 mustChangePassword:", mustChangePassword);
       console.log("👤 USER:", user);
+      console.log("👉 ROLE (FROM USER):", user.role);
+      console.log("🔐 mustChangePassword:", mustChangePassword);
 
-      // ✅ ALWAYS CLEAR FIRST (prevents corruption)
+      // ✅ CLEAR OLD STATE
       localStorage.clear();
 
-      // ✅ STORE TOKEN FIRST
-      localStorage.setItem("token", token);
-      localStorage.setItem("role", role);
-      localStorage.setItem("user", JSON.stringify(user));
-
-      // ✅ SAFE LOGIN
-      login({
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: role,
-        forcePasswordChange: mustChangePassword || false,
-      });
+      // ✅ USE BACKEND USER DIRECTLY (NO TRANSFORMATION BUG)
+      login(user, token);
 
       // 🔐 PASSWORD ENFORCEMENT
       if (mustChangePassword) {
@@ -75,8 +65,8 @@ export default function Login() {
         return;
       }
 
-      // ✅ ROLE-BASED REDIRECT
-      const normalizedRole = role?.toUpperCase();
+      // ✅ ROLE-BASED REDIRECT (SAFE SOURCE)
+      const normalizedRole = user.role?.toUpperCase();
 
       if (normalizedRole === "ADMIN") {
         navigate("/admin", { replace: true });

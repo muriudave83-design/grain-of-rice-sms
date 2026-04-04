@@ -9,15 +9,28 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   // 🔁 Restore session on refresh
-    useEffect(() => {
-      console.log("🔁 Auth restore running");
+  useEffect(() => {
+    console.log("🔁 Auth restore running");
 
-      const token = localStorage.getItem("token");
-      const storedUser = localStorage.getItem("user");
+    const token = localStorage.getItem("token");
+    const storedUser = localStorage.getItem("user");
 
-      // 🚨 HARD RULE: both must exist
-      if (!token || !storedUser) {
-        console.warn("⚠️ Incomplete auth state → clearing");
+    // 🚨 HARD RULE: both must exist
+    if (!token || !storedUser) {
+      console.warn("⚠️ Incomplete auth state → clearing");
+
+      localStorage.clear();
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      const isExpired = payload.exp * 1000 < Date.now();
+
+      if (isExpired) {
+        console.warn("⛔ Token expired → clearing");
 
         localStorage.clear();
         setUser(null);
@@ -25,66 +38,42 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        const isExpired = payload.exp * 1000 < Date.now();
+      const parsed = JSON.parse(storedUser);
 
-        if (isExpired) {
-          console.warn("⛔ Token expired → clearing");
+      setUser({
+        id: parsed.id,
+        name: parsed.name,
+        email: parsed.email,
+        role: parsed.role,
+        forcePasswordChange: parsed.forcePasswordChange || false,
+      });
 
-          localStorage.clear();
-          setUser(null);
-          setLoading(false);
-          return;
-        }
+    } catch (err) {
+      console.error("⚠️ Corrupt session → clearing:", err);
 
-        const parsed = JSON.parse(storedUser);
+      localStorage.clear();
+      setUser(null);
+    }
 
-        setUser({
-          id: parsed.id,
-          name: parsed.name,
-          email: parsed.email,
-          role: parsed.role,
-          forcePasswordChange: parsed.forcePasswordChange || false,
-        });
+    setLoading(false);
+  }, []);
 
-      } catch (err) {
-        console.error("⚠️ Corrupt session → clearing:", err);
+  // 🔐 LOGIN (🔥 FINAL FIX)
+  const login = (user, token) => {
+    console.log("🔥 LOGIN DATA RECEIVED:", user);
 
-        localStorage.clear();
-        setUser(null);
-      }
-
-      setLoading(false);
-    }, []);
-
-  // 🔐 LOGIN (🔥 BULLETPROOF FIX)
-  const login = (data) => {
-    console.log("🔥 LOGIN DATA RECEIVED:", data);
-
-    // ✅ HANDLE BOTH CASES:
-    // login(response.data)
-    // login(response.data.user)
-    const safeUser = data?.user ?? data;
-
-    if (!safeUser || !safeUser.id) {
-      console.error("❌ INVALID LOGIN DATA:", data);
+    // ✅ CORRECT VALIDATION (MATCHES NEW SIGNATURE)
+    if (!user || !user.role || !token) {
+      console.error("❌ INVALID LOGIN DATA:", { user, token });
       throw new Error("Invalid login data structure");
     }
 
-    const userData = {
-      id: safeUser.id,
-      name: safeUser.name,
-      email: safeUser.email,
-      role: safeUser.role,
-      forcePasswordChange: safeUser.forcePasswordChange || false,
-    };
+    setUser(user);
 
-    setUser(userData);
+    localStorage.setItem("user", JSON.stringify(user));
+    localStorage.setItem("token", token);
 
-    localStorage.setItem("user", JSON.stringify(userData));
-
-    console.log("🔐 AuthContext.login → stored user:", userData);
+    console.log("🔐 AuthContext.login → stored user:", user);
   };
 
   // 🚪 Logout

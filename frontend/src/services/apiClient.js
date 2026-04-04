@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // 🔥 PRODUCTION BACKEND (Render ONLY)
-const API_URL = "https://sms-backend-1w30.onrender.com/api";
+const API_URL = "http://localhost:5000/api";
 
 console.log("🌍 API URL:", API_URL);
 
