@@ -1,5 +1,6 @@
 import express from "express"
 import { PrismaClient } from "@prisma/client"
+import { markAttendance } from "../controllers/attendance/markAttendance.controller"
 
 const router = express.Router()
 const prisma = new PrismaClient()
@@ -9,11 +10,9 @@ Admin Attendance Summary
 GET /admin/attendance/summary
 */
 router.get("/summary", async (req, res) => {
-
   try {
-
     const today = new Date()
-    today.setHours(0,0,0,0)
+    today.setHours(0, 0, 0, 0)
 
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
@@ -21,37 +20,36 @@ router.get("/summary", async (req, res) => {
     const totalStudents = await prisma.student.count()
 
     const todayEntries = await prisma.attendanceEntry.findMany({
-      where:{
-        session:{
-          date:{
+      where: {
+        session: {
+          date: {
             gte: today,
             lt: tomorrow
           }
         }
       },
-      select:{
-        studentId:true,
-        status:true
+      select: {
+        studentId: true,
+        status: true
       }
     })
 
-    const presentStudents = new Set<number>()
-    const absentStudents = new Set<number>()
+    // ✅ Ensure unique students
+    const studentStatusMap = new Map<number, string>()
 
     todayEntries.forEach(entry => {
-
-      if(entry.status === "PRESENT"){
-        presentStudents.add(entry.studentId)
+      if (!studentStatusMap.has(entry.studentId)) {
+        studentStatusMap.set(entry.studentId, entry.status)
       }
-
-      if(entry.status === "ABSENT"){
-        absentStudents.add(entry.studentId)
-      }
-
     })
 
-    const present = presentStudents.size
-    const absent = absentStudents.size
+    let present = 0
+    let absent = 0
+
+    studentStatusMap.forEach(status => {
+      if (status === "PRESENT") present++
+      if (status === "ABSENT") absent++
+    })
 
     const attendanceRate =
       totalStudents > 0
@@ -66,15 +64,12 @@ router.get("/summary", async (req, res) => {
     })
 
   } catch (error) {
-
     console.error(error)
 
     res.status(500).json({
-      error:"Failed to load attendance summary"
+      error: "Failed to load attendance summary"
     })
-
   }
-
 })
 
 /*
@@ -82,11 +77,9 @@ Admin Attendance by Class
 GET /admin/attendance/by-class
 */
 router.get("/by-class", async (req, res) => {
-
   try {
-
     const today = new Date()
-    today.setHours(0,0,0,0)
+    today.setHours(0, 0, 0, 0)
 
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
@@ -106,27 +99,25 @@ router.get("/by-class", async (req, res) => {
     })
 
     const result = classes.map(cls => {
-
       const students = cls.students
 
       let present = 0
       let absent = 0
 
       students.forEach(student => {
+        let status = "NOT_MARKED"
 
-        student.attendanceEntries.forEach(entry => {
-
+        for (const entry of [...student.attendanceEntries].reverse()) {
           const sessionDate = new Date(entry.session.date)
 
-          if(sessionDate >= today && sessionDate < tomorrow){
-
-            if(entry.status === "PRESENT") present++
-            if(entry.status === "ABSENT") absent++
-
+          if (sessionDate >= today && sessionDate < tomorrow) {
+            status = entry.status
+            break // ✅ stop after first valid entry
           }
+        }
 
-        })
-
+        if (status === "PRESENT") present++
+        if (status === "ABSENT") absent++
       })
 
       const totalStudents = students.length
@@ -140,167 +131,33 @@ router.get("/by-class", async (req, res) => {
         absent,
         notMarked,
         attendanceRate:
-          totalStudents === 0 || notMarked === totalStudents
-            ? null
+          totalStudents === 0
+            ? 0
             : Math.round((present / totalStudents) * 100),
       }
-
     })
 
     res.json(result)
 
   } catch (error) {
-
     console.error(error)
 
     res.status(500).json({
       error: "Failed to load attendance by class"
     })
-
   }
-
 })
 
 /*
-Admin Attendance by Grade
-GET /admin/attendance/by-grade
-*/
-
-router.get("/by-grade", async (req, res) => {
-
-  try {
-
-    const sessions = await prisma.attendanceSession.findMany({
-      include: {
-        class: true,
-        entries: true
-      }
-    })
-
-    const gradeStats: Record<string, { present: number; total: number }> = {}
-
-    sessions.forEach(session => {
-
-      const gradeName = session.class.name
-
-      if (!gradeStats[gradeName]) {
-        gradeStats[gradeName] = { present: 0, total: 0 }
-      }
-
-      session.entries.forEach(entry => {
-
-        gradeStats[gradeName].total++
-
-        if (entry.status === "PRESENT") {
-          gradeStats[gradeName].present++
-        }
-
-      })
-
-    })
-
-    const result = Object.keys(gradeStats).map(grade => {
-
-      const stats = gradeStats[grade]
-
-      const rate =
-        stats.total > 0
-          ? Math.round((stats.present / stats.total) * 100)
-          : 0
-
-      return {
-        grade,
-        attendanceRate: rate
-      }
-
-    })
-
-    res.json(result)
-
-  } catch (error) {
-
-    console.error(error)
-
-    res.status(500).json({
-      error: "Failed to load grade attendance"
-    })
-
-  }
-
-})
-
-/*
-Admin Absent Students Today
-GET /admin/attendance/absent-today
-*/
-
-router.get("/absent-today", async (req, res) => {
-
-  try {
-
-    const today = new Date()
-    today.setHours(0,0,0,0)
-
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-
-    const absentEntries = await prisma.attendanceEntry.findMany({
-      where: {
-        status: "ABSENT",
-        session: {
-          date: {
-            gte: today,
-            lt: tomorrow
-          }
-        }
-      },
-      include: {
-        student: true,
-        session: {
-          include: {
-            class: true
-          }
-        }
-      }
-    })
-
-    const result = absentEntries.map(entry => {
-
-      return {
-        studentName: entry.student.firstName + " " + entry.student.lastName,
-        grade: entry.session.class.name,
-        status: entry.status
-      }
-
-    })
-
-    res.json(result)
-
-  } catch (error) {
-
-    console.error(error)
-
-    res.status(500).json({
-      error: "Failed to load absent students"
-    })
-
-  }
-
-})
-
-/*
-Admin Class Attendance
+Admin Class Attendance (DETAIL VIEW)
 GET /admin/attendance/class/:classId
 */
-
 router.get("/class/:classId", async (req, res) => {
-
   try {
-
-    const classId = Number(req.params.classId)
+    const classId = parseInt(req.params.classId)
 
     const today = new Date()
-    today.setHours(0,0,0,0)
+    today.setHours(0, 0, 0, 0)
 
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
@@ -310,6 +167,7 @@ router.get("/class/:classId", async (req, res) => {
         classId: classId
       },
       include: {
+        user: true,
         attendanceEntries: {
           include: {
             session: true
@@ -319,35 +177,39 @@ router.get("/class/:classId", async (req, res) => {
     })
 
     const result = students.map(student => {
+      let status = "NOT_MARKED"
 
-      const entry = student.attendanceEntries.find(e => {
+      for (const entry of [...student.attendanceEntries].reverse()) {
+        const sessionDate = new Date(entry.session.date)
 
-        const sessionDate = new Date(e.session.date)
-
-        return sessionDate >= today && sessionDate < tomorrow
-
-      })
+        if (sessionDate >= today && sessionDate < tomorrow) {
+          status = entry.status
+          break // ✅ prevent overwrite / duplicates
+        }
+      }
 
       return {
         studentId: student.id,
-        studentName: student.firstName + " " + student.lastName,
-        status: entry ? entry.status : "NOT MARKED"
+        name: student.user?.name || "Unknown",
+        status
       }
-
     })
 
     res.json(result)
 
   } catch (error) {
-
-    console.error("Class attendance error:", error)
+    console.error(error)
 
     res.status(500).json({
-      error: "Failed to fetch class attendance"
+      error: "Failed to load class attendance"
     })
-
   }
-
 })
+
+/*
+Admin Mark Attendance
+POST /admin/attendance/mark
+*/
+router.post("/mark", markAttendance)
 
 export default router

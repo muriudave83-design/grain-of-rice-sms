@@ -7,7 +7,6 @@ export default function SidebarNav() {
   const [open, setOpen] = useState({
     management: true,
     academics: true,
-    // 🔥 attendance removed
   });
 
   const toggle = (section) => {
@@ -61,6 +60,11 @@ export default function SidebarNav() {
               🏫 Classes
             </NavLink>
 
+            {/* ✅ NEW: Attendance */}
+            <NavLink to={path("attendance")} className={linkClass}>
+              📅 Attendance
+            </NavLink>
+
             {/* ✅ ARCHIVED */}
             <NavLink to="/dashboard/admin/archived" className={linkClass}>
               <span>🗂️</span> Archived
@@ -95,13 +99,9 @@ export default function SidebarNav() {
             <NavLink to={path("class-subjects")} className={linkClass}>
               🏫 Class Subject Assignment
             </NavLink>
-
-            {/* ❌ Exams removed */}
           </div>
         )}
       </div>
-
-      {/* ❌ ATTENDANCE SECTION REMOVED COMPLETELY */}
 
       {/* FOOTER */}
       <div className="mt-6 text-xs text-gray-400">

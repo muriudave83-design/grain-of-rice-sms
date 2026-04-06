@@ -12,6 +12,7 @@ import { getParentAttendance, getStudentAttendanceSummary } from "../controllers
 
 // ✅ NEW IMPORT
 import { getTodaySession } from "../controllers/attendance/getTodaySession.controller";
+import { getClassAttendance } from "../controllers/attendance/getClassAttendance.controller";
 
 const router = Router();
 
@@ -35,7 +36,7 @@ router.post("/sessions/:id/submit", authenticate, async (req, res) => {
   }
 });
 
-// GET today's session for a class ✅ ADDED
+// GET today's session for a class ✅
 router.get("/sessions/today/:classId", authenticate, async (req, res) => {
   try {
     return await getTodaySession(req, res);
@@ -72,7 +73,7 @@ router.post("/sessions/:id/records", authenticate, async (req, res) => {
   }
 });
 
-// GET attendance by class
+// GET attendance by class (existing)
 router.get("/classes/:classId", authenticate, async (req, res) => {
   try {
     return await getAttendanceByClass(req, res);
@@ -81,6 +82,19 @@ router.get("/classes/:classId", authenticate, async (req, res) => {
     return res.status(200).json({
       students: [],
       message: "Could not load class attendance",
+    });
+  }
+});
+
+// ✅ NEW: ADMIN CLASS ATTENDANCE (matches frontend)
+router.get("/class/:classId", authenticate, async (req, res) => {
+  try {
+    return await getClassAttendance(req, res);
+  } catch (err) {
+    console.error("Admin class attendance error:", err);
+    return res.status(500).json({
+      students: [],
+      message: "Could not load admin class attendance",
     });
   }
 });

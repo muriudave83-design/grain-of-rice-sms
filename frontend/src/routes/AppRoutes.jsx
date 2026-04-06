@@ -30,6 +30,12 @@ import AdminAuditLogs from "../pages/admin/audit/AdminAuditLogs";
 import AttendanceAnalytics from "../pages/admin/AttendanceAnalytics";
 import AdminArchived from "../pages/admin/AdminArchived";
 import EditStudent from "../pages/admin/EditStudent";
+import AttendancePage from "../pages/admin/AttendancePage";
+
+// ✅ PARENTS
+import ParentsPage from "../pages/admin/ParentsPage";
+import CreateParentPage from "../pages/admin/CreateParentPage";
+import EditParentPage from "../pages/admin/EditParentPage";
 
 // =======================
 // TEACHER PAGES
@@ -79,83 +85,80 @@ import LoginPage from "../pages/Login";
 import ChangePassword from "../pages/ChangePassword";
 
 
+// 🔒 =======================
+// MAINTENANCE MODE
+// =======================
+const MAINTENANCE_MODE = true;
+
+
 // ======================================
-// PUBLIC ROUTE (PREVENT LOGIN IF LOGGED)
+// PUBLIC ROUTE
 // ======================================
-    function PublicRoute({ children }) {
-      // 🔥 DO NOT TRUST TOKEN ALONE
-      const token = localStorage.getItem("token");
-      const userStr = localStorage.getItem("user");
+function PublicRoute({ children }) {
+  const token = localStorage.getItem("token");
+  const userStr = localStorage.getItem("user");
 
-      if (!token || !userStr) {
-        return children;
-      }
+  if (!token || !userStr) return children;
 
-      try {
-        const user = JSON.parse(userStr);
+  try {
+    const user = JSON.parse(userStr);
 
-        // 🔥 OPTIONAL: decode token expiry (extra safety)
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        const isExpired = payload.exp * 1000 < Date.now();
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    const isExpired = payload.exp * 1000 < Date.now();
 
-        if (isExpired) {
-          console.warn("⛔ Token expired — clearing session");
-
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          localStorage.removeItem("role");
-
-          return children;
-        }
-
-        // ✅ VALID SESSION → redirect
-        if (user.role === "ADMIN") return <Navigate to="/dashboard/admin" replace />;
-        if (user.role === "TEACHER") return <Navigate to="/teacher" replace />;
-        if (user.role === "PARENT") return <Navigate to="/parent" replace />;
-        if (user.role === "STUDENT") return <Navigate to="/student" replace />;
-
-      } catch (err) {
-        console.warn("⚠️ Corrupt auth data — clearing");
-
-        localStorage.clear();
-        return children;
-      }
-
+    if (isExpired) {
+      localStorage.clear();
       return children;
     }
 
+    if (user.role === "ADMIN") return <Navigate to="/dashboard/admin" replace />;
+    if (user.role === "TEACHER") return <Navigate to="/teacher" replace />;
+    if (user.role === "PARENT") return <Navigate to="/parent" replace />;
+    if (user.role === "STUDENT") return <Navigate to="/student" replace />;
+  } catch {
+    localStorage.clear();
+    return children;
+  }
+
+  return children;
+}
+
 export default function AppRoutes() {
-     // 🔥 GLOBAL SESSION GUARD (runs once)
-    (function enforceSessionValidity() {
-      const token = localStorage.getItem("token");
 
-      if (!token) return;
+  // 🔒 HARD LOCK (runs before anything else)
+  if (MAINTENANCE_MODE) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-100">
+        <div className="bg-white p-6 rounded-xl shadow text-center">
+          <h1 className="text-xl font-semibold mb-2">
+            System temporarily unavailable
+          </h1>
+          <p className="text-gray-500">
+            Maintenance in progress. Please try again later.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        const isExpired = payload.exp * 1000 < Date.now();
+  (function enforceSessionValidity() {
+    const token = localStorage.getItem("token");
+    if (!token) return;
 
-        if (isExpired) {
-          console.warn("⛔ Token expired → clearing");
-
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          localStorage.removeItem("role");
-        }
-      } catch (err) {
-        console.warn("⚠️ Token parse failed — NOT clearing storage");
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      if (payload.exp * 1000 < Date.now()) {
+        localStorage.clear();
       }
-    })();
-    
+    } catch {}
+  })();
+
   return (
     <BrowserRouter>
-
       <Routes>
 
-        {/* ROOT */}
         <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {/* LOGIN */}
         <Route
           path="/login"
           element={
@@ -165,25 +168,24 @@ export default function AppRoutes() {
           }
         />
 
-        {/* CHANGE PASSWORD */}
         <Route element={<ProtectedRoute />}>
           <Route path="/change-password" element={<ChangePassword />} />
         </Route>
 
-
-        {/* ======================= */}
         {/* ADMIN */}
-        {/* ======================= */}
-
         <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
           <Route element={<AdminLayout />}>
 
-            <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />
-
             <Route path="/dashboard/admin" element={<Dashboard />} />
+
             <Route path="/dashboard/admin/students" element={<AdminStudents />} />
             <Route path="/dashboard/admin/teachers" element={<AdminTeachers />} />
-            <Route path="/dashboard/admin/classes" element={<Classes />} />
+
+            {/* ✅ PARENTS */}
+            <Route path="/dashboard/admin/parents" element={<ParentsPage />} />
+            <Route path="/dashboard/admin/parents/new" element={<CreateParentPage />} />
+            <Route path="/dashboard/admin/parents/:id" element={<EditParentPage />} />
+                        <Route path="/dashboard/admin/classes" element={<Classes />} />
 
             <Route
               path="/dashboard/admin/classes/:classId/students"
@@ -208,9 +210,9 @@ export default function AppRoutes() {
               element={<AdminClassSubjects />}
             />
 
-            <Route
-              path="/dashboard/admin/attendance"
-              element={<AdminAttendanceOverview />}
+            <Route 
+              path="/dashboard/admin/attendance" 
+              element={<AttendancePage />} 
             />
 
             <Route
@@ -251,7 +253,7 @@ export default function AppRoutes() {
 
             <Route
               path="/teacher"
-                element={<Navigate to="/teacher/classes" replace />}
+              element={<Navigate to="/teacher/classes" replace />}
             />
 
             <Route
@@ -299,43 +301,36 @@ export default function AppRoutes() {
               element={<AssessmentReview />}
             />
 
-            {/* ✅ GRADEBOOK (kept original) */}
             <Route
               path="/teacher/gradebook"
               element={<Gradebook />}
             />
 
-            {/* ✅ NEW HOMEWORK ROUTE */}
             <Route
               path="/teacher/homework/create"
               element={<CreateHomework />}
             />
 
-            {/* 🔧 FIXED duplicate safely */}
             <Route
               path="/teacher/gradebook-legacy"
               element={<TeacherGradebook />}
             />
 
-            {/* ✅ NEW REPORT CARDS ROUTE */}
             <Route
               path="/teacher/report-cards/:classId/:term"
               element={<ClassReportCards />}
             />
 
-            {/* Attendance Redirect */}
             <Route
               path="/teacher/attendance"
-                element={<TeacherAttendance />}
+              element={<TeacherAttendance />}
             />
 
-            {/* Attendance by Class */}
             <Route
               path="/teacher/attendance/class/:classId"
               element={<TeacherAttendanceClass />}
             />
 
-            {/* Attendance Session */}
             <Route
               path="/teacher/attendance/session/:sessionId"
               element={<TeacherAttendanceSession />}
@@ -353,6 +348,8 @@ export default function AppRoutes() {
 
           <Route path="/parent" element={<ParentDashboard />} />
 
+          <Route path="/parent/dashboard" element={<ParentDashboard />} />
+
           <Route path="/parent/report-cards" element={<ParentReportCards />} />
 
           <Route
@@ -365,10 +362,6 @@ export default function AppRoutes() {
             element={<ParentAttendanceSummary />}
           />
 
-          <Route path="/parent/dashboard" 
-            element={<ParentDashboard />} 
-          />
-
         </Route>
 
 
@@ -377,40 +370,41 @@ export default function AppRoutes() {
         {/* ======================= */}
 
         <Route element={<ProtectedRoute allowedRoles={["STUDENT"]} />}>
-        <Route element={<StudentLayout />}>
+          <Route element={<StudentLayout />}>
 
-          <Route
-            path="/student"
-            element={<Navigate to="/student/dashboard" replace />}
-          />
+            <Route
+              path="/student"
+              element={<Navigate to="/student/dashboard" replace />}
+            />
 
-          <Route
-            path="/student/dashboard"
-            element={<StudentDashboard />}
-          />
+            <Route
+              path="/student/dashboard"
+              element={<StudentDashboard />}
+            />
 
-          <Route
-            path="/student/attendance"
-            element={<StudentAttendance />}
-          />
+            <Route
+              path="/student/attendance"
+              element={<StudentAttendance />}
+            />
 
-          <Route
-            path="/student/report-cards"
-            element={<StudentReportCardsList />}
-          />
+            <Route
+              path="/student/report-cards"
+              element={<StudentReportCardsList />}
+            />
 
-          <Route
-            path="/student/report-cards/:classId/:term"
-            element={<StudentReportCardView />}
-          />
+            <Route
+              path="/student/report-cards/:classId/:term"
+              element={<StudentReportCardView />}
+            />
 
-          <Route
-           path="/student/profile"
-           element={<StudentProfile />}
-          />
+            <Route
+              path="/student/profile"
+              element={<StudentProfile />}
+            />
 
+          </Route>
         </Route>
-      </Route>
+
 
         {/* ======================= */}
         {/* SHARED */}
@@ -429,7 +423,6 @@ export default function AppRoutes() {
         <Route path="*" element={<Navigate to="/login" replace />} />
 
       </Routes>
-
     </BrowserRouter>
   );
 }
