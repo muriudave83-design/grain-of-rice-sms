@@ -213,16 +213,51 @@ router.post(
 );
 
 /**
- * 🚨 TEMPORARY TEST ROUTE
+ * ✅ REAL STUDENT USER CREATION (FIXED)
  */
 router.post(
   "/users/student",
   authenticate,
   requireRole(["ADMIN"]),
-  async (_req, res) => {
-    return res.status(400).json({
-      message: "BACKEND VERSION TEST 123",
-    });
+  async (req, res) => {
+    try {
+      const { firstName, lastName, email, password } = req.body;
+
+      if (!firstName || !email || !password) {
+        return res.status(400).json({
+          message: "firstName, email and password are required",
+        });
+      }
+
+      const existing = await prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (existing) {
+        return res.status(400).json({
+          message: "User already exists",
+        });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const user = await prisma.user.create({
+        data: {
+          name: `${firstName} ${lastName || ""}`.trim(),
+          email,
+          password: hashedPassword,
+          role: "STUDENT",
+          mustChangePassword: true,
+        },
+      });
+
+      return res.status(201).json(user);
+    } catch (error) {
+      console.error("Create student error:", error);
+      return res.status(500).json({
+        message: "Failed to create student user",
+      });
+    }
   }
 );
 
