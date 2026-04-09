@@ -14,41 +14,94 @@ router.post(
   requireRole(["ADMIN", "TEACHER"]),
   async (req, res) => {
     try {
-      console.log("🔥 student route hit");
-      console.log("📦 BODY:", req.body);
+      console.log("🔥 CREATE STUDENT ROUTE HIT");
+      console.log("📦 RAW BODY:", req.body);
 
-      const { firstName, lastName, classId, admissionNo, dob, userId } = req.body;
+      let { firstName, lastName, classId, admissionNo, dob, userId } = req.body;
 
-      // ✅ HARD VALIDATION (CRITICAL)
-      if (!classId) {
-        return res.status(400).json({ message: "classId is required" });
+      // ✅ Normalize types (CRITICAL FIX)
+      classId = classId ? Number(classId) : null;
+      userId = userId ? Number(userId) : null;
+
+      console.log("🔄 NORMALIZED:", {
+        firstName,
+        lastName,
+        classId,
+        admissionNo,
+        dob,
+        userId,
+      });
+
+      // ✅ VALIDATION (prevents 500 crashes)
+      if (!firstName || !lastName) {
+        return res.status(400).json({
+          message: "firstName and lastName are required",
+        });
+      }
+
+      if (!classId || isNaN(classId)) {
+        return res.status(400).json({
+          message: "Valid classId is required",
+        });
       }
 
       if (!admissionNo) {
-        return res.status(400).json({ message: "admissionNo is required" });
+        return res.status(400).json({
+          message: "admissionNo is required",
+        });
       }
 
-      if (!userId) {
-        return res.status(400).json({ message: "userId is required" });
+      if (!userId || isNaN(userId)) {
+        return res.status(400).json({
+          message: "Valid userId is required",
+        });
       }
 
+      // ✅ Check foreign keys BEFORE create (prevents Prisma crash)
+      const existingClass = await prisma.class.findUnique({
+        where: { id: classId },
+      });
+
+      if (!existingClass) {
+        return res.status(400).json({
+          message: "Class not found",
+        });
+      }
+
+      const existingUser = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!existingUser) {
+        return res.status(400).json({
+          message: "User not found",
+        });
+      }
+
+      // ✅ Create student safely
       const student = await prisma.student.create({
         data: {
           firstName,
           lastName,
-          classId: Number(classId),
+          classId,
           admissionNo,
           dob: dob ? new Date(dob) : null,
-          userId: Number(userId),
+          userId,
         },
       });
 
+      console.log("✅ STUDENT CREATED:", student);
+
       res.status(201).json(student);
     } catch (err: any) {
-      console.error("❌ ERROR:", err);
+      console.error("❌ CREATE STUDENT ERROR:");
+      console.error("Message:", err.message);
+      console.error("Meta:", err.meta);
+      console.error("Stack:", err.stack);
 
       res.status(500).json({
-        message: err.message,
+        message: "Student creation failed",
+        error: err.message,
         meta: err.meta || null,
       });
     }
@@ -64,7 +117,7 @@ router.get(
     try {
       const students = await prisma.student.findMany({
         where: {
-          isArchived: false, // ✅ added
+          isArchived: false,
         },
         orderBy: { id: "asc" },
         include: {
@@ -150,7 +203,7 @@ router.get(
   }
 );
 
-// ✅ DELETE → ARCHIVE (safe delete)
+// ✅ DELETE → ARCHIVE
 router.delete(
   "/:id",
   authenticate,

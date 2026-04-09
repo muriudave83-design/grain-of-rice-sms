@@ -14,8 +14,6 @@ console.log("🔥 reportCardReadRoutes.ts LOADED");
 /**
  * ============================================================
  * TEACHER — COMPUTED REPORT CARDS (🔥 FIXED ENGINE)
- * MUST BE FIRST ROUTE (VERY IMPORTANT)
- * GET /api/report-cards/teacher/:classId/:term
  * ============================================================
  */
 router.get(
@@ -54,8 +52,6 @@ router.get(
         },
       });
 
-      console.log("✅ TERM FOUND:", term);
-
       if (!term) {
         return res.status(404).json({ message: "Term not found" });
       }
@@ -67,8 +63,6 @@ router.get(
         },
         include: { user: true },
       });
-
-      console.log("👨‍🎓 STUDENTS:", students);
 
       const assessments = await prisma.assessment.findMany({
         where: {
@@ -83,8 +77,6 @@ router.get(
           scores: true,
         },
       });
-
-      console.log("📊 ASSESSMENTS:", assessments);
 
       const report = students.map((student) => {
         const subjectMap: Record<string, { total: number; count: number }> = {};
@@ -130,8 +122,6 @@ router.get(
         };
       });
 
-      console.log("🧠 FINAL REPORT:", report);
-
       return res.json(report);
 
     } catch (err) {
@@ -143,8 +133,7 @@ router.get(
 
 /**
  * ============================================================
- * ✅ NEW: TEACHER — PUBLISH REPORT CARDS
- * POST /api/report-cards/teacher/:classId/:term/publish
+ * TEACHER — PUBLISH REPORT CARDS
  * ============================================================
  */
 router.post(
@@ -152,8 +141,6 @@ router.post(
   authenticate,
   requireRole([Role.TEACHER]),
   async (req, res) => {
-    console.log("🚀 PUBLISH ROUTE HIT");
-
     try {
       const classId = Number(req.params.classId);
       const termParam = req.params.term;
@@ -162,7 +149,6 @@ router.post(
         return res.status(400).json({ message: "Invalid classId" });
       }
 
-      // ✅ FIX: Handle string | string[]
       if (Array.isArray(termParam)) {
         return res.status(400).json({ message: "Invalid term parameter" });
       }
@@ -185,7 +171,6 @@ router.post(
         return res.status(404).json({ message: "Term not found" });
       }
 
-      // ✅ Publish report cards
       const result = await prisma.reportCard.updateMany({
         where: {
           classId,
@@ -196,7 +181,6 @@ router.post(
         },
       });
 
-      // ✅ ALSO update assessments (🔥 FIX FOR "Waiting publish")
       const assessmentsUpdated = await prisma.assessment.updateMany({
         where: {
           classId,
@@ -204,12 +188,9 @@ router.post(
           status: "SUBMITTED",
         },
         data: {
-          status: "SUBMITTED"
+          status: "SUBMITTED",
         },
       });
-
-      console.log("✅ REPORT CARDS PUBLISHED:", result.count);
-      console.log("✅ ASSESSMENTS UPDATED:", assessmentsUpdated.count);
 
       return res.json({
         message: "Report cards published successfully",
@@ -228,7 +209,7 @@ router.post(
 
 /**
  * ============================================================
- * STUDENT — VIEW OWN REPORT CARD (TERM)
+ * STUDENT — VIEW OWN REPORT CARD
  * ============================================================
  */
 router.get(
@@ -295,10 +276,10 @@ router.get(
   authenticate,
   requireRole([Role.PARENT]),
   async (req, res) => {
-    const parentId = req.user!.id;
+    const parentId = String(req.user!.id); // ✅ FIXED
 
     const links = await prisma.parentStudent.findMany({
-      where: { parentId },
+      where: { parentId }, // ✅ FIXED
       select: { studentId: true },
     });
 
@@ -327,7 +308,6 @@ router.get(
 /**
  * ============================================================
  * ADMIN / PARENT — VIEW REPORT CARD BY ID
- * MUST BE LAST (VERY IMPORTANT)
  * ============================================================
  */
 router.get(
@@ -364,7 +344,7 @@ router.get(
     if (req.user!.role === Role.PARENT) {
       const link = await prisma.parentStudent.findFirst({
         where: {
-          parentId: req.user!.id,
+          parentId: String(req.user!.id), // ✅ FIXED
           studentId: reportCard.studentId,
         },
       });

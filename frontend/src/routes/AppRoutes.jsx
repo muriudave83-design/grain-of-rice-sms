@@ -32,7 +32,7 @@ import AdminArchived from "../pages/admin/AdminArchived";
 import EditStudent from "../pages/admin/EditStudent";
 import AttendancePage from "../pages/admin/AttendancePage";
 
-// ✅ PARENTS
+// ✅ NEW: PARENTS PAGES
 import ParentsPage from "../pages/admin/ParentsPage";
 import CreateParentPage from "../pages/admin/CreateParentPage";
 import EditParentPage from "../pages/admin/EditParentPage";
@@ -85,20 +85,16 @@ import LoginPage from "../pages/Login";
 import ChangePassword from "../pages/ChangePassword";
 
 
-// 🔒 =======================
-// MAINTENANCE MODE
-// =======================
-const MAINTENANCE_MODE = true;
-
-
 // ======================================
-// PUBLIC ROUTE
+// PUBLIC ROUTE (PREVENT LOGIN IF LOGGED)
 // ======================================
 function PublicRoute({ children }) {
   const token = localStorage.getItem("token");
   const userStr = localStorage.getItem("user");
 
-  if (!token || !userStr) return children;
+  if (!token || !userStr) {
+    return children;
+  }
 
   try {
     const user = JSON.parse(userStr);
@@ -107,7 +103,12 @@ function PublicRoute({ children }) {
     const isExpired = payload.exp * 1000 < Date.now();
 
     if (isExpired) {
-      localStorage.clear();
+      console.warn("⛔ Token expired — clearing session");
+
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("role");
+
       return children;
     }
 
@@ -115,7 +116,10 @@ function PublicRoute({ children }) {
     if (user.role === "TEACHER") return <Navigate to="/teacher" replace />;
     if (user.role === "PARENT") return <Navigate to="/parent" replace />;
     if (user.role === "STUDENT") return <Navigate to="/student" replace />;
-  } catch {
+
+  } catch (err) {
+    console.warn("⚠️ Corrupt auth data — clearing");
+
     localStorage.clear();
     return children;
   }
@@ -124,41 +128,35 @@ function PublicRoute({ children }) {
 }
 
 export default function AppRoutes() {
-
-  // 🔒 HARD LOCK (runs before anything else)
-  if (MAINTENANCE_MODE) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gray-100">
-        <div className="bg-white p-6 rounded-xl shadow text-center">
-          <h1 className="text-xl font-semibold mb-2">
-            System temporarily unavailable
-          </h1>
-          <p className="text-gray-500">
-            Maintenance in progress. Please try again later.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   (function enforceSessionValidity() {
     const token = localStorage.getItem("token");
+
     if (!token) return;
 
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
-      if (payload.exp * 1000 < Date.now()) {
-        localStorage.clear();
+      const isExpired = payload.exp * 1000 < Date.now();
+
+      if (isExpired) {
+        console.warn("⛔ Token expired → clearing");
+
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("role");
       }
-    } catch {}
+    } catch (err) {
+      console.warn("⚠️ Token parse failed — NOT clearing storage");
+    }
   })();
 
   return (
     <BrowserRouter>
       <Routes>
 
+        {/* ROOT */}
         <Route path="/" element={<Navigate to="/login" replace />} />
 
+        {/* LOGIN */}
         <Route
           path="/login"
           element={
@@ -168,24 +166,32 @@ export default function AppRoutes() {
           }
         />
 
+        {/* CHANGE PASSWORD */}
         <Route element={<ProtectedRoute />}>
           <Route path="/change-password" element={<ChangePassword />} />
         </Route>
 
+
+        {/* ======================= */}
         {/* ADMIN */}
+        {/* ======================= */}
+
         <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
           <Route element={<AdminLayout />}>
+
+            <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />
 
             <Route path="/dashboard/admin" element={<Dashboard />} />
 
             <Route path="/dashboard/admin/students" element={<AdminStudents />} />
             <Route path="/dashboard/admin/teachers" element={<AdminTeachers />} />
 
-            {/* ✅ PARENTS */}
+            {/* ✅ NEW: PARENTS ROUTES */}
             <Route path="/dashboard/admin/parents" element={<ParentsPage />} />
             <Route path="/dashboard/admin/parents/new" element={<CreateParentPage />} />
             <Route path="/dashboard/admin/parents/:id" element={<EditParentPage />} />
-                        <Route path="/dashboard/admin/classes" element={<Classes />} />
+
+            <Route path="/dashboard/admin/classes" element={<Classes />} />
 
             <Route
               path="/dashboard/admin/classes/:classId/students"
@@ -243,7 +249,6 @@ export default function AppRoutes() {
           </Route>
         </Route>
 
-
         {/* ======================= */}
         {/* TEACHER */}
         {/* ======================= */}
@@ -279,11 +284,6 @@ export default function AppRoutes() {
             <Route
               path="/teacher/assessments/create"
               element={<CreateAssessment />}
-            />
-
-            <Route
-              path="/teacher/homework/create"
-              element={<CreateHomework />}
             />
 
             <Route

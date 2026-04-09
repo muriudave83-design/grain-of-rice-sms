@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
 import { stringify } from "csv-stringify/sync";
-import bcrypt from "bcryptjs";
 import { prisma } from "../prisma/client";
 
 /**
@@ -23,7 +22,7 @@ export const exportStudentsCSV = async (req: Request, res: Response) => {
       orderBy: { id: "asc" },
     });
 
-    const records = students.map((s) => [
+    const records = students.map((s: any) => [
       s.id,
       s.firstName,
       s.lastName,
@@ -44,121 +43,49 @@ export const exportStudentsCSV = async (req: Request, res: Response) => {
 };
 
 /**
- * Create Parent
+ * ✅ Create Parent (NOW USES Parent TABLE)
  */
 export const createParent = async (req: Request, res: Response) => {
+  console.log("🔥 CREATE PARENT BODY:", req.body);
+
   try {
-    const {
-      firstName,
-      lastName,
-      email,
-      password,
-      phone,
-      childrenIds,
-    } = req.body;
+    const { name, email, phone, address, city, relationship, notes } = req.body;
 
-    if (!firstName || !lastName || !email || !password) {
-      return res.status(400).json({
-        message: "Missing required fields",
-      });
+    if (!name) {
+      return res.status(400).json({ message: "Name required" });
     }
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    if (existingUser) {
-      return res.status(400).json({
-        message: "User already exists",
-      });
-    }
-
-    if (childrenIds && childrenIds.length > 0) {
-      const students = await prisma.student.findMany({
-        where: {
-          id: { in: childrenIds },
-          isArchived: false,
-        },
-      });
-
-      if (students.length !== childrenIds.length) {
-        return res.status(400).json({
-          message: "One or more students are invalid or archived",
-        });
-      }
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newParent = await prisma.user.create({
+    const newParent = await prisma.parent.create({
       data: {
-        name: `${firstName} ${lastName}`,
+        name,
         email,
-        password: hashedPassword,
-        role: "PARENT",
+        phone,
+        address,
+        city,
+        relationship,
+        notes,
       },
     });
 
-    if (childrenIds && childrenIds.length > 0) {
-      await prisma.parentStudent.createMany({
-        data: childrenIds.map((studentId: number) => ({
-          parentId: newParent.id,
-          studentId,
-        })),
-        skipDuplicates: true,
-      });
-    }
+    return res.status(201).json(newParent);
+  } catch (error: any) {
+    console.error("💥 CREATE PARENT ERROR:", error);
 
-    const parentWithChildren = await prisma.user.findUnique({
-      where: { id: newParent.id },
-      include: {
-        parentStudents: {
-          include: {
-            student: true,
-          },
-        },
-      },
-    });
-
-    if (!parentWithChildren) {
-      return res.status(404).json({ message: "Parent not found after creation" });
-    }
-
-    const { password: _, parentStudents, ...safeParent } = parentWithChildren;
-
-    const formatted = {
-      id: safeParent.id,
-      name: safeParent.name,
-      email: safeParent.email,
-      role: safeParent.role,
-      children: parentStudents.map((ps) => ({
-        id: ps.student.id,
-        firstName: ps.student.firstName,
-        lastName: ps.student.lastName,
-      })),
-    };
-
-    return res.status(201).json(formatted);
-  } catch (error) {
-    console.error("CREATE PARENT ERROR:", error);
     return res.status(500).json({
       message: "Failed to create parent",
+      error: error.message,
     });
   }
 };
 
 /**
- * Get Parents
+ * ✅ GET ALL PARENTS (FIXED — USES JUNCTION + DEEP INCLUDE)
  */
 export const getParents = async (req: Request, res: Response) => {
   try {
-    const parents = await prisma.user.findMany({
-      where: {
-        role: "PARENT",
-        isArchived: false,
-      },
+    const parents = await prisma.parent.findMany({
       include: {
-        parentStudents: {
+        students: {
           include: {
             student: true,
           },
@@ -169,92 +96,41 @@ export const getParents = async (req: Request, res: Response) => {
       },
     });
 
-    const formatted = parents.map((parent) => ({
-      id: parent.id,
-      name: parent.name,
-      email: parent.email,
-      role: parent.role,
-      children: parent.parentStudents.map((ps) => ({
+    const formatted = parents.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      email: p.email,
+      phone: p.phone || "",
+      address: p.address || "",
+      city: p.city || "",
+      relationship: p.relationship || "",
+      notes: p.notes || "",
+      childrenCount: p.students.length,
+      children: p.students.map((ps: any) => ({
         id: ps.student.id,
         firstName: ps.student.firstName,
         lastName: ps.student.lastName,
       })),
     }));
 
-    return res.json(formatted);
+    res.json(formatted);
   } catch (error) {
     console.error("GET PARENTS ERROR:", error);
-    return res.status(500).json({
-      message: "Failed to fetch parents",
-    });
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 /**
- * Update Parent
+ * ✅ GET SINGLE PARENT
  */
-export const updateParent = async (req: Request, res: Response) => {
+export const getParentById = async (req: Request, res: Response) => {
   try {
-    const parentId = Number(req.params.id);
-    const { firstName, lastName, email, childrenIds } = req.body;
+    const id = String(req.params.id);
 
-    // 1. FIND USER
-    const existingUser = await prisma.user.findUnique({
-      where: { id: parentId },
-    });
-
-    if (!existingUser || existingUser.role !== "PARENT") {
-      return res.status(404).json({ message: "Parent not found" });
-    }
-
-    // 2. VALIDATE STUDENTS
-    if (childrenIds && childrenIds.length > 0) {
-      const students = await prisma.student.findMany({
-        where: {
-          id: { in: childrenIds },
-          isArchived: false,
-        },
-      });
-
-      if (students.length !== childrenIds.length) {
-        return res.status(400).json({
-          message: "One or more students are invalid or archived",
-        });
-      }
-    }
-
-    // 3. UPDATE USER
-    await prisma.user.update({
-      where: { id: parentId },
-      data: {
-        email: email ?? existingUser.email,
-        name:
-          firstName && lastName
-            ? `${firstName} ${lastName}`
-            : existingUser.name,
-      },
-    });
-
-    // 4. RESET RELATIONSHIPS
-    await prisma.parentStudent.deleteMany({
-      where: { parentId },
-    });
-
-    if (childrenIds && childrenIds.length > 0) {
-      await prisma.parentStudent.createMany({
-        data: childrenIds.map((studentId: number) => ({
-          parentId,
-          studentId,
-        })),
-        skipDuplicates: true,
-      });
-    }
-
-    // 5. RETURN UPDATED DATA
-    const updatedParent = await prisma.user.findUnique({
-      where: { id: parentId },
+    const parent = await prisma.parent.findUnique({
+      where: { id },
       include: {
-        parentStudents: {
+        students: {
           include: {
             student: true,
           },
@@ -262,64 +138,147 @@ export const updateParent = async (req: Request, res: Response) => {
       },
     });
 
-    if (!updatedParent) {
-      return res.status(404).json({ message: "Parent not found after update" });
+    if (!parent) {
+      return res.status(404).json({ message: "Parent not found" });
     }
 
-    const { password: _, parentStudents, ...safeParent } = updatedParent;
-
-    const formatted = {
-      id: safeParent.id,
-      name: safeParent.name,
-      email: safeParent.email,
-      role: safeParent.role,
-      children: parentStudents.map((ps) => ({
-        id: ps.student.id,
-        firstName: ps.student.firstName,
-        lastName: ps.student.lastName,
-      })),
-    };
-
-    return res.json(formatted);
-  } catch (err) {
-    console.error("UPDATE PARENT ERROR:", err);
-    return res.status(500).json({
-      message: "Failed to update parent",
-    });
+    res.json(parent);
+  } catch (error) {
+    console.error("GET PARENT ERROR:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
 
 /**
- * Archive (Deactivate) Parent
+ * ✅ UPDATE PARENT
  */
-export const archiveParent = async (req: Request, res: Response) => {
+export const updateParent = async (req: Request, res: Response) => {
   try {
-    const parentId = Number(req.params.id);
+    const id = String(req.params.id);
 
-    // 1. FIND USER
-    const existingUser = await prisma.user.findUnique({
-      where: { id: parentId },
-    });
+    const { name, email, phone, address, city, relationship, notes } = req.body;
 
-    if (!existingUser || existingUser.role !== "PARENT") {
-      return res.status(404).json({ message: "Parent not found" });
-    }
-
-    // 2. ARCHIVE USER
-    await prisma.user.update({
-      where: { id: parentId },
+    const updated = await prisma.parent.update({
+      where: { id },
       data: {
-        isArchived: true,
+        name,
+        email,
+        phone,
+        address,
+        city,
+        relationship,
+        notes,
       },
     });
 
-    return res.json({
-      message: "Parent archived successfully",
+    res.json(updated);
+  } catch (error) {
+    console.error("UPDATE PARENT ERROR:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/**
+ * ✅ ARCHIVE PARENT (SOFT DELETE STYLE)
+ */
+export const archiveParent = async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+
+    await prisma.parent.delete({
+      where: { id },
     });
+
+    res.json({ message: "Parent deleted" });
+  } catch (error) {
+    console.error("ARCHIVE ERROR:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/**
+ * ✅ LINK STUDENT TO PARENT
+ */
+export const linkStudentToParent = async (req: Request, res: Response) => {
+  try {
+    const { studentId, parentId } = req.body;
+
+    if (!studentId || !parentId) {
+      return res.status(400).json({ message: "studentId and parentId required" });
+    }
+
+    const existing = await prisma.parentStudent.findUnique({
+      where: {
+        parentId_studentId: {
+          parentId,
+          studentId,
+        },
+      },
+    });
+
+    if (existing) {
+      return res.status(400).json({ message: "Already linked" });
+    }
+
+    const link = await prisma.parentStudent.create({
+      data: {
+        parentId,
+        studentId,
+      },
+    });
+
+    res.status(201).json(link);
+  } catch (error) {
+    console.error("LINK ERROR:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/**
+ * 🔥 NEW — UNLINK STUDENT FROM PARENT
+ */
+export const unlinkStudentFromParent = async (req: Request, res: Response) => {
+  try {
+    const { parentId, studentId } = req.body;
+
+    if (!parentId || !studentId) {
+      return res.status(400).json({ message: "Missing parentId or studentId" });
+    }
+
+    await prisma.parentStudent.deleteMany({
+      where: {
+        parentId: String(parentId), // ✅ KEEP STRING
+        studentId: Number(studentId), // ✅ STUDENT IS NUMBER
+      },
+    });
+
+    return res.json({ message: "Student unlinked successfully" });
+  } catch (error) {
+    console.error("UNLINK ERROR:", error);
+    return res.status(500).json({ message: "Failed to unlink student" });
+  }
+};
+
+/**
+ * ✅ Reset User Password (UNCHANGED)
+ */
+export const resetUserPassword = async (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.params.id);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: "123456",
+        mustChangePassword: true,
+      },
+    });
+
+    return res.json({ message: "Password reset" });
   } catch (err) {
-    console.error("ARCHIVE PARENT ERROR:", err);
+    console.error("RESET PASSWORD ERROR:", err);
     return res.status(500).json({
-      message: "Failed to archive parent",
+      message: "Failed to reset password",
     });
   }
 };

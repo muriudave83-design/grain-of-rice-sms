@@ -32,14 +32,6 @@ export async function authenticate(
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      include: {
-        studentProfile: {
-          select: { id: true },
-        },
-        parentStudents: {
-          select: { studentId: true },
-        },
-      },
     });
 
     // ✅ STRICT: User must exist
@@ -50,29 +42,13 @@ export async function authenticate(
       });
     }
 
-    const authUser: any = {
+    // ✅ CLEAN USER CONTEXT (NO RELATIONS)
+    req.user = {
       id: user.id,
       email: user.email,
       role: user.role,
     };
 
-    // 🎓 STUDENT CONTEXT (non-blocking, but logged)
-    if (user.role === Role.STUDENT) {
-      if (!user.studentProfile) {
-        console.warn("⚠️ Student has no profile linked");
-      } else {
-        authUser.studentId = user.studentProfile.id;
-      }
-    }
-
-    // 👨‍👩‍👧 PARENT CONTEXT
-    if (user.role === Role.PARENT) {
-      authUser.studentIds = user.parentStudents.map(
-        (ps) => ps.studentId
-      );
-    }
-
-    req.user = authUser;
     return next();
 
   } catch (error) {

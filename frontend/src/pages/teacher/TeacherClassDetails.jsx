@@ -38,13 +38,12 @@ export default function TeacherClassDetails() {
         maxScore,
       });
 
-      // reset form
       setTitle("");
       setType("ASSIGNMENT");
       setMaxScore(100);
 
       setShowModal(false);
-      fetchStudents(); // refresh
+      fetchStudents();
     } catch (err) {
       console.error(err);
     }
@@ -65,16 +64,14 @@ export default function TeacherClassDetails() {
         minHeight: "100vh",
       }}
     >
-      {/* 🔙 Back Button */}
+      {/* 🔙 Back Button (lighter style) */}
       <button
         onClick={() => navigate("/teacher/classes")}
         style={{
           marginBottom: "20px",
-          padding: "10px 14px",
-          backgroundColor: "#6c757d",
-          color: "#fff",
+          background: "none",
           border: "none",
-          borderRadius: "6px",
+          color: "#2563eb",
           cursor: "pointer",
           fontSize: "14px",
         }}
@@ -92,13 +89,14 @@ export default function TeacherClassDetails() {
         }}
       >
         <div>
-          <h2 style={{ margin: 0, color: "#333" }}>Class Students</h2>
-          <p style={{ color: "#777", marginTop: "5px" }}>
-            View and manage students in this class
+          <h2 style={{ margin: 0, color: "#111827" }}>
+            Class Students
+          </h2>
+          <p style={{ color: "#6b7280", marginTop: "5px" }}>
+            Click a student to view details or create assignments
           </p>
         </div>
 
-        {/* ✅ NEW BUTTON */}
         <button
           onClick={() => setShowModal(true)}
           style={{
@@ -131,8 +129,7 @@ export default function TeacherClassDetails() {
           border: "1px solid #ccc",
         }}
       />
-
-      {/* 📋 Table */}
+            {/* 📋 Table */}
       {filteredStudents.length === 0 ? (
         <div
           style={{
@@ -185,7 +182,7 @@ export default function TeacherClassDetails() {
                     navigate(`/teacher/student/${student.id}`)
                   }
                   onMouseEnter={(e) =>
-                    (e.currentTarget.style.backgroundColor = "#f9fafb")
+                    (e.currentTarget.style.backgroundColor = "#f3f4f6")
                   }
                   onMouseLeave={(e) =>
                     (e.currentTarget.style.backgroundColor = "#fff")

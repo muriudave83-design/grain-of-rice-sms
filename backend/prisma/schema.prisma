@@ -19,15 +19,33 @@ model User {
   isArchived         Boolean             @default(false)
   lastLoginAt        DateTime?           @db.Timestamp(6)
   updatedAt          DateTime?           @db.Timestamp(6)
+
   attendanceSessions AttendanceSession[]
   disciplineRecords  Discipline[]        @relation("UserDisciplineRecords")
   guardians          Guardian[]          @relation("UserToGuardian")
   invoices           Invoice[]           @relation("AccountantInvoices")
-  parentStudents     ParentStudent[]     @relation("ParentLinks")
   sponsorships       Sponsorship[]
   studentProfile     Student?
   taughtSubjects     Subject[]           @relation("TeacherSubjectsLegacy")
   teacherSubjects    TeacherSubject[]
+}
+
+model Parent {
+  id           String   @id @default(uuid())
+  name         String
+  email        String?
+  phone        String?
+
+  // ✅ NEW FIELDS
+  address      String?
+  city         String?
+  relationship String?
+  notes        String?
+
+  createdAt    DateTime @default(now())
+
+  // ✅ RELATION
+  students     ParentStudent[]
 }
 
 model Student {
@@ -39,6 +57,7 @@ model Student {
   dob               DateTime?
   userId            Int?              @unique
   classId           Int
+
   assessmentScores  AssessmentScore[]
   attendanceEntries AttendanceEntry[]
   disciplines       Discipline[]
@@ -49,8 +68,10 @@ model Student {
   parentLinks       ParentStudent[]
   reportCards       ReportCard[]
   sponsorships      Sponsorship[]
+
   class             Class             @relation(fields: [classId], references: [id])
   user              User?             @relation(fields: [userId], references: [id])
+
   isArchived        Boolean @default(false)
 }
 
@@ -59,12 +80,14 @@ model Class {
   name               String
   level              String?
   createdAt          DateTime            @default(now())
+
   assessments        Assessment[]
   attendanceSessions AttendanceSession[]
   classSubjects      ClassSubject[]
   reportCards        ReportCard[]
   students           Student[]
   teacherSubjects    TeacherSubject[]
+
   isArchived Boolean @default(false)
 }
 
@@ -74,6 +97,7 @@ model Guardian {
   studentId Int
   relation  String?
   createdAt DateTime @default(now())
+
   student   Student  @relation(fields: [studentId], references: [id])
   user      User     @relation("UserToGuardian", fields: [userId], references: [id])
 
@@ -82,9 +106,10 @@ model Guardian {
 
 model ParentStudent {
   id        Int     @id @default(autoincrement())
-  parentId  Int
+  parentId  String
   studentId Int
-  parent    User    @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
+
+  parent    Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
   student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([parentId, studentId])
@@ -96,6 +121,7 @@ model Sponsorship {
   studentId Int
   notes     String?
   createdAt DateTime @default(now())
+
   sponsor   User     @relation(fields: [sponsorId], references: [id])
   student   Student  @relation(fields: [studentId], references: [id])
 
@@ -108,11 +134,13 @@ model Subject {
   code            String?                  @unique
   createdAt       DateTime                 @default(now())
   teacherId       Int?
+
   assessments     Assessment[]
   classSubjects   ClassSubject[]
   enrollments     Enrollment[]
   grades          Grade[]
   reportEntries   ReportCardSubjectEntry[]
+
   teacher         User?                    @relation("TeacherSubjectsLegacy", fields: [teacherId], references: [id])
   teacherSubjects TeacherSubject[]
 }
@@ -121,6 +149,7 @@ model ClassSubject {
   id        Int     @id @default(autoincrement())
   classId   Int
   subjectId Int
+
   class     Class   @relation(fields: [classId], references: [id])
   subject   Subject @relation(fields: [subjectId], references: [id])
 
@@ -132,6 +161,7 @@ model Enrollment {
   studentId Int
   subjectId Int
   createdAt DateTime @default(now())
+
   student   Student  @relation(fields: [studentId], references: [id])
   subject   Subject  @relation(fields: [subjectId], references: [id])
 
@@ -152,10 +182,12 @@ model Assessment {
   status      AssessmentStatus    @default(DRAFT)
   categoryId  Int?
   type        AssessmentType
+
   category    AssignmentCategory? @relation(fields: [categoryId], references: [id])
   class       Class               @relation(fields: [classId], references: [id])
   subject     Subject             @relation(fields: [subjectId], references: [id])
   term        Term                @relation(fields: [termId], references: [id])
+
   scores      AssessmentScore[]
 }
 
@@ -165,6 +197,7 @@ model AssessmentScore {
   studentId    Int
   score        Float
   createdAt    DateTime   @default(now())
+
   assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   student      Student    @relation(fields: [studentId], references: [id])
 
@@ -178,6 +211,7 @@ model Grade {
   average   Float
   termId    Int
   total     Float
+
   student   Student @relation(fields: [studentId], references: [id])
   subject   Subject @relation(fields: [subjectId], references: [id])
   term      Term    @relation(fields: [termId], references: [id])
@@ -192,6 +226,7 @@ model Discipline {
   recordedById Int?
   notes        String?
   type         String
+
   recordedBy   User?    @relation("UserDisciplineRecords", fields: [recordedById], references: [id])
   student      Student  @relation(fields: [studentId], references: [id])
 }
@@ -205,6 +240,7 @@ model Invoice {
   dueDate     DateTime?
   notes       String?
   createdById Int?
+
   createdBy   User?     @relation("AccountantInvoices", fields: [createdById], references: [id])
   student     Student   @relation(fields: [studentId], references: [id])
 }
@@ -218,6 +254,7 @@ model Term {
   isActive     Boolean      @default(true)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
+
   assessments  Assessment[]
   grades       Grade[]
   reportCards  ReportCard[]
@@ -233,9 +270,11 @@ model ReportCard {
   publishedAt DateTime?
   total       Float
   status      ReportCardStatus
+
   class       Class                    @relation(fields: [classId], references: [id])
   student     Student                  @relation(fields: [studentId], references: [id])
   term        Term                     @relation(fields: [termId], references: [id])
+
   subjects    ReportCardSubjectEntry[]
 
   @@unique([studentId, termId])
@@ -247,6 +286,7 @@ model ReportCardSubjectEntry {
   subjectId    Int
   average      Float
   total        Float
+
   reportCard   ReportCard @relation(fields: [reportCardId], references: [id], onDelete: Cascade)
   subject      Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
@@ -261,7 +301,9 @@ model AttendanceSession {
   status    AttendanceSessionStatus @default(DRAFT)
   createdAt DateTime                @default(now())
   updatedAt DateTime                @updatedAt
+
   entries   AttendanceEntry[]
+
   class     Class                   @relation(fields: [classId], references: [id])
   teacher   User                    @relation(fields: [teacherId], references: [id])
 
@@ -275,6 +317,7 @@ model AttendanceEntry {
   status              AttendanceStatus
   note                String?
   createdAt           DateTime          @default(now())
+
   session             AttendanceSession @relation(fields: [attendanceSessionId], references: [id])
   student             Student           @relation(fields: [studentId], references: [id])
 
@@ -296,6 +339,7 @@ model AssignmentCategory {
   id          Int          @id @default(autoincrement())
   name        String       @unique
   weight      Float        @default(1)
+
   assessments Assessment[]
 }
 
@@ -305,9 +349,10 @@ model TeacherSubject {
   subjectId Int
   classId   Int
   createdAt DateTime @default(now()) @db.Timestamp(6)
-  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  teacher   User     @relation(fields: [teacherId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher   User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
   @@unique([teacherId, subjectId, classId], map: "TeacherSubject_unique_assignment")
 }

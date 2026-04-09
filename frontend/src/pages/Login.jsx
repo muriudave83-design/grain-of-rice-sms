@@ -39,7 +39,6 @@ export default function Login() {
 
       console.log("✅ LOGIN RESPONSE:", res.data);
 
-      // ✅ CORRECT STRUCTURE
       const { token, user, mustChangePassword } = res.data;
 
       // 🚨 HARD VALIDATION
@@ -50,22 +49,29 @@ export default function Login() {
 
       console.log("🔥 TOKEN BEFORE SAVE:", token);
       console.log("👤 USER:", user);
-      console.log("👉 ROLE (FROM USER):", user.role);
+      console.log("👉 ROLE:", user.role);
       console.log("🔐 mustChangePassword:", mustChangePassword);
 
       // ✅ CLEAR OLD STATE
       localStorage.clear();
 
-      // ✅ USE BACKEND USER DIRECTLY (NO TRANSFORMATION BUG)
+      // ✅ STORE TOKEN FIRST (CRITICAL FOR RACE CONDITIONS)
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+
+      console.log("💾 Token after save:", localStorage.getItem("token"));
+
+      // ✅ SYNC CONTEXT
       login(user, token);
 
       // 🔐 PASSWORD ENFORCEMENT
       if (mustChangePassword) {
+        console.log("➡️ Redirecting to /change-password");
         navigate("/change-password", { replace: true });
         return;
       }
 
-      // ✅ ROLE-BASED REDIRECT (SAFE SOURCE)
+      // ✅ ROLE-BASED REDIRECT
       const normalizedRole = user.role?.toUpperCase();
 
       if (normalizedRole === "ADMIN") {
@@ -84,7 +90,7 @@ export default function Login() {
     } catch (err) {
       console.error("❌ LOGIN ERROR:", err);
 
-      // 🚨 ENSURE NO PARTIAL STATE
+      // 🚨 ENSURE CLEAN STATE
       localStorage.clear();
 
       setError(

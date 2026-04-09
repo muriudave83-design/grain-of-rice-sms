@@ -52,6 +52,11 @@ export default function SidebarNav() {
               🎓 Students
             </NavLink>
 
+            {/* ✅ ADDED: Parents */}
+            <NavLink to={path("parents")} className={linkClass}>
+              👪 Parents
+            </NavLink>
+
             <NavLink to={path("teachers")} className={linkClass}>
               👩‍🏫 Teachers
             </NavLink>
@@ -60,12 +65,10 @@ export default function SidebarNav() {
               🏫 Classes
             </NavLink>
 
-            {/* ✅ NEW: Attendance */}
             <NavLink to={path("attendance")} className={linkClass}>
               📅 Attendance
             </NavLink>
 
-            {/* ✅ ARCHIVED */}
             <NavLink to="/dashboard/admin/archived" className={linkClass}>
               <span>🗂️</span> Archived
             </NavLink>

@@ -1,7 +1,12 @@
 import axios from "axios";
 
-// 🔥 PRODUCTION BACKEND (Render ONLY)
-const API_URL = "http://localhost:5000/api";
+// 🌍 USE ENV VARIABLE (DEV vs PROD)
+const API_URL = import.meta.env.VITE_API_URL;
+
+// 🚨 FAIL FAST IF NOT CONFIGURED
+if (!API_URL) {
+  console.error("❌ VITE_API_URL is not defined. Check your .env files.");
+}
 
 console.log("🌍 API URL:", API_URL);
 
@@ -14,13 +19,23 @@ const apiClient = axios.create({
 // ==============================
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
+    let token = localStorage.getItem("token");
 
-    console.log("🔑 TOKEN:", token);
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (
+      !token ||
+      token === "null" ||
+      token === "undefined" ||
+      token.trim() === ""
+    ) {
+      console.warn("⚠️ No valid token found");
+      return config;
     }
+
+    if (!config.headers) {
+      config.headers = {};
+    }
+
+    config.headers["Authorization"] = `Bearer ${token}`;
 
     return config;
   },
@@ -28,30 +43,48 @@ apiClient.interceptors.request.use(
 );
 
 // ==============================
-// 🚨 RESPONSE INTERCEPTOR (SAFE VERSION)
+// 🧠 HELPER: EXTRACT ERROR MESSAGE
+// ==============================
+const getErrorMessage = (error) => {
+  if (!error.response) return "Network error. Check your connection.";
+
+  return (
+    error.response.data?.message ||
+    error.response.data?.error ||
+    "Something went wrong"
+  );
+};
+
+// ==============================
+// 🚨 RESPONSE INTERCEPTOR
 // ==============================
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error("❌ API ERROR:", error.response || error.message);
+    const message = getErrorMessage(error);
 
+    console.error("❌ API ERROR:", {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      message,
+    });
+
+    // 🔐 AUTH HANDLING
     if (error.response) {
       const status = error.response.status;
-
-      // 🔥 ONLY logout if token exists AND clearly invalid
       const token = localStorage.getItem("token");
 
-      if ((status === 401 || status === 403) && token) {
-        console.warn("⚠️ Possible session issue detected");
-
-        // ⚠️ DO NOT instantly logout (prevents login race bug)
-        // Instead, allow ProtectedRoute to handle auth state
-
-        // OPTIONAL: only logout if NOT during app init
+      if (
+        (status === 401 || status === 403) &&
+        token &&
+        token !== "null" &&
+        token !== "undefined"
+      ) {
         const isOnLoginPage = window.location.pathname === "/login";
 
         if (!isOnLoginPage) {
-          console.warn("🔁 Redirecting to login (safe)");
+          console.warn("🔁 Session expired → redirecting to login");
 
           localStorage.removeItem("token");
           localStorage.removeItem("user");
@@ -60,6 +93,11 @@ apiClient.interceptors.response.use(
           window.location.href = "/login";
         }
       }
+    }
+
+    // 🔥 GLOBAL ERROR FEEDBACK (TEMP: alert, later replace with toast)
+    if (!error.config?.silent) {
+      alert(message);
     }
 
     return Promise.reject(error);

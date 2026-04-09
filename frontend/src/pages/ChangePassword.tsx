@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import apiClient from "../services/apiClient"; // ✅ USE THIS
 import { useAuth } from "../context/AuthContext";
 
 export default function ChangePassword() {
@@ -39,21 +39,29 @@ export default function ChangePassword() {
     try {
       setLoading(true);
 
-      await axios.patch(
-        "https://sms-backend-1w30.onrender.com/api/auth/change-password",
-        {
-          currentPassword,
-          newPassword,
-        },
-        { withCredentials: true }
-      );
+      console.log("🚀 Sending change-password request");
 
+      // ✅ USE apiClient (INTERCEPTOR ATTACHES TOKEN)
+      await apiClient.patch("/auth/change-password", {
+        currentPassword,
+        newPassword,
+      });
+
+      console.log("✅ Password updated successfully");
+
+      // 🔐 FORCE RE-LOGIN AFTER PASSWORD CHANGE
       localStorage.removeItem("token");
+      localStorage.removeItem("user");
+
       navigate("/login", { replace: true });
       return;
 
     } catch (err: any) {
-      setError(err.response?.data?.message || "Password change failed.");
+      console.error("❌ Change password error:", err);
+
+      setError(
+        err.response?.data?.message || "Password change failed."
+      );
     } finally {
       setLoading(false);
     }

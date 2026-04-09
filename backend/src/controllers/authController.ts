@@ -94,19 +94,11 @@ export const loginUser = async (req: Request, res: Response) => {
       });
     }
 
-    // ✅ INCLUDE PARENT RELATIONS
     const user = await prisma.user.findUnique({
       where: { email },
-      include: {
-        parentStudents: {
-          include: {
-            student: true,
-          },
-        },
-      },
     });
 
-    // ✅ BLOCK INVALID OR ARCHIVED USERS (CRITICAL)
+    // ✅ BLOCK INVALID OR ARCHIVED USERS
     if (!user || user.isArchived) {
       return res.status(401).json({
         message: "Invalid credentials",
@@ -151,28 +143,14 @@ export const loginUser = async (req: Request, res: Response) => {
       maxAge: 60 * 60 * 1000,
     });
 
-    // ✅ FORMAT CHILDREN (FOR PARENTS)
-    let children: any[] = [];
-
-    if (user.role === "PARENT") {
-      children = user.parentStudents.map((ps) => ({
-        id: ps.student.id,
-        firstName: ps.student.firstName,
-        lastName: ps.student.lastName,
-      }));
-    }
-
     // ✅ CLEAN USER OBJECT
-    const { password: _, parentStudents, ...safeUser } = user;
+    const { password: _, ...safeUser } = user;
 
-    // ✅ FINAL RESPONSE SHAPE (STANDARDIZED)
+    // ✅ FINAL RESPONSE (PURE USER)
     return res.json({
       token,
       mustChangePassword: user.mustChangePassword,
-      user: {
-        ...safeUser,
-        children,
-      },
+      user: safeUser,
     });
 
   } catch (err: any) {

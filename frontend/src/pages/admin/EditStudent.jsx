@@ -10,23 +10,25 @@ export default function EditStudent() {
   const [parents, setParents] = useState([]);
   const [classes, setClasses] = useState([]);
 
+  const [selectedParents, setSelectedParents] = useState([]);
+  const [originalParents, setOriginalParents] = useState([]); // 🔥 NEW
+
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
     admissionNo: "",
-    parentId: "",
     classId: "",
   });
 
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // ✅ FETCH ALL REQUIRED DATA
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [studentRes, parentsRes, classesRes] = await Promise.all([
           apiClient.get(`/admin/students/${id}`),
-          apiClient.get(`/admin/users?role=PARENT`),
+          apiClient.get(`/admin/parents`),
           apiClient.get(`/admin/classes`),
         ]);
 
@@ -40,9 +42,15 @@ export default function EditStudent() {
           firstName: studentData.firstName || "",
           lastName: studentData.lastName || "",
           admissionNo: studentData.admissionNo || "",
-          parentId: studentData.parentId || "",
           classId: studentData.classId || "",
         });
+
+        if (studentData.parents) {
+          const parentIds = studentData.parents.map((p) => String(p.id));
+
+          setSelectedParents(parentIds);
+          setOriginalParents(parentIds); // 🔥 TRACK ORIGINAL
+        }
 
       } catch (err) {
         console.error("Failed to load data", err);
@@ -55,26 +63,66 @@ export default function EditStudent() {
     fetchData();
   }, [id]);
 
-  // ✅ HANDLE SUBMIT
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     try {
+      setSaving(true);
+
+      // ✅ Update student
       await apiClient.put(`/admin/students/${id}`, {
         firstName: form.firstName,
         lastName: form.lastName,
         admissionNo: form.admissionNo,
-        parentId: form.parentId ? Number(form.parentId) : null,
         classId: form.classId ? Number(form.classId) : null,
       });
 
-      alert("Student updated successfully");
+      // 🔥 DETECT CHANGES
+      const toAdd = selectedParents.filter(
+        (id) => !originalParents.includes(id)
+      );
 
+      const toRemove = originalParents.filter(
+        (id) => !selectedParents.includes(id)
+      );
+
+      console.log("TO ADD:", toAdd);
+      console.log("TO REMOVE:", toRemove);
+
+      // ✅ LINK NEW
+      for (const parentId of toAdd) {
+        try {
+          await apiClient.post("/admin/link-student", {
+            studentId: Number(id),
+            parentId,
+          });
+        } catch (err) {
+          console.warn("Link skipped:", parentId);
+        }
+      }
+
+      // 🔥 UNLINK REMOVED
+      for (const parentId of toRemove) {
+        try {
+          await apiClient.delete("/admin/unlink-student", {
+            data: {
+              studentId: Number(id),
+              parentId,
+            },
+          });
+        } catch (err) {
+          console.warn("Unlink failed:", parentId);
+        }
+      }
+
+      alert("Student updated successfully");
       navigate("/dashboard/admin/students");
 
     } catch (err) {
       console.error("Update failed", err);
       alert("Failed to update student");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -87,76 +135,108 @@ export default function EditStudent() {
         Edit {student.firstName} {student.lastName}
       </h2>
 
+      <button
+        onClick={() => navigate("/dashboard/admin/students")}
+        className="mb-4 text-blue-500"
+      >
+        ← Back to Students
+      </button>
+
       <form onSubmit={handleSubmit} className="space-y-4">
 
-        <input
-          type="text"
-          placeholder="First Name"
-          className="w-full p-2 border rounded"
-          value={form.firstName}
-          onChange={(e) =>
-            setForm({ ...form, firstName: e.target.value })
-          }
-        />
+        <div>
+          <label className="block text-sm font-medium">First Name</label>
+          <input
+            type="text"
+            value={form.firstName}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, firstName: e.target.value }))
+            }
+            className="w-full p-2 border rounded"
+            required
+          />
+        </div>
 
-        <input
-          type="text"
-          placeholder="Last Name"
-          className="w-full p-2 border rounded"
-          value={form.lastName}
-          onChange={(e) =>
-            setForm({ ...form, lastName: e.target.value })
-          }
-        />
+        <div>
+          <label className="block text-sm font-medium">Last Name</label>
+          <input
+            type="text"
+            value={form.lastName}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, lastName: e.target.value }))
+            }
+            className="w-full p-2 border rounded"
+            required
+          />
+        </div>
 
-        <input
-          type="text"
-          placeholder="Admission No"
-          className="w-full p-2 border rounded"
-          value={form.admissionNo}
-          onChange={(e) =>
-            setForm({ ...form, admissionNo: e.target.value })
-          }
-        />
+        <div>
+          <label className="block text-sm font-medium">Admission Number</label>
+          <input
+            type="text"
+            value={form.admissionNo}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, admissionNo: e.target.value }))
+            }
+            className="w-full p-2 border rounded"
+          />
+        </div>
 
-        {/* ✅ CLASS SELECT */}
-        <select
-          className="w-full p-2 border rounded"
-          value={form.classId}
-          onChange={(e) =>
-            setForm({ ...form, classId: e.target.value })
-          }
-        >
-          <option value="">Select Class</option>
-          {classes.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        <div>
+          <label className="block text-sm font-medium">Class</label>
+          <select
+            className="w-full p-2 border rounded"
+            value={form.classId}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, classId: e.target.value }))
+            }
+          >
+            <option value="">Select Class</option>
+            {classes.map((c) => (
+              <option key={c.id} value={String(c.id)}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        {/* ✅ PARENT SELECT */}
-        <select
-          className="w-full p-2 border rounded"
-          value={form.parentId}
-          onChange={(e) =>
-            setForm({ ...form, parentId: e.target.value })
-          }
-        >
-          <option value="">Select Parent</option>
-          {parents.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+        <div>
+          <label className="block text-sm font-medium">
+            Assign Parents
+          </label>
+
+          <select
+            multiple
+            className="w-full p-2 border rounded h-32"
+            value={selectedParents}
+            onChange={(e) => {
+              const values = Array.from(
+                e.target.selectedOptions,
+                (opt) => opt.value
+              );
+
+              setSelectedParents(values);
+            }}
+          >
+            {parents.map((p) => (
+              <option key={p.id} value={String(p.id)}>
+                {p.name} ({p.email})
+              </option>
+            ))}
+          </select>
+
+          <p className="text-xs text-gray-500 mt-1">
+            Hold Ctrl (Windows) or Cmd (Mac) to select multiple
+          </p>
+        </div>
 
         <div className="flex gap-2">
           <button
             type="submit"
+            disabled={saving}
             className="px-4 py-2 bg-blue-600 text-white rounded"
           >
-            Save Changes
+            {saving ? "Saving..." : "Save Changes"}
           </button>
 
           <button

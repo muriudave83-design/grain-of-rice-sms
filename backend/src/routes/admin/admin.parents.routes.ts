@@ -2,8 +2,9 @@ import { Router } from "express";
 import {
   createParent,
   getParents,
+  getParentById, // ✅ ADDED
   updateParent,
-  archiveParent, // 👈 ADDED
+  archiveParent,
 } from "../../controllers/adminController";
 import { authenticate } from "../../middlewares/authMiddleware";
 import { requireRole } from "../../middlewares/rolesMiddleware";
@@ -24,6 +25,14 @@ router.get(
   authenticate,
   requireRole(["ADMIN"]),
   getParents
+);
+
+// ✅ GET ONE (🔥 FIXES EDIT PAGE)
+router.get(
+  "/:id",
+  authenticate,
+  requireRole(["ADMIN"]),
+  getParentById
 );
 
 // ✅ UPDATE

@@ -265,7 +265,7 @@ router.put("/students/:id", async (req, res) => {
       await prisma.parentStudent.create({
         data: {
           studentId,
-          parentId: Number(parentId),
+          parentId: String(parentId),
         },
       });
     }

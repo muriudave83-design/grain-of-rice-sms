@@ -8,7 +8,7 @@ import express from "express";
 import type { Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import { prisma } from "./prisma/client";
+import { prisma } from "../prisma/client";
 
 import authRoutes from "./routes/authRoutes";
 import protectedRoutes from "./routes/protectedRoutes";
@@ -33,6 +33,11 @@ import adminClassStudentsRoutes from "./routes/admin/admin.class.students.routes
 import adminClassSubjectsRoutes from "./routes/admin/admin.classSubjects.routes";
 import adminAttendanceRoutes from "./routes/adminAttendance.routes";
 
+// ❌ REMOVED WRONG DUPLICATE IMPORT
+// import adminParentsRoutes from "./routes/admin/admin.parents.routes";
+
+import parentRoutes from "./routes/parentRoutes";
+
 // ✅ NEW: Teacher ↔ Subject assignments (ADMIN)
 import teacherSubjectsRoutes from "./routes/admin/admin.teacherSubjects.routes";
 
@@ -46,6 +51,9 @@ import { reportCardReadRoutes as reportCardRoutes } from "./routes/reportCardRou
 // ✅ Phase-7.5: Parent ↔ Student linking
 import { parentStudentRoutes } from "./routes/parentStudentRoutes";
 
+// ✅ ✅ CORRECT PARENT ROUTES (THIS ONE ONLY)
+import adminParentRoutes from "./routes/admin.parents.routes";
+
 // ✅ Phase-8: Report Card PDF
 import reportCardPdfRoutes from "./routes/reportCardPdf.routes";
 
@@ -54,9 +62,6 @@ import attendanceRoutes from "./routes/attendanceRoutes";
 
 // ✅ Teacher-visible classes
 import classesRoutes from "./routes/classes";
-
-// ✅ 🆕 NEW: Admin Parents Routes
-import adminParentsRoutes from "./routes/admin/admin.parents.routes";
 
 const app = express();
 
@@ -156,8 +161,8 @@ app.use("/api/admin", adminSubjectsRoutes);
 app.use("/api/admin", adminClassStudentsRoutes);
 app.use("/api/admin", adminClassSubjectsRoutes);
 
-// ✅ 🆕 NEW: Parents route (THIS IS THE KEY ADD)
-app.use("/api/admin/parents", adminParentsRoutes);
+// ✅ ✅ ✅ THIS IS THE ONLY LINE THAT MATTERS
+app.use("/api/admin", adminParentRoutes);
 
 // ✅ NEW: Teacher Subject Assignments (ADMIN)
 app.use("/api/admin", teacherSubjectsRoutes);
