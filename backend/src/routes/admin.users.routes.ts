@@ -126,49 +126,6 @@ router.patch(
 );
 
 /**
- * Shared admin user creation helper
- */
-async function createUser({
-  name,
-  email,
-  password,
-  role,
-}: {
-  name: string;
-  email: string;
-  password: string;
-  role: "TEACHER" | "PARENT";
-}) {
-  if (!name || !email || !password) {
-    throw new Error("All fields are required");
-  }
-
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    throw new Error("User already exists");
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  return prisma.user.create({
-    data: {
-      name,
-      email,
-      password: hashedPassword,
-      role,
-      mustChangePassword: true,
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      createdAt: true,
-    },
-  });
-}
-
-/**
  * POST /api/admin/users/teacher
  */
 router.post(
@@ -177,9 +134,27 @@ router.post(
   requireRole(["ADMIN"]),
   async (req, res) => {
     try {
-      const user = await createUser({
-        ...req.body,
-        role: "TEACHER",
+      const { name, email, password } = req.body;
+
+      if (!name || !email || !password) {
+        return res.status(400).json({ message: "Missing fields" });
+      }
+
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        return res.status(400).json({ message: "User already exists" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const user = await prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          role: "TEACHER",
+          mustChangePassword: true,
+        },
       });
 
       return res.status(201).json(user);
@@ -191,7 +166,7 @@ router.post(
 );
 
 /**
- * POST /api/admin/users/parent
+ * ✅ CREATE PARENT (USER + PARENT LINKED)
  */
 router.post(
   "/users/parent",
@@ -199,9 +174,37 @@ router.post(
   requireRole(["ADMIN"]),
   async (req, res) => {
     try {
-      const user = await createUser({
-        ...req.body,
-        role: "PARENT",
+      const { name, email, password } = req.body;
+
+      if (!name || !email || !password) {
+        return res.status(400).json({ message: "Missing fields" });
+      }
+
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        return res.status(400).json({ message: "User already exists" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const user = await prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          role: "PARENT",
+          mustChangePassword: true,
+
+          parent: {
+            create: {
+              name,
+              email, // keep consistent
+            },
+          },
+        },
+        include: {
+          parent: true,
+        },
       });
 
       return res.status(201).json(user);
@@ -213,7 +216,7 @@ router.post(
 );
 
 /**
- * ✅ REAL STUDENT USER CREATION (FIXED)
+ * ✅ CREATE STUDENT (USER + STUDENT LINKED)
  */
 router.post(
   "/users/student",
@@ -221,11 +224,11 @@ router.post(
   requireRole(["ADMIN"]),
   async (req, res) => {
     try {
-      const { firstName, lastName, email, password } = req.body;
+      const { firstName, lastName, email, password, classId } = req.body;
 
-      if (!firstName || !email || !password) {
+      if (!firstName || !email || !password || !classId) {
         return res.status(400).json({
-          message: "firstName, email and password are required",
+          message: "firstName, email, password, classId are required",
         });
       }
 
@@ -248,6 +251,18 @@ router.post(
           password: hashedPassword,
           role: "STUDENT",
           mustChangePassword: true,
+
+          student: {
+            create: {
+              firstName,
+              lastName,
+              admissionNo: Math.floor(Math.random() * 100000).toString(),
+              classId: Number(classId), // ✅ REQUIRED FIX
+            },
+          },
+        },
+        include: {
+          student: true,
         },
       });
 
@@ -263,6 +278,7 @@ router.post(
 
 /**
  * 🔗 POST /api/admin/students/:studentId/link-user
+ * (KEEP — useful fallback)
  */
 router.post(
   "/students/:studentId/link-user",

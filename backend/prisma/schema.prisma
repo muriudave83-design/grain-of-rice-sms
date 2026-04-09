@@ -8,24 +8,28 @@ datasource db {
 }
 
 model User {
-  id                 Int                 @id @default(autoincrement())
+  id                 Int       @id @default(autoincrement())
   name               String
-  email              String              @unique
+  email              String    @unique
   password           String
-  createdAt          DateTime            @default(now())
+  createdAt          DateTime  @default(now())
   role               Role
-  mustChangePassword Boolean             @default(true)
-  isActive           Boolean             @default(true)
-  isArchived         Boolean             @default(false)
-  lastLoginAt        DateTime?           @db.Timestamp(6)
-  updatedAt          DateTime?           @db.Timestamp(6)
+  mustChangePassword Boolean   @default(true)
+  isActive           Boolean   @default(true)
+  isArchived         Boolean   @default(false)
+  lastLoginAt        DateTime? @db.Timestamp(6)
+  updatedAt          DateTime? @db.Timestamp(6)
 
+  // ✅ CLEAN RELATIONS
+  student            Student?
+  parent             Parent?
+
+  // EXISTING RELATIONS (UNCHANGED)
   attendanceSessions AttendanceSession[]
   disciplineRecords  Discipline[]        @relation("UserDisciplineRecords")
   guardians          Guardian[]          @relation("UserToGuardian")
   invoices           Invoice[]           @relation("AccountantInvoices")
   sponsorships       Sponsorship[]
-  studentProfile     Student?
   taughtSubjects     Subject[]           @relation("TeacherSubjectsLegacy")
   teacherSubjects    TeacherSubject[]
 }
@@ -36,7 +40,6 @@ model Parent {
   email        String?
   phone        String?
 
-  // ✅ NEW FIELDS
   address      String?
   city         String?
   relationship String?
@@ -44,7 +47,11 @@ model Parent {
 
   createdAt    DateTime @default(now())
 
-  // ✅ RELATION
+  // ✅ LINK TO USER
+  userId       Int?     @unique
+  user         User?    @relation(fields: [userId], references: [id])
+
+  // EXISTING RELATION
   students     ParentStudent[]
 }
 
@@ -55,9 +62,14 @@ model Student {
   createdAt         DateTime          @default(now())
   admissionNo       String            @unique
   dob               DateTime?
+
+  // ✅ LINK TO USER
   userId            Int?              @unique
+  user              User?             @relation(fields: [userId], references: [id])
+
   classId           Int
 
+  // EXISTING RELATIONS
   assessmentScores  AssessmentScore[]
   attendanceEntries AttendanceEntry[]
   disciplines       Discipline[]
@@ -70,7 +82,6 @@ model Student {
   sponsorships      Sponsorship[]
 
   class             Class             @relation(fields: [classId], references: [id])
-  user              User?             @relation(fields: [userId], references: [id])
 
   isArchived        Boolean @default(false)
 }
