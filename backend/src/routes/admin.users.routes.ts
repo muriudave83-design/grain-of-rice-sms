@@ -32,17 +32,12 @@ router.get(
   requireRole(["ADMIN"]),
   async (_req, res) => {
     try {
-      const students = await prisma.student.count();
-
-      const teachers = await prisma.user.count({
-        where: { role: "TEACHER" },
-      });
-
-      const parents = await prisma.user.count({
-        where: { role: "PARENT" },
-      });
-
-      const classes = await prisma.class.count();
+      const [students, teachers, parents, classes] = await Promise.all([
+        prisma.student.count(),
+        prisma.user.count({ where: { role: "TEACHER" } }),
+        prisma.user.count({ where: { role: "PARENT" } }),
+        prisma.class.count(),
+      ]);
 
       return res.json({
         students,
@@ -88,7 +83,7 @@ router.patch(
     try {
       const userId = Number(req.params.id);
 
-      if (Number.isNaN(userId)) {
+      if (!userId) {
         return res.status(400).json({ message: "Invalid user ID" });
       }
 
@@ -232,62 +227,66 @@ router.post(
 );
 
 /**
- * POST /api/admin/students/:studentId/link-user
+ * 🔗 POST /api/admin/students/:studentId/link-user
  */
 router.post(
   "/students/:studentId/link-user",
   authenticate,
   requireRole(["ADMIN"]),
   async (req, res) => {
-    const studentId = Number(req.params.studentId);
-    const { userId } = req.body;
+    try {
+      const studentId = Number(req.params.studentId);
+      const userId = Number(req.body.userId);
 
-    if (Number.isNaN(studentId) || !userId) {
-      return res.status(400).json({ message: "Invalid input" });
-    }
+      if (!studentId || !userId) {
+        return res.status(400).json({ message: "Invalid input" });
+      }
 
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-    });
+      const [student, user] = await Promise.all([
+        prisma.student.findUnique({ where: { id: studentId } }),
+        prisma.user.findUnique({ where: { id: userId } }),
+      ]);
 
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+      if (!user || user.role !== "STUDENT") {
+        return res.status(400).json({
+          message: "User must exist and have STUDENT role",
+        });
+      }
 
-    if (!user || user.role !== "STUDENT") {
-      return res.status(400).json({
-        message: "User must exist and have STUDENT role",
+      if (student.userId) {
+        return res.status(409).json({
+          message: "Student already linked",
+        });
+      }
+
+      const alreadyLinked = await prisma.student.findFirst({
+        where: { userId },
+      });
+
+      if (alreadyLinked) {
+        return res.status(409).json({
+          message: "User already linked to another student",
+        });
+      }
+
+      await prisma.student.update({
+        where: { id: studentId },
+        data: { userId },
+      });
+
+      return res.json({
+        message: "Student successfully linked to user",
+      });
+    } catch (error) {
+      console.error("Link user error:", error);
+      return res.status(500).json({
+        message: "Failed to link user",
       });
     }
-
-    if (student.userId) {
-      return res.status(409).json({
-        message: "Student already linked to a user",
-      });
-    }
-
-    const userAlreadyLinked = await prisma.student.findFirst({
-      where: { userId },
-    });
-
-    if (userAlreadyLinked) {
-      return res.status(409).json({
-        message: "This user is already linked to another student",
-      });
-    }
-
-    await prisma.student.update({
-      where: { id: studentId },
-      data: { userId: user.id },
-    });
-
-    return res.json({
-      message: "Student successfully linked to user",
-    });
   }
 );
 
