@@ -30,14 +30,14 @@ export default function TeacherLayout() {
 
         <nav className="p-2 space-y-1">
 
-          {/* ✅ My Classes (MAIN ENTRY) */}
+          {/* ✅ NEW: Gradebook (MAIN ENTRY) */}
           <Link
-            to="/teacher/classes"
+            to="/teacher/gradebook"
             className={`block px-3 py-2 rounded ${isActive(
-              "/teacher/classes"
+              "/teacher/gradebook"
             )}`}
           >
-            My Classes
+            Gradebook
           </Link>
 
           {/* ✅ Attendance */}

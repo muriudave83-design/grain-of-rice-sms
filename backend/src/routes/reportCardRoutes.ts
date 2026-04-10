@@ -409,7 +409,7 @@ router.get(
  * ============================================================
  */
 router.get(
-  "/teacher/:classId/:term",
+  "/by-class/:classId/term/:term",
   authenticate,
   async (req: any, res) => {
     console.log("🔥 REPORT CARD ROUTE HIT");
@@ -421,7 +421,8 @@ router.get(
 
       console.log("USER:", req.user);
 
-      let classId = Number(req.params.classId);
+      let classIdParam = req.params.classId;
+      let classId = classIdParam ? Number(classIdParam) : undefined;
       const userId = req.user.id;
       const role = req.user.role;
 
@@ -440,11 +441,17 @@ router.get(
         
         classId = student.classId;
         students = [student];
-      } else {
-        students = await prisma.student.findMany({
-          where: { classId },
-        });
-      }
+        } else {
+          if (!classId || isNaN(classId)) {
+            return res.status(400).json({
+              message: "Valid classId is required",
+            });
+          }
+
+          students = await prisma.student.findMany({
+            where: { classId },
+          });
+        }
 
       const classSubjects = await prisma.classSubject.findMany({
         where: { classId },

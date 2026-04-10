@@ -81,11 +81,13 @@ model Student {
   reportCards       ReportCard[]
   sponsorships      Sponsorship[]
 
+  // ✅ ADDED (fix for Score relation)
+  scores            Score[]
+
   class             Class             @relation(fields: [classId], references: [id])
 
   isArchived        Boolean @default(false)
 }
-
 model Class {
   id                 Int                 @id @default(autoincrement())
   name               String
@@ -365,7 +367,35 @@ model TeacherSubject {
   subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   teacher   User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
+  assignments Assignment[]
+
   @@unique([teacherId, subjectId, classId], map: "TeacherSubject_unique_assignment")
+}
+
+model Assignment {
+  id               Int      @id @default(autoincrement())
+  title            String
+  teacherSubjectId Int
+  createdAt        DateTime @default(now())
+  weight           Float   @default(1)
+
+  // ✅ RELATION BACK
+  teacherSubject   TeacherSubject @relation(fields: [teacherSubjectId], references: [id], onDelete: Cascade)
+
+  // ✅ SCORES
+  scores           Score[]
+}
+
+model Score {
+  id           Int @id @default(autoincrement())
+  studentId    Int
+  assignmentId Int
+  score        Float
+
+  student      Student    @relation(fields: [studentId], references: [id])
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, assignmentId])
 }
 
 enum Role {

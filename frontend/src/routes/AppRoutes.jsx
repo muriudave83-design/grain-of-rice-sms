@@ -55,6 +55,8 @@ import TeacherClasses from "../pages/teacher/TeacherClasses";
 import TeacherClassDetails from "../pages/teacher/TeacherClassDetails";
 import TeacherStudentDetails from "../pages/teacher/TeacherStudentDetails";
 import TeacherAttendance from "../pages/teacher/attendance/TeacherAttendance";
+import GradebookPage from "../pages/teacher/GradebookPage";
+import GradebookDetail from "../pages/teacher/GradebookDetail";
 
 // =======================
 // PARENT PAGES
@@ -303,7 +305,12 @@ export default function AppRoutes() {
 
             <Route
               path="/teacher/gradebook"
-              element={<Gradebook />}
+              element={<GradebookPage />}
+            />
+
+            <Route
+              path="/teacher/gradebook/:id"
+              element={<GradebookDetail />}
             />
 
             <Route

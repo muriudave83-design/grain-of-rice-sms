@@ -20,7 +20,7 @@ import dashboardRoutes from "./routes/dashboardRoutes";
 // ✅ Assignment Categories
 import assignmentCategoryRoutes from "./routes/assignmentCategory.routes";
 
-// ✅ Terms route (STANDARDIZED)
+// ✅ Terms route
 import termRoutes from "./routes/termRoutes";
 
 // ✅ Admin routes
@@ -33,28 +33,24 @@ import adminClassStudentsRoutes from "./routes/admin/admin.class.students.routes
 import adminClassSubjectsRoutes from "./routes/admin/admin.classSubjects.routes";
 import adminAttendanceRoutes from "./routes/adminAttendance.routes";
 
-// ❌ REMOVED WRONG DUPLICATE IMPORT
-// import adminParentsRoutes from "./routes/admin/admin.parents.routes";
-
 import parentRoutes from "./routes/parentRoutes";
 
-// ✅ NEW: Teacher ↔ Subject assignments (ADMIN)
+// ✅ Teacher ↔ Subject assignments
 import teacherSubjectsRoutes from "./routes/admin/admin.teacherSubjects.routes";
 
-// ✅ NEW: Teacher assignments endpoint
+// ✅ Teacher assignments endpoint
 import teacherAssignmentsRoutes from "./routes/teacherAssignments.routes";
 
-// ✅ Phase-7: Report Cards
+// ✅ REPORT CARDS (FIXED IMPORTS)
 import { reportCardReadRoutes } from "./routes/reportCardReadRoutes";
-import { reportCardReadRoutes as reportCardRoutes } from "./routes/reportCardRoutes";
 
-// ✅ Phase-7.5: Parent ↔ Student linking
+// ✅ Parent ↔ Student linking
 import { parentStudentRoutes } from "./routes/parentStudentRoutes";
 
-// ✅ ✅ CORRECT PARENT ROUTES (THIS ONE ONLY)
+// ✅ Parent routes
 import adminParentRoutes from "./routes/admin.parents.routes";
 
-// ✅ Phase-8: Report Card PDF
+// ✅ Report Card PDF
 import reportCardPdfRoutes from "./routes/reportCardPdf.routes";
 
 // ✅ Attendance
@@ -62,6 +58,7 @@ import attendanceRoutes from "./routes/attendanceRoutes";
 
 // ✅ Teacher-visible classes
 import classesRoutes from "./routes/classes";
+import teacherRoutes from "./routes/teacher.routes";
 
 const app = express();
 
@@ -84,7 +81,6 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
-// Prevent malformed cookie crash
 app.use((req, res, next) => {
   try {
     const cookie = req.headers["cookie"];
@@ -100,7 +96,7 @@ app.use((req, res, next) => {
 // ----------------------------------
 // HEALTH CHECK
 // ----------------------------------
-app.get("/api", (req: Request, res: Response) => {
+app.get("/api", (_req: Request, res: Response) => {
   res.json({ message: "Grain of Rice SMS backend is running 🚀" });
 });
 
@@ -125,25 +121,22 @@ app.use("/api/students", studentRoutes);
 app.use("/api", protectedRoutes);
 app.use("/api/assessments", assessmentRoutes);
 app.use("/api/classes", classesRoutes);
+app.use("/api/teacher", teacherRoutes); // ✅ MUST be before any generic /api routes
 app.use("/api/gradebook", gradebookRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/assignment-categories", assignmentCategoryRoutes);
 app.use("/api/admin/attendance", adminAttendanceRoutes);
-
-// ✅ STANDARDIZED TERMS ROUTE
 app.use("/api/terms", termRoutes);
-
 app.use("/api/attendance", attendanceRoutes);
 
-// ✅ NEW: Teacher assignments route
-app.use("/api", teacherAssignmentsRoutes);
+// ✅ Teacher assignments (safe)
+app.use("/api/teacher-assignments", teacherAssignmentsRoutes);
 
 // ----------------------------------
-// REPORT CARDS
+// REPORT CARDS (STRICT SCOPING)
 // ----------------------------------
 app.use("/api/report-cards", reportCardReadRoutes);
-app.use("/api/report-cards", reportCardRoutes);
-app.use("/api", reportCardPdfRoutes);
+app.use("/api/report-cards/pdf", reportCardPdfRoutes); // ✅ FIXED (NO MORE /api LEAK)
 
 // ----------------------------------
 // PARENT ↔ STUDENT
@@ -160,11 +153,7 @@ app.use("/api/admin", adminClassesRoutes);
 app.use("/api/admin", adminSubjectsRoutes);
 app.use("/api/admin", adminClassStudentsRoutes);
 app.use("/api/admin", adminClassSubjectsRoutes);
-
-// ✅ ✅ ✅ THIS IS THE ONLY LINE THAT MATTERS
 app.use("/api/admin", adminParentRoutes);
-
-// ✅ NEW: Teacher Subject Assignments (ADMIN)
 app.use("/api/admin", teacherSubjectsRoutes);
 
 // ----------------------------------
