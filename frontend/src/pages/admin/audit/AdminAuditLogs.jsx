@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import apiClient from "../../../services/apiClient";
 
 export default function AdminAuditLogs() {
   const [logs, setLogs] = useState([]);
@@ -18,13 +18,9 @@ export default function AdminAuditLogs() {
         if (action) params.action = action;
         if (role) params.role = role;
 
-        const res = await axios.get(
-          `${import.meta.env.VITE_API_URL}/audit-logs`,
-          {
-            params,
-            withCredentials: true,
-          }
-        );
+        const res = await apiClient.get("/audit-logs", {
+          params,
+        });
 
         setLogs(res.data.items || []);
       } catch {

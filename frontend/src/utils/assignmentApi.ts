@@ -1,16 +1,15 @@
-export const createAssignment = async (classId: number, data: any, token: string) => {
-  const res = await fetch(`http://localhost:5000/api/teacher/class/${classId}/assignment`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(data),
-  });
+import apiClient from "../services/apiClient";
 
-  if (!res.ok) {
-    throw new Error("Failed to create assignment");
+export const createAssignment = async (classId: number, data: any) => {
+  try {
+    const res = await apiClient.post(
+      `/teacher/class/${classId}/assignment`,
+      data
+    );
+
+    return res.data;
+  } catch (err) {
+    console.error("Create assignment failed:", err);
+    throw err;
   }
-
-  return res.json();
 };

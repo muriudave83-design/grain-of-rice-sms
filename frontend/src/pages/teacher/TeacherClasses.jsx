@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../../api/apiClient";
+import apiClient from "../../services/apiClient";
 
 export default function TeacherClasses() {
   const navigate = useNavigate();
@@ -12,7 +12,7 @@ export default function TeacherClasses() {
 
   const fetchSubjects = async () => {
     try {
-      const res = await api.get("/teacher/subjects");
+      const res = await apiClient.get("/teacher/subjects");
       setSubjects(res.data || []);
     } catch (err) {
       console.error(err);

@@ -1,13 +1,9 @@
 import axios from "axios";
 
-// 🌍 USE ENV VARIABLE (DEV vs PROD)
+// 🌍 ENV CONFIG (WORKS IN DEV + PROD)
 const API_URL = import.meta.env.VITE_API_URL;
 
-// 🚨 FAIL FAST IF NOT CONFIGURED
-if (!API_URL) {
-  console.error("❌ VITE_API_URL is not defined. Check your .env files.");
-}
-
+// 🧠 DEBUG (optional but useful)
 console.log("🌍 API URL:", API_URL);
 
 const apiClient = axios.create({
@@ -95,7 +91,7 @@ apiClient.interceptors.response.use(
       }
     }
 
-    // 🔥 GLOBAL ERROR FEEDBACK (TEMP: alert, later replace with toast)
+    // 🔥 GLOBAL ERROR FEEDBACK
     if (!error.config?.silent) {
       alert(message);
     }

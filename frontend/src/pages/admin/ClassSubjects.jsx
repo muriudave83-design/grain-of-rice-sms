@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "../../utils/axios";
+import apiClient from "../../services/apiClient";
 import AdminLayout from "../../components/layout/AdminLayout";
 
 export default function ClassSubjects() {
@@ -15,9 +15,9 @@ export default function ClassSubjects() {
 
   const loadData = async () => {
     const [c, s, a] = await Promise.all([
-      axios.get("/admin/classes"),
-      axios.get("/admin/subjects"),
-      axios.get("/admin/class-subjects"),
+      apiClient.get("/admin/classes"),
+      apiClient.get("/admin/subjects"),
+      apiClient.get("/admin/class-subjects"),
     ]);
 
     setClasses(c.data);
@@ -31,7 +31,7 @@ export default function ClassSubjects() {
       return;
     }
 
-    await axios.post("/admin/class-subjects", {
+    await apiClient.post("/admin/class-subjects", {
       classId: Number(classId),
       subjectId: Number(subjectId),
     });
