@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import api from "../../api/apiClient";
+import apiClient from "../../services/apiClient";
 
 export default function TeacherClassDetails() {
   const { id } = useParams();
@@ -15,7 +15,7 @@ export default function TeacherClassDetails() {
 
   const fetchStudents = async () => {
     try {
-      const res = await api.get(`/teacher/class/${id}/students`);
+      const res = await apiClient.get(`/teacher/class/${id}/students`);
       setStudents(res.data || []);
     } catch (err) {
       console.error("FETCH STUDENTS ERROR:", err);

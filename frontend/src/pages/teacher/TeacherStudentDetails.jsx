@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import api from "../../api/apiClient";
+import apiClient from "../../services/apiClient";
 
 export default function TeacherStudentDetails() {
   const { id } = useParams();
@@ -14,7 +14,7 @@ export default function TeacherStudentDetails() {
 
   const fetchData = async () => {
     try {
-      const res = await api.get(`/teacher/student/${id}/gradebook`);
+      const res = await apiClient.get(`/teacher/student/${id}/gradebook`);
       setData(res.data || []);
     } catch (err) {
       console.error(err);
@@ -24,7 +24,7 @@ export default function TeacherStudentDetails() {
 
   const updateScore = async (item) => {
     try {
-      await api.put("/teacher/score", {
+      await apiClient.put("/teacher/score", {
         assessmentId: item.assessmentId,
         studentId: Number(id),
         score: item.score,
@@ -44,7 +44,10 @@ export default function TeacherStudentDetails() {
 
   const calculateAverage = (data) => {
     if (!data.length) return 0;
-    const total = data.reduce((sum, item) => sum + (Number(item.score) || 0), 0);
+    const total = data.reduce(
+      (sum, item) => sum + (Number(item.score) || 0),
+      0
+    );
     return Number((total / data.length).toFixed(1));
   };
 
@@ -80,7 +83,7 @@ export default function TeacherStudentDetails() {
 
   return (
     <div style={page}>
-      {/* Back */}
+            {/* Back */}
       <button onClick={() => navigate(-1)} style={backBtn}>
         ← Back
       </button>
@@ -102,7 +105,7 @@ export default function TeacherStudentDetails() {
           </p>
         </div>
 
-        {/* ✅ NEW: VIEW FULL REPORT BUTTON */}
+        {/* View Report */}
         <Link to={`/reports/student/${id}`} style={reportBtn}>
           📄 View Full Report
         </Link>
@@ -113,7 +116,8 @@ export default function TeacherStudentDetails() {
           </div>
         )}
       </div>
-            {/* Summary Cards */}
+
+      {/* Summary Cards */}
       {data.length > 0 && (
         <div style={cards}>
           <div style={card}>
@@ -212,7 +216,7 @@ export default function TeacherStudentDetails() {
           </table>
         </div>
       )}
-    </div>
+          </div>
   );
 }
 
