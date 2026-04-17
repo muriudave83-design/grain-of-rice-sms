@@ -36,11 +36,9 @@ const StudentDashboard = () => {
     fetchStudent();
   }, [term]);
 
-  // ✅ Loading UI
   if (loading)
     return <p style={{ padding: "20px" }}>Loading dashboard...</p>;
 
-  // ✅ Error UI
   if (error)
     return (
       <p style={{ padding: "20px", color: "red" }}>
@@ -48,7 +46,6 @@ const StudentDashboard = () => {
       </p>
     );
 
-  // 🧠 Safe fallbacks
   const studentName =
     student?.name || student?.studentName || "Student";
 
@@ -80,7 +77,7 @@ const StudentDashboard = () => {
         </button>
       </div>
 
-      {/* ✅ CARD UI */}
+      {/* CARD UI */}
       <div style={{ display: "flex", gap: "20px", marginTop: "20px" }}>
         <div
           style={{
@@ -118,7 +115,7 @@ const StudentDashboard = () => {
 
       <hr style={{ margin: "20px 0" }} />
 
-      {/* ✅ TERM SELECTOR */}
+      {/* TERM SELECTOR */}
       <div style={{ margin: "20px 0" }}>
         <label style={{ marginRight: "10px" }}>Select Term:</label>
 
@@ -147,10 +144,9 @@ const StudentDashboard = () => {
 
       <h3>Quick Links</h3>
 
-      {/* ✅ FIXED LINKS (React Router) */}
       <div style={{ display: "flex", gap: "10px" }}>
         <Link
-          to={`/student/report-cards/${studentId}/${term}`}
+          to={`/student/report/${studentId}`}
           style={{
             padding: "10px",
             background: "#333",
@@ -158,7 +154,7 @@ const StudentDashboard = () => {
             textDecoration: "none",
           }}
         >
-          📄 Report Card
+          📄 View My Report
         </Link>
 
         <Link

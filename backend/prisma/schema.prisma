@@ -8,50 +8,40 @@ datasource db {
 }
 
 model User {
-  id                 Int       @id @default(autoincrement())
+  id                 Int                 @id @default(autoincrement())
   name               String
-  email              String    @unique
+  email              String              @unique
   password           String
-  createdAt          DateTime  @default(now())
+  createdAt          DateTime            @default(now())
   role               Role
-  mustChangePassword Boolean   @default(true)
-  isActive           Boolean   @default(true)
-  isArchived         Boolean   @default(false)
-  lastLoginAt        DateTime? @db.Timestamp(6)
-  updatedAt          DateTime? @db.Timestamp(6)
-
-  // ✅ CLEAN RELATIONS
-  student            Student?
-  parent             Parent?
-
-  // EXISTING RELATIONS (UNCHANGED)
+  mustChangePassword Boolean             @default(true)
+  isActive           Boolean             @default(true)
+  isArchived         Boolean             @default(false)
+  lastLoginAt        DateTime?           @db.Timestamp(6)
+  updatedAt          DateTime?           @db.Timestamp(6)
   attendanceSessions AttendanceSession[]
   disciplineRecords  Discipline[]        @relation("UserDisciplineRecords")
   guardians          Guardian[]          @relation("UserToGuardian")
   invoices           Invoice[]           @relation("AccountantInvoices")
+  parent             Parent?
   sponsorships       Sponsorship[]
+  student            Student?
   taughtSubjects     Subject[]           @relation("TeacherSubjectsLegacy")
   teacherSubjects    TeacherSubject[]
 }
 
 model Parent {
-  id           String   @id @default(uuid())
+  id           String          @id @default(uuid())
   name         String
   email        String?
   phone        String?
-
   address      String?
   city         String?
   relationship String?
   notes        String?
-
-  createdAt    DateTime @default(now())
-
-  // ✅ LINK TO USER
-  userId       Int?     @unique
-  user         User?    @relation(fields: [userId], references: [id])
-
-  // EXISTING RELATION
+  createdAt    DateTime        @default(now())
+  userId       Int?            @unique
+  user         User?           @relation(fields: [userId], references: [id])
   students     ParentStudent[]
 }
 
@@ -62,14 +52,9 @@ model Student {
   createdAt         DateTime          @default(now())
   admissionNo       String            @unique
   dob               DateTime?
-
-  // ✅ LINK TO USER
   userId            Int?              @unique
-  user              User?             @relation(fields: [userId], references: [id])
-
   classId           Int
-
-  // EXISTING RELATIONS
+  isArchived        Boolean           @default(false)
   assessmentScores  AssessmentScore[]
   attendanceEntries AttendanceEntry[]
   disciplines       Discipline[]
@@ -79,29 +64,27 @@ model Student {
   invoices          Invoice[]
   parentLinks       ParentStudent[]
   reportCards       ReportCard[]
-  sponsorships      Sponsorship[]
-
-  // ✅ ADDED (fix for Score relation)
+  reportComments    ReportComment[]
   scores            Score[]
-
+  sponsorships      Sponsorship[]
+  transcripts       Transcript[]
   class             Class             @relation(fields: [classId], references: [id])
-
-  isArchived        Boolean @default(false)
+  user              User?             @relation(fields: [userId], references: [id])
 }
+
 model Class {
   id                 Int                 @id @default(autoincrement())
   name               String
   level              String?
   createdAt          DateTime            @default(now())
-
+  isArchived         Boolean             @default(false)
   assessments        Assessment[]
   attendanceSessions AttendanceSession[]
   classSubjects      ClassSubject[]
   reportCards        ReportCard[]
   students           Student[]
   teacherSubjects    TeacherSubject[]
-
-  isArchived Boolean @default(false)
+  terms              Term[]
 }
 
 model Guardian {
@@ -110,7 +93,6 @@ model Guardian {
   studentId Int
   relation  String?
   createdAt DateTime @default(now())
-
   student   Student  @relation(fields: [studentId], references: [id])
   user      User     @relation("UserToGuardian", fields: [userId], references: [id])
 
@@ -121,7 +103,6 @@ model ParentStudent {
   id        Int     @id @default(autoincrement())
   parentId  String
   studentId Int
-
   parent    Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
   student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
@@ -134,7 +115,6 @@ model Sponsorship {
   studentId Int
   notes     String?
   createdAt DateTime @default(now())
-
   sponsor   User     @relation(fields: [sponsorId], references: [id])
   student   Student  @relation(fields: [studentId], references: [id])
 
@@ -147,13 +127,11 @@ model Subject {
   code            String?                  @unique
   createdAt       DateTime                 @default(now())
   teacherId       Int?
-
   assessments     Assessment[]
   classSubjects   ClassSubject[]
   enrollments     Enrollment[]
   grades          Grade[]
   reportEntries   ReportCardSubjectEntry[]
-
   teacher         User?                    @relation("TeacherSubjectsLegacy", fields: [teacherId], references: [id])
   teacherSubjects TeacherSubject[]
 }
@@ -162,7 +140,6 @@ model ClassSubject {
   id        Int     @id @default(autoincrement())
   classId   Int
   subjectId Int
-
   class     Class   @relation(fields: [classId], references: [id])
   subject   Subject @relation(fields: [subjectId], references: [id])
 
@@ -174,7 +151,6 @@ model Enrollment {
   studentId Int
   subjectId Int
   createdAt DateTime @default(now())
-
   student   Student  @relation(fields: [studentId], references: [id])
   subject   Subject  @relation(fields: [subjectId], references: [id])
 
@@ -195,12 +171,10 @@ model Assessment {
   status      AssessmentStatus    @default(DRAFT)
   categoryId  Int?
   type        AssessmentType
-
   category    AssignmentCategory? @relation(fields: [categoryId], references: [id])
   class       Class               @relation(fields: [classId], references: [id])
   subject     Subject             @relation(fields: [subjectId], references: [id])
   term        Term                @relation(fields: [termId], references: [id])
-
   scores      AssessmentScore[]
 }
 
@@ -210,7 +184,6 @@ model AssessmentScore {
   studentId    Int
   score        Float
   createdAt    DateTime   @default(now())
-
   assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
   student      Student    @relation(fields: [studentId], references: [id])
 
@@ -224,7 +197,6 @@ model Grade {
   average   Float
   termId    Int
   total     Float
-
   student   Student @relation(fields: [studentId], references: [id])
   subject   Subject @relation(fields: [subjectId], references: [id])
   term      Term    @relation(fields: [termId], references: [id])
@@ -239,7 +211,6 @@ model Discipline {
   recordedById Int?
   notes        String?
   type         String
-
   recordedBy   User?    @relation("UserDisciplineRecords", fields: [recordedById], references: [id])
   student      Student  @relation(fields: [studentId], references: [id])
 }
@@ -253,24 +224,37 @@ model Invoice {
   dueDate     DateTime?
   notes       String?
   createdById Int?
-
   createdBy   User?     @relation("AccountantInvoices", fields: [createdById], references: [id])
   student     Student   @relation(fields: [studentId], references: [id])
 }
 
 model Term {
-  id           Int          @id @default(autoincrement())
-  name         String
+  id      Int    @id @default(autoincrement())
+  name    String
+  classId Int
+
+  // Academic structure
   startDate    DateTime
   endDate      DateTime
   academicYear String
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  isActive     Boolean  @default(true)
 
-  assessments  Assessment[]
-  grades       Grade[]
-  reportCards  ReportCard[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  class Class @relation(fields: [classId], references: [id])
+
+  // Existing system
+  assessments Assessment[]
+  grades      Grade[]
+  reportCards ReportCard[]
+
+  // New system
+  assignments Assignment[]
+  transcripts Transcript[]
+
+  @@unique([name, classId])
 }
 
 model ReportCard {
@@ -283,11 +267,9 @@ model ReportCard {
   publishedAt DateTime?
   total       Float
   status      ReportCardStatus
-
   class       Class                    @relation(fields: [classId], references: [id])
   student     Student                  @relation(fields: [studentId], references: [id])
   term        Term                     @relation(fields: [termId], references: [id])
-
   subjects    ReportCardSubjectEntry[]
 
   @@unique([studentId, termId])
@@ -299,7 +281,6 @@ model ReportCardSubjectEntry {
   subjectId    Int
   average      Float
   total        Float
-
   reportCard   ReportCard @relation(fields: [reportCardId], references: [id], onDelete: Cascade)
   subject      Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
@@ -314,9 +295,7 @@ model AttendanceSession {
   status    AttendanceSessionStatus @default(DRAFT)
   createdAt DateTime                @default(now())
   updatedAt DateTime                @updatedAt
-
   entries   AttendanceEntry[]
-
   class     Class                   @relation(fields: [classId], references: [id])
   teacher   User                    @relation(fields: [teacherId], references: [id])
 
@@ -330,7 +309,6 @@ model AttendanceEntry {
   status              AttendanceStatus
   note                String?
   createdAt           DateTime          @default(now())
-
   session             AttendanceSession @relation(fields: [attendanceSessionId], references: [id])
   student             Student           @relation(fields: [studentId], references: [id])
 
@@ -352,50 +330,100 @@ model AssignmentCategory {
   id          Int          @id @default(autoincrement())
   name        String       @unique
   weight      Float        @default(1)
-
   assessments Assessment[]
 }
 
 model TeacherSubject {
-  id        Int      @id @default(autoincrement())
-  teacherId Int
-  subjectId Int
-  classId   Int
-  createdAt DateTime @default(now()) @db.Timestamp(6)
-
-  class     Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  teacher   User     @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-
-  assignments Assignment[]
+  id             Int             @id @default(autoincrement())
+  teacherId      Int
+  subjectId      Int
+  classId        Int
+  createdAt      DateTime        @default(now()) @db.Timestamp(6)
+  assignments    Assignment[]
+  reportComments ReportComment[]
+  class          Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
+  subject        Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  teacher        User            @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
   @@unique([teacherId, subjectId, classId], map: "TeacherSubject_unique_assignment")
 }
 
 model Assignment {
-  id               Int      @id @default(autoincrement())
-  title            String
+  id    Int            @id @default(autoincrement())
+  title String
+  type  AssessmentType @default(HOMEWORK)
+
   teacherSubjectId Int
-  createdAt        DateTime @default(now())
-  weight           Float   @default(1)
+  termId           Int
 
-  // ✅ RELATION BACK
-  teacherSubject   TeacherSubject @relation(fields: [teacherSubjectId], references: [id], onDelete: Cascade)
+  // Metadata
+  createdAt DateTime  @default(now())
+  weight    Float     @default(1)
+  date      DateTime?
+  dueDate   DateTime?
+  maxScore  Float?
+  position  Int       @default(0)
+  isLocked  Boolean   @default(false)
 
-  // ✅ SCORES
-  scores           Score[]
+  // Relations
+  teacherSubject TeacherSubject @relation(fields: [teacherSubjectId], references: [id], onDelete: Cascade)
+  term           Term           @relation(fields: [termId], references: [id])
+
+  scores Score[]
 }
 
 model Score {
-  id           Int @id @default(autoincrement())
+  id           Int        @id @default(autoincrement())
   studentId    Int
   assignmentId Int
   score        Float
-
-  student      Student    @relation(fields: [studentId], references: [id])
   assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student      Student    @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, assignmentId])
+}
+
+model ReportComment {
+  id               Int            @id @default(autoincrement())
+  studentId        Int
+  comment          String
+  createdAt        DateTime       @default(now())
+  teacherSubjectId Int
+  updatedAt        DateTime       @updatedAt
+  student          Student        @relation(fields: [studentId], references: [id])
+  teacherSubject   TeacherSubject @relation(fields: [teacherSubjectId], references: [id])
+
+  @@unique([studentId, teacherSubjectId])
+}
+
+model Transcript {
+  id Int @id @default(autoincrement())
+
+  studentId Int
+  classId   Int
+  termId    Int
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id])
+  term    Term    @relation(fields: [termId], references: [id])
+
+  entries TranscriptEntry[]
+
+  @@unique([studentId, classId, termId])
+}
+
+model TranscriptEntry {
+  id           Int    @id @default(autoincrement())
+  transcriptId Int
+  subjectName  String
+
+  finalGrade  Float
+  letterGrade String
+  position    Int?
+
+  transcript Transcript @relation(fields: [transcriptId], references: [id])
 }
 
 enum Role {
@@ -416,15 +444,15 @@ enum AssessmentType {
   EXAM
   TEST
   QUIZ
-  PROJECT
   ASSIGNMENT
   HOMEWORK
+  PROJECT
 }
 
 enum ReportCardStatus {
-  DRAFT
   GENERATED
   PUBLISHED
+  DRAFT
 }
 
 enum AttendanceSessionStatus {

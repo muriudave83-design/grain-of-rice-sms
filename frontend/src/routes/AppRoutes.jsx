@@ -31,6 +31,8 @@ import AttendanceAnalytics from "../pages/admin/AttendanceAnalytics";
 import AdminArchived from "../pages/admin/AdminArchived";
 import EditStudent from "../pages/admin/EditStudent";
 import AttendancePage from "../pages/admin/AttendancePage";
+import AdminReportsPage from "../pages/admin/AdminReportsPage";
+
 
 // ✅ NEW: PARENTS PAGES
 import ParentsPage from "../pages/admin/ParentsPage";
@@ -40,6 +42,7 @@ import EditParentPage from "../pages/admin/EditParentPage";
 // =======================
 // TEACHER PAGES
 // =======================
+import Reports from "../pages/teacher/Reports";
 import TeacherAssessments from "../pages/teacher/assessments";
 import CreateAssessment from "../pages/teacher/assessments/CreateAssessment";
 import ScoresEntry from "../pages/teacher/assessments/ScoresEntry";
@@ -248,6 +251,17 @@ export default function AppRoutes() {
               element={<EditStudent />}
             />
 
+            {/* ✅ REPORTS (ADMIN OWNS THIS) */}
+            <Route
+              path="/dashboard/admin/reports"
+              element={<AdminReportsPage />}
+            />
+
+            <Route
+              path="/dashboard/admin/reports/:studentId"
+              element={<StudentReportCardView />}
+            />
+
           </Route>
         </Route>
 
@@ -329,6 +343,11 @@ export default function AppRoutes() {
             />
 
             <Route
+              path="/teacher/reports"
+              element={<Reports />}
+            />
+
+            <Route
               path="/teacher/attendance"
               element={<TeacherAttendance />}
             />
@@ -400,11 +419,6 @@ export default function AppRoutes() {
             />
 
             <Route
-              path="/student/report-cards/:classId/:term"
-              element={<StudentReportCardView />}
-            />
-
-            <Route
               path="/student/profile"
               element={<StudentProfile />}
             />
@@ -423,8 +437,8 @@ export default function AppRoutes() {
           }
         >
           <Route path="/notifications" element={<Notifications />} />
+          
         </Route>
-
 
         {/* FALLBACK */}
         <Route path="*" element={<Navigate to="/login" replace />} />

@@ -3,9 +3,21 @@ import { PrismaClient } from "@prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
 import { authorizeStudentAccess } from "../middlewares/ownershipMiddleware";
+import { getStudentTranscript } from "../controllers/student.controller";
 
 const prisma = new PrismaClient();
 const router = Router();
+// ✅ TEST ROUTE (NO AUTH)
+router.get("/test", (_req, res) => {
+  res.json({ message: "student routes working ✅" });
+});
+
+// ✅ Student transcript route (TEMP: no ownership check)
+router.get(
+  "/:id/transcript",
+  authenticate,
+  getStudentTranscript
+);
 
 // Create student (Admin + Teacher)
 router.post(
@@ -107,7 +119,6 @@ router.post(
     }
   }
 );
-
 // ✅ Get ALL students (EXCLUDES archived)
 router.get(
   "/",
@@ -202,7 +213,6 @@ router.get(
     }
   }
 );
-
 // ✅ DELETE → ARCHIVE
 router.delete(
   "/:id",

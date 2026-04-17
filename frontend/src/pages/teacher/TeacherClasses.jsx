@@ -3,61 +3,83 @@ import { useNavigate } from "react-router-dom";
 import api from "../../api/apiClient";
 
 export default function TeacherClasses() {
-  const [classes, setClasses] = useState([]);
   const navigate = useNavigate();
+  const [subjects, setSubjects] = useState([]);
 
   useEffect(() => {
-    fetchClasses();
+    fetchSubjects();
   }, []);
 
-  const fetchClasses = async () => {
+  const fetchSubjects = async () => {
     try {
-      const res = await api.get("/teacher/classes");
-      setClasses(res.data || []);
+      const res = await api.get("/teacher/subjects");
+      setSubjects(res.data || []);
     } catch (err) {
       console.error(err);
-      setClasses([]);
+      setSubjects([]);
     }
   };
 
   return (
-    <div className="p-6">
-      {/* 🔥 HEADER WITH GUIDANCE */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-semibold">My Classes</h2>
-        <p className="text-gray-500 text-sm">
-          Select a class to view students and create assignments
-        </p>
-      </div>
+    <div
+      style={{
+        padding: "30px",
+        minHeight: "100vh",
+        background: "#0f172a",
+        color: "#fff",
+      }}
+    >
+      <h2 style={{ marginBottom: "10px" }}>My Classes</h2>
+      <p style={{ color: "#9ca3af", marginBottom: "20px" }}>
+        Select a class & subject to manage assignments and grades
+      </p>
 
-      {/* 🔥 EMPTY STATE */}
-      {classes.length === 0 ? (
-        <div className="text-gray-500">No classes assigned</div>
+      {subjects.length === 0 ? (
+        <p>No subjects found</p>
       ) : (
-        /* 🔥 CARD GRID */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {classes.map((cls) => (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
+            gap: "20px",
+          }}
+        >
+          {subjects.map((ts) => (
             <div
-              key={cls.id}
-              onClick={() => navigate(`/teacher/class/${cls.id}`)}
-              className="cursor-pointer border rounded-xl p-5 bg-white hover:bg-blue-50 hover:shadow-md transition-all group"
+              key={ts.id}
+              onClick={() => navigate(`/teacher/gradebook/${ts.id}`)}
+              style={{
+                padding: "20px",
+                borderRadius: "12px",
+                background: "#111827",
+                cursor: "pointer",
+                border: "1px solid #1f2937",
+                transition: "0.2s",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "#1f2937")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "#111827")
+              }
             >
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">
-                    {cls.name}
-                  </h3>
+              <h3 style={{ margin: 0 }}>
+                {ts.class?.name || "Class"}
+              </h3>
 
-                  <p className="text-sm text-gray-500 mt-1">
-                    View students & manage assignments
-                  </p>
-                </div>
+              <p style={{ marginTop: "5px", color: "#9ca3af" }}>
+                {ts.subject?.name || "Subject"}
+              </p>
 
-                {/* 👉 visual cue */}
-                <div className="text-blue-500 opacity-0 group-hover:opacity-100 transition text-xl">
-                  →
-                </div>
-              </div>
+              <p
+                style={{
+                  marginTop: "10px",
+                  fontSize: "12px",
+                  color: "#6b7280",
+                }}
+              >
+                Click to manage assignments & grades
+              </p>
             </div>
           ))}
         </div>

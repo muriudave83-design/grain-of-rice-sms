@@ -7,7 +7,7 @@ export default function TeacherLayout() {
   const isActive = (path) =>
     location.pathname.startsWith(path)
       ? "bg-blue-100 text-blue-700"
-      : "text-gray-700";
+      : "text-gray-700 hover:bg-gray-100";
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -19,35 +19,55 @@ export default function TeacherLayout() {
 
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r flex flex-col">
-        <div className="p-4 border-b">
-          <div className="font-bold text-lg">
-            Grain of Rice SMS
-          </div>
-          <div className="text-sm text-gray-500">
-            Teacher
+
+        {/* 🔥 HEADER (LOGO + TITLE) */}
+        <div className="p-4 border-b flex items-center gap-3">
+          <img
+            src="/logo.png"
+            alt="School Logo"
+            className="h-10 w-10 object-contain"
+          />
+          <div>
+            <div className="font-bold text-lg leading-tight">
+              Grain of Rice SMS
+            </div>
+            <div className="text-sm text-gray-500">
+              Teacher
+            </div>
           </div>
         </div>
 
+        {/* NAV */}
         <nav className="p-2 space-y-1">
 
-          {/* ✅ NEW: Gradebook (MAIN ENTRY) */}
+          {/* Gradebook */}
           <Link
             to="/teacher/gradebook"
             className={`block px-3 py-2 rounded ${isActive(
               "/teacher/gradebook"
             )}`}
           >
-            Gradebook
+            📘 Gradebook
           </Link>
 
-          {/* ✅ Attendance */}
+          {/* Reports 🔥 NEW */}
+          <Link
+            to="/teacher/reports"
+            className={`block px-3 py-2 rounded ${isActive(
+              "/teacher/reports"
+            )}`}
+          >
+            📊 Reports
+          </Link>
+
+          {/* Attendance */}
           <Link
             to="/teacher/attendance"
             className={`block px-3 py-2 rounded ${isActive(
               "/teacher/attendance"
             )}`}
           >
-            Attendance
+            📅 Attendance
           </Link>
         </nav>
       </aside>

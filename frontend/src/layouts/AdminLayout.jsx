@@ -1,17 +1,28 @@
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import SidebarNav from "../pages/admin/components/SidebarNav";
 import Topbar from "../pages/admin/components/Topbar";
 import NotificationBell from "../pages/notifications/NotificationBell";
 
 export default function AdminLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // ✅ Logout logic (moved here from Topbar)
+  // ✅ Logout logic (FIXED: clear ALL auth state)
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("role");
     localStorage.removeItem("name");
+    localStorage.removeItem("user"); // ✅ IMPORTANT FIX
     navigate("/login");
+  };
+
+  // ✅ OPTIONAL: Dynamic page title (small UX upgrade)
+  const getTitle = () => {
+    if (location.pathname.includes("/reports")) return "Reports";
+    if (location.pathname.includes("/students")) return "Students";
+    if (location.pathname.includes("/classes")) return "Classes";
+    if (location.pathname.includes("/attendance")) return "Attendance";
+    return "Admin Dashboard";
   };
 
   return (
@@ -40,7 +51,7 @@ export default function AdminLayout() {
             Grain of Rice Academy
           </div>
 
-          {/* ✅ NAVIGATION LINKS */}
+          {/* ✅ NAVIGATION LINKS (UPDATED) */}
           <div className="hidden md:flex items-center gap-6 text-sm">
             <span
               onClick={() => navigate("/dashboard/admin")}
@@ -69,6 +80,14 @@ export default function AdminLayout() {
             >
               Attendance
             </span>
+
+            {/* ✅ NEW: REPORTS LINK */}
+            <span
+              onClick={() => navigate("/dashboard/admin/reports")}
+              className="hover:underline cursor-pointer"
+            >
+              Reports
+            </span>
           </div>
 
           {/* ✅ LOGOUT BUTTON */}
@@ -80,9 +99,9 @@ export default function AdminLayout() {
           </button>
         </div>
 
-        {/* EXISTING TOPBAR */}
+        {/* TOPBAR */}
         <div className="flex items-center justify-between px-6 bg-white border-b h-14 shadow-sm">
-          <Topbar title="Admin Dashboard" />
+          <Topbar title={getTitle()} /> {/* ✅ dynamic title */}
           <NotificationBell />
         </div>
 

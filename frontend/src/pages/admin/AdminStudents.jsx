@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 
 export default function AdminStudents() {
@@ -256,6 +256,14 @@ export default function AdminStudents() {
                                 Edit
                               </button>
 
+                              {/* ✅ NEW: VIEW REPORT */}
+                              <Link
+                                to={`/reports/student/${s.id}`}
+                                className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                              >
+                                Report
+                              </Link>
+
                               <button
                                 onClick={() =>
                                   handleDelete(s)
@@ -265,17 +273,17 @@ export default function AdminStudents() {
                                 Delete
                               </button>
                             </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )
-          )
-        )}
-      </div>
+                            </tr>
+                            ))}
+                            </tbody>
+                            </table>
+                            </div>
+                            )}
+                            </div>
+                            )
+                            )
+                            )}
+                            </div>
 
       {showForm && (
         <form

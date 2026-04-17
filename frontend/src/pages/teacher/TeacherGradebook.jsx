@@ -28,7 +28,6 @@ function useSaveStatus() {
 
 function EditableRow({ student, assessments, onSaved }) {
   const [scores, setScores] = useState({ ...student.scores });
-
   const { saving, saved, startSaving, finishSaving } = useSaveStatus();
 
   const handleChange = (assessmentId, value) => {
@@ -123,6 +122,8 @@ function EditableRow({ student, assessments, onSaved }) {
 }
 
 export default function TeacherGradebook() {
+    throw new Error("TESTING FILE ACTIVE"); // 👈 ADD THIS LINE
+
   const navigate = useNavigate();
 
   const [classes, setClasses] = useState([]);
@@ -132,6 +133,36 @@ export default function TeacherGradebook() {
   const [subjectId, setSubjectId] = useState("");
 
   const [gradebook, setGradebook] = useState(null);
+
+  const [newAssignment, setNewAssignment] = useState("");
+
+  // ✅ RIGHT CLICK CONTEXT MENU STATE
+  const [contextMenu, setContextMenu] = useState(null);
+
+  const handleRightClick = (e, assignment) => {
+    e.preventDefault();
+
+    console.log("RIGHT CLICK WORKING", assignment); // 🧪 debug
+
+    setContextMenu({
+      x: e.clientX, // ✅ FIXED
+      y: e.clientY, // ✅ FIXED
+      assignment,
+    });
+  };
+
+  const handleDeleteAssignment = async () => {
+    try {
+      await apiClient.delete(
+        `/teacher/assignment/${contextMenu.assignment.id}`
+      );
+
+      setContextMenu(null);
+      fetchGradebook();
+    } catch (err) {
+      console.error("Failed to delete assignment", err);
+    }
+  };
 
   const fetchClasses = async () => {
     try {
@@ -165,6 +196,24 @@ export default function TeacherGradebook() {
     }
   };
 
+  const handleAddAssignment = async () => {
+    if (!newAssignment.trim()) return;
+
+    try {
+      await apiClient.post(`/teacher/assignment`, {
+        title: newAssignment,
+        subjectId: subjectId,
+        maxScore: 100,
+        type: "ASSIGNMENT",
+      });
+
+      setNewAssignment("");
+      fetchGradebook();
+    } catch (err) {
+      console.error("Failed to create assignment", err);
+    }
+  };
+
   useEffect(() => {
     fetchClasses();
   }, []);
@@ -186,9 +235,7 @@ export default function TeacherGradebook() {
 
     if (values.length === 0) return null;
 
-    return (
-      values.reduce((a, b) => a + b, 0) / values.length
-    ).toFixed(1);
+    return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
   };
 
   const computeClassOverallAverage = () => {
@@ -200,20 +247,22 @@ export default function TeacherGradebook() {
 
     if (values.length === 0) return "—";
 
-    return (
-      values.reduce((a, b) => a + b, 0) / values.length
-    ).toFixed(2);
+    return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2);
   };
 
   return (
-    <div className="p-6">
-
+    <div
+      className="p-6"
+      onClick={() => setContextMenu(null)}
+      onContextMenu={(e) => {
+        e.stopPropagation(); // ✅ FIXED
+      }}
+    >
       {/* Breadcrumb */}
       <div className="text-sm text-gray-600 mb-2">
         Teacher / Gradebook
       </div>
 
-      {/* Back Button */}
       <button
         onClick={() => navigate("/teacher")}
         className="mb-4 px-3 py-1 border rounded"
@@ -251,6 +300,24 @@ export default function TeacherGradebook() {
         </select>
       </div>
 
+      {/* Add Assignment */}
+      {gradebook && (
+        <div className="mb-4 flex gap-2">
+          <input
+            placeholder="New assignment"
+            value={newAssignment}
+            onChange={(e) => setNewAssignment(e.target.value)}
+            className="border p-2"
+          />
+          <button
+            onClick={handleAddAssignment}
+            className="bg-green-600 text-white px-4 rounded"
+          >
+            Add
+          </button>
+        </div>
+      )}
+
       {!gradebook && (
         <div className="text-gray-500">
           Select class and subject to view gradebook.
@@ -266,12 +333,16 @@ export default function TeacherGradebook() {
 
                 {gradebook.assessments.map((a) => (
                   <th key={a.id} className="p-3">
-                    {a.title}
+                    <div
+                      onContextMenu={(e) => handleRightClick(e, a)}
+                      style={{ cursor: "context-menu", width: "100%" }}
+                    >
+                      {a.title}
+                    </div>
                   </th>
                 ))}
 
                 <th className="p-3 text-center">Average</th>
-
                 <th className="p-3">Actions</th>
               </tr>
             </thead>
@@ -305,6 +376,34 @@ export default function TeacherGradebook() {
               </tr>
             </tfoot>
           </table>
+        </div>
+      )}
+
+      {/* ✅ CONTEXT MENU */}
+      {contextMenu && (
+        <div
+          style={{
+            position: "fixed",
+            top: contextMenu.y,
+            left: contextMenu.x,
+            background: "red", // ✅ DEBUG
+            color: "white",
+            padding: "8px",
+            borderRadius: "6px",
+            zIndex: 999999, // ✅ VERY HIGH
+            border: "2px solid black",
+          }}
+          onMouseLeave={() => setContextMenu(null)}
+        >
+          <div
+            onClick={handleDeleteAssignment}
+            style={{
+              padding: "6px 10px",
+              cursor: "pointer",
+            }}
+          >
+            Delete Column
+          </div>
         </div>
       )}
     </div>

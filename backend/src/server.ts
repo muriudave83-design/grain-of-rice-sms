@@ -43,6 +43,7 @@ import teacherAssignmentsRoutes from "./routes/teacherAssignments.routes";
 
 // ✅ REPORT CARDS (FIXED IMPORTS)
 import { reportCardReadRoutes } from "./routes/reportCardReadRoutes";
+import reportsRoutes from "./routes/reports.routes";
 
 // ✅ Parent ↔ Student linking
 import { parentStudentRoutes } from "./routes/parentStudentRoutes";
@@ -137,6 +138,7 @@ app.use("/api/teacher-assignments", teacherAssignmentsRoutes);
 // ----------------------------------
 app.use("/api/report-cards", reportCardReadRoutes);
 app.use("/api/report-cards/pdf", reportCardPdfRoutes); // ✅ FIXED (NO MORE /api LEAK)
+app.use("/api/reports", reportsRoutes);
 
 // ----------------------------------
 // PARENT ↔ STUDENT

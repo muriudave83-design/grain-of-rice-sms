@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "../../api/apiClient";
 
 export default function TeacherStudentDetails() {
@@ -22,7 +22,6 @@ export default function TeacherStudentDetails() {
     }
   };
 
-  // ✅ UPDATE SCORE API
   const updateScore = async (item) => {
     try {
       await api.put("/teacher/score", {
@@ -35,7 +34,6 @@ export default function TeacherStudentDetails() {
     }
   };
 
-  // ✅ HANDLE INPUT CHANGE
   const handleScoreChange = (index, value) => {
     const updated = [...data];
     updated[index].score = Number(value);
@@ -44,14 +42,12 @@ export default function TeacherStudentDetails() {
     updateScore(updated[index]);
   };
 
-  // ✅ NEW: LIVE AVERAGE
   const calculateAverage = (data) => {
     if (!data.length) return 0;
     const total = data.reduce((sum, item) => sum + (Number(item.score) || 0), 0);
     return Number((total / data.length).toFixed(1));
   };
 
-  // ✅ NEW: LIVE GRADE (FROM AVG)
   const calculateGrade = (avg) => {
     if (avg >= 80) return "A";
     if (avg >= 70) return "B";
@@ -60,7 +56,6 @@ export default function TeacherStudentDetails() {
     return "F";
   };
 
-  // existing per-score grade (kept)
   const getGrade = (score) => {
     if (score >= 80) return "A";
     if (score >= 70) return "B";
@@ -107,14 +102,18 @@ export default function TeacherStudentDetails() {
           </p>
         </div>
 
+        {/* ✅ NEW: VIEW FULL REPORT BUTTON */}
+        <Link to={`/reports/student/${id}`} style={reportBtn}>
+          📄 View Full Report
+        </Link>
+
         {data.length > 0 && (
           <div style={floatingBadge}>
             Avg: {calculateAverage(data)}
           </div>
         )}
       </div>
-
-      {/* Summary Cards */}
+            {/* Summary Cards */}
       {data.length > 0 && (
         <div style={cards}>
           <div style={card}>
@@ -218,6 +217,15 @@ export default function TeacherStudentDetails() {
 }
 
 /* STYLES */
+
+const reportBtn = {
+  padding: "10px 14px",
+  backgroundColor: "#2563eb",
+  color: "#fff",
+  textDecoration: "none",
+  borderRadius: "6px",
+  fontWeight: "500",
+};
 
 const page = {
   padding: "30px",
