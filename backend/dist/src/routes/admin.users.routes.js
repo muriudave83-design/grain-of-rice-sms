@@ -26,14 +26,12 @@ function generateTempPassword(length = 10) {
  */
 router.get("/stats", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (_req, res) => {
     try {
-        const students = await client_1.prisma.student.count();
-        const teachers = await client_1.prisma.user.count({
-            where: { role: "TEACHER" },
-        });
-        const parents = await client_1.prisma.user.count({
-            where: { role: "PARENT" },
-        });
-        const classes = await client_1.prisma.class.count();
+        const [students, teachers, parents, classes] = await Promise.all([
+            client_1.prisma.student.count(),
+            client_1.prisma.user.count({ where: { role: "TEACHER" } }),
+            client_1.prisma.user.count({ where: { role: "PARENT" } }),
+            client_1.prisma.class.count(),
+        ]);
         return res.json({
             students,
             teachers,
@@ -60,7 +58,7 @@ router.patch("/users/:id/archive", authMiddleware_1.authenticate, (0, rolesMiddl
 router.patch("/users/:id/reset-password", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
     try {
         const userId = Number(req.params.id);
-        if (Number.isNaN(userId)) {
+        if (!userId) {
             return res.status(400).json({ message: "Invalid user ID" });
         }
         const user = await client_1.prisma.user.findUnique({
@@ -96,42 +94,27 @@ router.patch("/users/:id/reset-password", authMiddleware_1.authenticate, (0, rol
     }
 });
 /**
- * Shared admin user creation helper
- */
-async function createUser({ name, email, password, role, }) {
-    if (!name || !email || !password) {
-        throw new Error("All fields are required");
-    }
-    const existing = await client_1.prisma.user.findUnique({ where: { email } });
-    if (existing) {
-        throw new Error("User already exists");
-    }
-    const hashedPassword = await bcryptjs_1.default.hash(password, 10);
-    return client_1.prisma.user.create({
-        data: {
-            name,
-            email,
-            password: hashedPassword,
-            role,
-            mustChangePassword: true,
-        },
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            createdAt: true,
-        },
-    });
-}
-/**
  * POST /api/admin/users/teacher
  */
 router.post("/users/teacher", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
     try {
-        const user = await createUser({
-            ...req.body,
-            role: "TEACHER",
+        const { name, email, password } = req.body;
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: "Missing fields" });
+        }
+        const existing = await client_1.prisma.user.findUnique({ where: { email } });
+        if (existing) {
+            return res.status(400).json({ message: "User already exists" });
+        }
+        const hashedPassword = await bcryptjs_1.default.hash(password, 10);
+        const user = await client_1.prisma.user.create({
+            data: {
+                name,
+                email,
+                password: hashedPassword,
+                role: "TEACHER",
+                mustChangePassword: true,
+            },
         });
         return res.status(201).json(user);
     }
@@ -141,13 +124,36 @@ router.post("/users/teacher", authMiddleware_1.authenticate, (0, rolesMiddleware
     }
 });
 /**
- * POST /api/admin/users/parent
+ * ✅ CREATE PARENT (USER + PARENT LINKED)
  */
 router.post("/users/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
     try {
-        const user = await createUser({
-            ...req.body,
-            role: "PARENT",
+        const { name, email, password } = req.body;
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: "Missing fields" });
+        }
+        const existing = await client_1.prisma.user.findUnique({ where: { email } });
+        if (existing) {
+            return res.status(400).json({ message: "User already exists" });
+        }
+        const hashedPassword = await bcryptjs_1.default.hash(password, 10);
+        const user = await client_1.prisma.user.create({
+            data: {
+                name,
+                email,
+                password: hashedPassword,
+                role: "PARENT",
+                mustChangePassword: true,
+                parent: {
+                    create: {
+                        name,
+                        email, // keep consistent
+                    },
+                },
+            },
+            include: {
+                parent: true,
+            },
         });
         return res.status(201).json(user);
     }
@@ -157,55 +163,103 @@ router.post("/users/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_
     }
 });
 /**
- * 🚨 TEMPORARY TEST ROUTE
+ * ✅ CREATE STUDENT (USER + STUDENT LINKED)
  */
-router.post("/users/student", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (_req, res) => {
-    return res.status(400).json({
-        message: "BACKEND VERSION TEST 123",
-    });
+router.post("/users/student", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
+    try {
+        const { firstName, lastName, email, password, classId } = req.body;
+        if (!firstName || !email || !password || !classId) {
+            return res.status(400).json({
+                message: "firstName, email, password, classId are required",
+            });
+        }
+        const existing = await client_1.prisma.user.findUnique({
+            where: { email },
+        });
+        if (existing) {
+            return res.status(400).json({
+                message: "User already exists",
+            });
+        }
+        const hashedPassword = await bcryptjs_1.default.hash(password, 10);
+        const user = await client_1.prisma.user.create({
+            data: {
+                name: `${firstName} ${lastName || ""}`.trim(),
+                email,
+                password: hashedPassword,
+                role: "STUDENT",
+                mustChangePassword: true,
+                student: {
+                    create: {
+                        firstName,
+                        lastName,
+                        admissionNo: Math.floor(Math.random() * 100000).toString(),
+                        classId: Number(classId), // ✅ REQUIRED FIX
+                    },
+                },
+            },
+            include: {
+                student: true,
+            },
+        });
+        return res.status(201).json(user);
+    }
+    catch (error) {
+        console.error("Create student error:", error);
+        return res.status(500).json({
+            message: "Failed to create student user",
+        });
+    }
 });
 /**
- * POST /api/admin/students/:studentId/link-user
+ * 🔗 POST /api/admin/students/:studentId/link-user
+ * (KEEP — useful fallback)
  */
 router.post("/students/:studentId/link-user", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
-    const studentId = Number(req.params.studentId);
-    const { userId } = req.body;
-    if (Number.isNaN(studentId) || !userId) {
-        return res.status(400).json({ message: "Invalid input" });
-    }
-    const student = await client_1.prisma.student.findUnique({
-        where: { id: studentId },
-    });
-    if (!student) {
-        return res.status(404).json({ message: "Student not found" });
-    }
-    const user = await client_1.prisma.user.findUnique({
-        where: { id: userId },
-    });
-    if (!user || user.role !== "STUDENT") {
-        return res.status(400).json({
-            message: "User must exist and have STUDENT role",
+    try {
+        const studentId = Number(req.params.studentId);
+        const userId = Number(req.body.userId);
+        if (!studentId || !userId) {
+            return res.status(400).json({ message: "Invalid input" });
+        }
+        const [student, user] = await Promise.all([
+            client_1.prisma.student.findUnique({ where: { id: studentId } }),
+            client_1.prisma.user.findUnique({ where: { id: userId } }),
+        ]);
+        if (!student) {
+            return res.status(404).json({ message: "Student not found" });
+        }
+        if (!user || user.role !== "STUDENT") {
+            return res.status(400).json({
+                message: "User must exist and have STUDENT role",
+            });
+        }
+        if (student.userId) {
+            return res.status(409).json({
+                message: "Student already linked",
+            });
+        }
+        const alreadyLinked = await client_1.prisma.student.findFirst({
+            where: { userId },
+        });
+        if (alreadyLinked) {
+            return res.status(409).json({
+                message: "User already linked to another student",
+            });
+        }
+        await client_1.prisma.student.update({
+            where: { id: studentId },
+            data: { userId },
+        });
+        return res.json({
+            message: "Student successfully linked to user",
         });
     }
-    if (student.userId) {
-        return res.status(409).json({
-            message: "Student already linked to a user",
+    catch (error) {
+        console.error("Link user error:", error);
+        return res.status(500).json({
+            message: "Failed to link user",
         });
     }
-    const userAlreadyLinked = await client_1.prisma.student.findFirst({
-        where: { userId },
-    });
-    if (userAlreadyLinked) {
-        return res.status(409).json({
-            message: "This user is already linked to another student",
-        });
-    }
-    await client_1.prisma.student.update({
-        where: { id: studentId },
-        data: { userId: user.id },
-    });
-    return res.json({
-        message: "Student successfully linked to user",
-    });
 });
 exports.default = router;

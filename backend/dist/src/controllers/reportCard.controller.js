@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getParentReportCards = exports.downloadReportCardPdf = exports.getStudentReportCard = void 0;
 const client_1 = require("../prisma/client");
+const client_2 = require("@prisma/client");
 /**
  * Get a single student's report card for a given term
  * (Student / Parent / Admin â€“ access controlled here)
@@ -67,7 +68,7 @@ const downloadReportCardPdf = async (req, res) => {
             if (user.id !== reportCard.studentId) {
                 return res.status(403).json({ message: "Forbidden" });
             }
-            if (reportCard.status !== "PUBLISHED") {
+            if (reportCard.status !== client_2.ReportCardStatus.PUBLISHED) {
                 return res
                     .status(403)
                     .json({ message: "Report card not PUBLISHED" });
@@ -85,7 +86,7 @@ const downloadReportCardPdf = async (req, res) => {
             if (!guardian) {
                 return res.status(403).json({ message: "Forbidden" });
             }
-            if (reportCard.status !== "PUBLISHED") {
+            if (reportCard.status !== client_2.ReportCardStatus.PUBLISHED) {
                 return res
                     .status(403)
                     .json({ message: "Report card not PUBLISHED" });
@@ -143,7 +144,7 @@ const getParentReportCards = async (req, res) => {
         const reportCards = await client_1.prisma.reportCard.findMany({
             where: {
                 studentId: { in: studentIds },
-                status: "PUBLISHED",
+                status: client_2.ReportCardStatus.PUBLISHED,
             },
             include: {
                 term: true,

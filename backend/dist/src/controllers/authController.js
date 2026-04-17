@@ -35,7 +35,6 @@ const registerUser = async (req, res) => {
                 message: "Email already registered",
             });
         }
-        // 🔥 ALWAYS USE DEFAULT PASSWORD (ignore incoming password)
         const hashedPassword = await (0, password_1.hashPassword)(DEFAULT_PASSWORD);
         const user = await prisma.user.create({
             data: {
@@ -43,14 +42,14 @@ const registerUser = async (req, res) => {
                 email,
                 password: hashedPassword,
                 role,
-                isActive: true, // ✅ ALWAYS ACTIVE
-                isArchived: false, // ✅ SAFETY
-                mustChangePassword: true, // ✅ FORCE PASSWORD RESET
+                isActive: true,
+                isArchived: false,
+                mustChangePassword: true,
             },
         });
         res.status(201).json({
             message: "User registered successfully",
-            defaultPassword: DEFAULT_PASSWORD, // ✅ Optional: helps admin communicate login
+            defaultPassword: DEFAULT_PASSWORD,
             user: {
                 id: user.id,
                 name: user.name,
@@ -88,15 +87,10 @@ const loginUser = async (req, res) => {
         const user = await prisma.user.findUnique({
             where: { email },
         });
-        if (!user) {
-            return res.status(400).json({
-                message: "Invalid email or password",
-            });
-        }
-        // 🛡️ BLOCK ARCHIVED ACCOUNTS
-        if (user.isArchived) {
-            return res.status(403).json({
-                message: "Account is archived. Contact administrator.",
+        // ✅ BLOCK INVALID OR ARCHIVED USERS
+        if (!user || user.isArchived) {
+            return res.status(401).json({
+                message: "Invalid credentials",
             });
         }
         // 🛡️ BLOCK DEACTIVATED ACCOUNTS
@@ -107,8 +101,8 @@ const loginUser = async (req, res) => {
         }
         const validPassword = await (0, password_1.verifyPassword)(password, user.password);
         if (!validPassword) {
-            return res.status(400).json({
-                message: "Invalid email or password",
+            return res.status(401).json({
+                message: "Invalid credentials",
             });
         }
         const token = jsonwebtoken_1.default.sign({
@@ -124,17 +118,13 @@ const loginUser = async (req, res) => {
             path: "/",
             maxAge: 60 * 60 * 1000,
         });
-        res.json({
-            message: "Login successful",
+        // ✅ CLEAN USER OBJECT
+        const { password: _, ...safeUser } = user;
+        // ✅ FINAL RESPONSE (PURE USER)
+        return res.json({
             token,
             mustChangePassword: user.mustChangePassword,
-            role: user.role,
-            user: {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-            },
+            user: safeUser,
         });
     }
     catch (err) {

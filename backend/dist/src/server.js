@@ -10,7 +10,7 @@ console.log("DATABASE_URL =", process.env.DATABASE_URL);
 const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
-const client_1 = require("./prisma/client");
+const client_1 = require("../prisma/client");
 const authRoutes_1 = __importDefault(require("./routes/authRoutes"));
 const protectedRoutes_1 = __importDefault(require("./routes/protectedRoutes"));
 const studentRoutes_1 = __importDefault(require("./routes/studentRoutes"));
@@ -19,7 +19,7 @@ const gradebookRoutes_1 = __importDefault(require("./routes/gradebookRoutes"));
 const dashboardRoutes_1 = __importDefault(require("./routes/dashboardRoutes"));
 // ✅ Assignment Categories
 const assignmentCategory_routes_1 = __importDefault(require("./routes/assignmentCategory.routes"));
-// ✅ Terms route (STANDARDIZED)
+// ✅ Terms route
 const termRoutes_1 = __importDefault(require("./routes/termRoutes"));
 // ✅ Admin routes
 const admin_auditLogs_routes_1 = __importDefault(require("./routes/admin.auditLogs.routes"));
@@ -30,21 +30,24 @@ const admin_students_routes_1 = __importDefault(require("./routes/admin/admin.st
 const admin_class_students_routes_1 = __importDefault(require("./routes/admin/admin.class.students.routes"));
 const admin_classSubjects_routes_1 = __importDefault(require("./routes/admin/admin.classSubjects.routes"));
 const adminAttendance_routes_1 = __importDefault(require("./routes/adminAttendance.routes"));
-// ✅ NEW: Teacher ↔ Subject assignments (ADMIN)
+// ✅ Teacher ↔ Subject assignments
 const admin_teacherSubjects_routes_1 = __importDefault(require("./routes/admin/admin.teacherSubjects.routes"));
-// ✅ NEW: Teacher assignments endpoint
+// ✅ Teacher assignments endpoint
 const teacherAssignments_routes_1 = __importDefault(require("./routes/teacherAssignments.routes"));
-// ✅ Phase-7: Report Cards
+// ✅ REPORT CARDS (FIXED IMPORTS)
 const reportCardReadRoutes_1 = require("./routes/reportCardReadRoutes");
-const reportCardRoutes_1 = require("./routes/reportCardRoutes");
-// ✅ Phase-7.5: Parent ↔ Student linking
+const reports_routes_1 = __importDefault(require("./routes/reports.routes"));
+// ✅ Parent ↔ Student linking
 const parentStudentRoutes_1 = require("./routes/parentStudentRoutes");
-// ✅ Phase-8: Report Card PDF
+// ✅ Parent routes
+const admin_parents_routes_1 = __importDefault(require("./routes/admin.parents.routes"));
+// ✅ Report Card PDF
 const reportCardPdf_routes_1 = __importDefault(require("./routes/reportCardPdf.routes"));
 // ✅ Attendance
 const attendanceRoutes_1 = __importDefault(require("./routes/attendanceRoutes"));
 // ✅ Teacher-visible classes
 const classes_1 = __importDefault(require("./routes/classes"));
+const teacher_routes_1 = __importDefault(require("./routes/teacher.routes"));
 const app = (0, express_1.default)();
 // ----------------------------------
 // CORS
@@ -61,7 +64,6 @@ app.use((0, cors_1.default)({
 // ----------------------------------
 app.use(express_1.default.json());
 app.use((0, cookie_parser_1.default)());
-// Prevent malformed cookie crash
 app.use((req, res, next) => {
     try {
         const cookie = req.headers["cookie"];
@@ -77,7 +79,7 @@ app.use((req, res, next) => {
 // ----------------------------------
 // HEALTH CHECK
 // ----------------------------------
-app.get("/api", (req, res) => {
+app.get("/api", (_req, res) => {
     res.json({ message: "Grain of Rice SMS backend is running 🚀" });
 });
 // ----------------------------------
@@ -99,21 +101,21 @@ app.use("/api/students", studentRoutes_1.default);
 app.use("/api", protectedRoutes_1.default);
 app.use("/api/assessments", assessmentRoutes_1.assessmentRoutes);
 app.use("/api/classes", classes_1.default);
+app.use("/api/teacher", teacher_routes_1.default); // ✅ MUST be before any generic /api routes
 app.use("/api/gradebook", gradebookRoutes_1.default);
 app.use("/api/dashboard", dashboardRoutes_1.default);
 app.use("/api/assignment-categories", assignmentCategory_routes_1.default);
 app.use("/api/admin/attendance", adminAttendance_routes_1.default);
-// ✅ STANDARDIZED TERMS ROUTE
 app.use("/api/terms", termRoutes_1.default);
 app.use("/api/attendance", attendanceRoutes_1.default);
-// ✅ NEW: Teacher assignments route
-app.use("/api", teacherAssignments_routes_1.default);
+// ✅ Teacher assignments (safe)
+app.use("/api/teacher-assignments", teacherAssignments_routes_1.default);
 // ----------------------------------
-// REPORT CARDS
+// REPORT CARDS (STRICT SCOPING)
 // ----------------------------------
 app.use("/api/report-cards", reportCardReadRoutes_1.reportCardReadRoutes);
-app.use("/api/report-cards", reportCardRoutes_1.reportCardReadRoutes);
-app.use("/api", reportCardPdf_routes_1.default);
+app.use("/api/report-cards/pdf", reportCardPdf_routes_1.default); // ✅ FIXED (NO MORE /api LEAK)
+app.use("/api/reports", reports_routes_1.default);
 // ----------------------------------
 // PARENT ↔ STUDENT
 // ----------------------------------
@@ -128,7 +130,7 @@ app.use("/api/admin", admin_classes_routes_1.default);
 app.use("/api/admin", admin_subjects_routes_1.default);
 app.use("/api/admin", admin_class_students_routes_1.default);
 app.use("/api/admin", admin_classSubjects_routes_1.default);
-// ✅ NEW: Teacher Subject Assignments (ADMIN)
+app.use("/api/admin", admin_parents_routes_1.default);
 app.use("/api/admin", admin_teacherSubjects_routes_1.default);
 // ----------------------------------
 // FALLBACK

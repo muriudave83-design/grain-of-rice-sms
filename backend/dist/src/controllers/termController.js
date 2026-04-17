@@ -12,7 +12,7 @@ async function getTerms(req, res) {
 }
 // POST /api/admin/terms
 async function createTerm(req, res) {
-    const { name, startDate, endDate, academicYear } = req.body;
+    const { name, startDate, endDate, academicYear, classId } = req.body;
     if (!name || !startDate || !endDate || !academicYear) {
         return res.status(400).json({ message: "All fields are required" });
     }
@@ -22,6 +22,7 @@ async function createTerm(req, res) {
             startDate: new Date(startDate),
             endDate: new Date(endDate),
             academicYear,
+            classId: Number(classId), // ✅ ADD THIS
         },
     });
     res.status(201).json(term);

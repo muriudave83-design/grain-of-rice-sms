@@ -6,6 +6,7 @@ const client_1 = require("../prisma/client");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 const rolesMiddleware_1 = require("../middlewares/rolesMiddleware");
 const client_2 = require("@prisma/client");
+const client_3 = require("@prisma/client");
 const router = (0, express_1.Router)();
 exports.reportCardReadRoutes = router;
 // 🔥 GLOBAL DEBUG (CONFIRMS FILE IS USED)
@@ -13,8 +14,6 @@ console.log("🔥 reportCardReadRoutes.ts LOADED");
 /**
  * ============================================================
  * TEACHER — COMPUTED REPORT CARDS (🔥 FIXED ENGINE)
- * MUST BE FIRST ROUTE (VERY IMPORTANT)
- * GET /api/report-cards/teacher/:classId/:term
  * ============================================================
  */
 router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.TEACHER]), async (req, res) => {
@@ -42,7 +41,6 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
                 },
             },
         });
-        console.log("✅ TERM FOUND:", term);
         if (!term) {
             return res.status(404).json({ message: "Term not found" });
         }
@@ -53,7 +51,6 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
             },
             include: { user: true },
         });
-        console.log("👨‍🎓 STUDENTS:", students);
         const assessments = await client_1.prisma.assessment.findMany({
             where: {
                 classId,
@@ -67,7 +64,6 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
                 scores: true,
             },
         });
-        console.log("📊 ASSESSMENTS:", assessments);
         const report = students.map((student) => {
             const subjectMap = {};
             assessments.forEach((assessment) => {
@@ -98,7 +94,6 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
                 overallAverage,
             };
         });
-        console.log("🧠 FINAL REPORT:", report);
         return res.json(report);
     }
     catch (err) {
@@ -108,19 +103,16 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
 });
 /**
  * ============================================================
- * ✅ NEW: TEACHER — PUBLISH REPORT CARDS
- * POST /api/report-cards/teacher/:classId/:term/publish
+ * TEACHER — PUBLISH REPORT CARDS
  * ============================================================
  */
 router.post("/teacher/:classId/:term/publish", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.TEACHER]), async (req, res) => {
-    console.log("🚀 PUBLISH ROUTE HIT");
     try {
         const classId = Number(req.params.classId);
         const termParam = req.params.term;
         if (Number.isNaN(classId)) {
             return res.status(400).json({ message: "Invalid classId" });
         }
-        // ✅ FIX: Handle string | string[]
         if (Array.isArray(termParam)) {
             return res.status(400).json({ message: "Invalid term parameter" });
         }
@@ -139,17 +131,15 @@ router.post("/teacher/:classId/:term/publish", authMiddleware_1.authenticate, (0
         if (!term) {
             return res.status(404).json({ message: "Term not found" });
         }
-        // ✅ Publish report cards
         const result = await client_1.prisma.reportCard.updateMany({
             where: {
                 classId,
                 termId: term.id,
             },
             data: {
-                status: "PUBLISHED",
+                status: client_3.ReportCardStatus.PUBLISHED,
             },
         });
-        // ✅ ALSO update assessments (🔥 FIX FOR "Waiting publish")
         const assessmentsUpdated = await client_1.prisma.assessment.updateMany({
             where: {
                 classId,
@@ -157,11 +147,9 @@ router.post("/teacher/:classId/:term/publish", authMiddleware_1.authenticate, (0
                 status: "SUBMITTED",
             },
             data: {
-                status: "PUBLISHED" // ✅ FIXED (no enum conflict)
+                status: "SUBMITTED",
             },
         });
-        console.log("✅ REPORT CARDS PUBLISHED:", result.count);
-        console.log("✅ ASSESSMENTS UPDATED:", assessmentsUpdated.count);
         return res.json({
             message: "Report cards published successfully",
             updated: result.count,
@@ -177,7 +165,7 @@ router.post("/teacher/:classId/:term/publish", authMiddleware_1.authenticate, (0
 });
 /**
  * ============================================================
- * STUDENT — VIEW OWN REPORT CARD (TERM)
+ * STUDENT — VIEW OWN REPORT CARD
  * ============================================================
  */
 router.get("/me", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.STUDENT]), async (req, res) => {
@@ -212,7 +200,7 @@ router.get("/me", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRo
             class: true,
         },
     });
-    if (!reportCard || reportCard.status !== "PUBLISHED") {
+    if (!reportCard || reportCard.status !== client_3.ReportCardStatus.PUBLISHED) {
         return res.status(404).json({
             message: "Report card not available",
         });
@@ -225,9 +213,9 @@ router.get("/me", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRo
  * ============================================================
  */
 router.get("/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.PARENT]), async (req, res) => {
-    const parentId = req.user.id;
+    const parentId = String(req.user.id); // ✅ FIXED
     const links = await client_1.prisma.parentStudent.findMany({
-        where: { parentId },
+        where: { parentId }, // ✅ FIXED
         select: { studentId: true },
     });
     if (links.length === 0) {
@@ -237,7 +225,7 @@ router.get("/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requi
     const reportCards = await client_1.prisma.reportCard.findMany({
         where: {
             studentId: { in: studentIds },
-            status: "PUBLISHED",
+            status: client_3.ReportCardStatus.PUBLISHED,
         },
         include: {
             student: true,
@@ -250,7 +238,6 @@ router.get("/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requi
 /**
  * ============================================================
  * ADMIN / PARENT — VIEW REPORT CARD BY ID
- * MUST BE LAST (VERY IMPORTANT)
  * ============================================================
  */
 router.get("/:id", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.ADMIN, client_2.Role.PARENT]), async (req, res) => {
@@ -271,7 +258,7 @@ router.get("/:id", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireR
             term: true,
         },
     });
-    if (!reportCard || reportCard.status !== "PUBLISHED") {
+    if (!reportCard || reportCard.status !== client_3.ReportCardStatus.PUBLISHED) {
         return res.status(404).json({
             message: "Report card not available",
         });
@@ -279,7 +266,7 @@ router.get("/:id", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireR
     if (req.user.role === client_2.Role.PARENT) {
         const link = await client_1.prisma.parentStudent.findFirst({
             where: {
-                parentId: req.user.id,
+                parentId: String(req.user.id), // ✅ FIXED
                 studentId: reportCard.studentId,
             },
         });

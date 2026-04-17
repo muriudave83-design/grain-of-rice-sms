@@ -170,10 +170,13 @@ exports.resetUserPassword = resetUserPassword;
  */
 async function createUserInternal(req, res, role) {
     try {
-        const { name, tempPassword } = req.body;
+        // ✅ FIXED: accept password instead of tempPassword
+        const { name, password } = req.body;
+        const tempPassword = password;
         // ✅ Normalize email to lowercase
         const email = req.body.email?.toLowerCase();
-        if (!name || !email || !tempPassword) {
+        // ✅ FIXED validation
+        if (!name || !email || !password) {
             return res.status(400).json({ message: "Missing required fields" });
         }
         if (!req.user) {
@@ -189,7 +192,7 @@ async function createUserInternal(req, res, role) {
         const user = await client_1.prisma.user.create({
             data: {
                 name,
-                email, // ✅ normalized email stored
+                email,
                 password: hashedPassword,
                 role,
                 mustChangePassword: true,

@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateReportCardsForClass = generateReportCardsForClass;
 const client_1 = require("../prisma/client");
+const client_2 = require("@prisma/client");
 async function generateReportCardsForClass({ classId, termId, }) {
     console.log("🚀 REPORT CARD GENERATION STARTED", { classId, termId });
     return client_1.prisma.$transaction(async (tx) => {
@@ -63,7 +64,7 @@ async function generateReportCardsForClass({ classId, termId, }) {
                     },
                 },
             });
-            if (existing && existing.status === "PUBLISHED") {
+            if (existing && existing.status === client_2.ReportCardStatus.PUBLISHED) {
                 console.log(`⚠️ Report card already published for student ${student.id}`);
                 continue;
             }
@@ -85,7 +86,7 @@ async function generateReportCardsForClass({ classId, termId, }) {
                 update: {
                     total,
                     average,
-                    status: "GENERATED",
+                    status: client_2.ReportCardStatus.GENERATED,
                 },
                 create: {
                     studentId: student.id,
@@ -93,7 +94,7 @@ async function generateReportCardsForClass({ classId, termId, }) {
                     termId,
                     total,
                     average,
-                    status: "GENERATED",
+                    status: client_2.ReportCardStatus.GENERATED,
                 },
             });
             /**

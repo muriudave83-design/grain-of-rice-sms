@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateReportCards = generateReportCards;
 const client_1 = require("../prisma/client");
+const client_2 = require("@prisma/client");
 async function generateReportCards(termId, classId) {
     const students = await client_1.prisma.student.findMany({
         where: { classId },
@@ -19,7 +20,7 @@ async function generateReportCards(termId, classId) {
                 studentId: student.id,
                 termId: termId,
                 classId: classId,
-                status: "GENERATED",
+                status: client_2.ReportCardStatus.GENERATED,
                 average: 0,
                 total: 0,
             },

@@ -2,13 +2,14 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.publishReportCards = publishReportCards;
 const client_1 = require("../../prisma/client");
+const client_2 = require("@prisma/client");
 /**
  * POST /report-cards/publish
  * Body: { termId: number; classId: number }
  *
  * Rules:
  * - ADMIN only
- * - Only DRAFT report cards may be published
+ * - Only GENERATED report cards may be published
  * - All report cards must be complete (no missing subject entries)
  * - Operation is atomic
  */
@@ -34,15 +35,15 @@ async function publishReportCards(req, res) {
         if (!classroom) {
             return res.status(400).json({ message: "Invalid classId" });
         }
-        // Fetch all DRAFT report cards for this class + term
+        // Fetch all GENERATED report cards for this class + term
         const reportCards = await client_1.prisma.reportCard.findMany({
             where: {
                 termId: Number(termId),
                 classId: Number(classId),
-                status: "GENERATED",
+                status: client_2.ReportCardStatus.GENERATED,
             },
             include: {
-                subjects: true,
+                subjects: true, // ✅ FIX: include relation
             },
         });
         if (reportCards.length === 0) {
@@ -53,6 +54,7 @@ async function publishReportCards(req, res) {
         // Validate completeness
         const incomplete = [];
         for (const rc of reportCards) {
+            // ✅ FIX: subjects is guaranteed because of include, but keep safety check
             if (!rc.subjects || rc.subjects.length === 0) {
                 incomplete.push({
                     studentId: rc.studentId,
@@ -60,7 +62,8 @@ async function publishReportCards(req, res) {
                 });
                 continue;
             }
-            const hasMissing = rc.subjects.some((s) => s.total === null || Number.isNaN(s.total));
+            // ✅ FIX: typed param (no implicit any)
+            const hasMissing = rc.subjects.some((s) => Number.isNaN(s.total));
             if (hasMissing) {
                 incomplete.push({
                     studentId: rc.studentId,
@@ -80,10 +83,11 @@ async function publishReportCards(req, res) {
                 where: {
                     termId: Number(termId),
                     classId: Number(classId),
-                    status: "GENERATED",
+                    status: client_2.ReportCardStatus.GENERATED,
                 },
                 data: {
-                    status: "PUBLISHED",
+                    status: client_2.ReportCardStatus.PUBLISHED,
+                    publishedAt: new Date(), // ✅ GOOD PRACTICE (optional but recommended)
                 },
             });
             return update.count;

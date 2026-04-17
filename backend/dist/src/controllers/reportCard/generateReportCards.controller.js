@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateReportCards = generateReportCards;
 const client_1 = require("../../prisma/client");
+const client_2 = require("@prisma/client");
 const gradeInput_service_1 = require("../../services/reportCard/gradeInput.service");
 /**
  * POST /report-cards/generate
@@ -61,7 +62,7 @@ async function generateReportCards(req, res) {
                 where: {
                     termId: Number(termId),
                     classId: Number(classId),
-                    status: "GENERATED",
+                    status: client_2.ReportCardStatus.GENERATED,
                 },
             });
         }
@@ -70,7 +71,7 @@ async function generateReportCards(req, res) {
                 where: {
                     termId: Number(termId),
                     classId: Number(classId),
-                    status: "GENERATED",
+                    status: client_2.ReportCardStatus.GENERATED,
                 },
             });
             if (existingDrafts > 0) {
@@ -155,7 +156,7 @@ async function generateReportCards(req, res) {
                         classId: Number(classId),
                         total: totals.total ?? 0,
                         average: totals.average ?? 0,
-                        status: "GENERATED",
+                        status: client_2.ReportCardStatus.GENERATED,
                     },
                 });
                 createdReportCardIds.push(reportCard.id);
@@ -180,7 +181,7 @@ async function generateReportCards(req, res) {
                 where: {
                     termId: Number(termId),
                     classId: Number(classId),
-                    status: "GENERATED",
+                    status: client_2.ReportCardStatus.GENERATED,
                 },
                 select: {
                     id: true,

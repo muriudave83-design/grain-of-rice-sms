@@ -5,6 +5,7 @@ const client_1 = require("../../prisma/client");
 const authMiddleware_1 = require("../../middlewares/authMiddleware");
 const rolesMiddleware_1 = require("../../middlewares/rolesMiddleware");
 const client_2 = require("@prisma/client");
+const client_3 = require("@prisma/client");
 const router = (0, express_1.Router)();
 /**
  * ============================================================
@@ -31,7 +32,7 @@ router.post("/report-cards/publish", authMiddleware_1.authenticate, (0, rolesMid
     }
     await client_1.prisma.reportCard.updateMany({
         where: { classId, termId },
-        data: { status: "PUBLISHED" },
+        data: { status: client_3.ReportCardStatus.PUBLISHED },
     });
     await client_1.prisma.auditLog.create({
         data: {
@@ -59,7 +60,7 @@ router.post("/report-cards/unpublish", authMiddleware_1.authenticate, (0, rolesM
         where: {
             classId,
             termId,
-            status: "PUBLISHED",
+            status: client_3.ReportCardStatus.PUBLISHED,
         },
     });
     if (!PUBLISHED) {
@@ -69,7 +70,7 @@ router.post("/report-cards/unpublish", authMiddleware_1.authenticate, (0, rolesM
     }
     await client_1.prisma.reportCard.updateMany({
         where: { classId, termId },
-        data: { status: "GENERATED" },
+        data: { status: client_3.ReportCardStatus.GENERATED },
     });
     await client_1.prisma.auditLog.create({
         data: {

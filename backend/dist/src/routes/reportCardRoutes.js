@@ -6,6 +6,7 @@ const express_1 = require("express");
 const client_1 = require("../prisma/client");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
 const client_2 = require("@prisma/client");
+const client_3 = require("@prisma/client");
 const router = (0, express_1.Router)();
 exports.reportCardReadRoutes = router;
 /**
@@ -198,7 +199,7 @@ router.get("/student/:studentId/term/:termId", authMiddleware_1.authenticate, as
             where: {
                 studentId,
                 termId,
-                status: "PUBLISHED",
+                status: client_3.ReportCardStatus.PUBLISHED,
             },
             include: {
                 student: true,
@@ -327,14 +328,15 @@ router.get("/generate/:studentId", authMiddleware_1.authenticate, async (req, re
  * 👨‍🏫 TEACHER + 🎓 STUDENT — REPORT CARDS
  * ============================================================
  */
-router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, async (req, res) => {
+router.get("/by-class/:classId/term/:term", authMiddleware_1.authenticate, async (req, res) => {
     console.log("🔥 REPORT CARD ROUTE HIT");
     try {
         if (!req.user) {
             return res.status(401).json({ message: "Unauthorized" });
         }
         console.log("USER:", req.user);
-        let classId = Number(req.params.classId);
+        let classIdParam = req.params.classId;
+        let classId = classIdParam ? Number(classIdParam) : undefined;
         const userId = req.user.id;
         const role = req.user.role;
         let students;
@@ -351,6 +353,11 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, async (req,
             students = [student];
         }
         else {
+            if (!classId || isNaN(classId)) {
+                return res.status(400).json({
+                    message: "Valid classId is required",
+                });
+            }
             students = await client_1.prisma.student.findMany({
                 where: { classId },
             });

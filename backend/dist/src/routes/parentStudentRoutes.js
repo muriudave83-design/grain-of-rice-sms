@@ -16,6 +16,7 @@ exports.parentStudentRoutes = router;
  * ============================================================
  */
 router.post("/", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.ADMIN]), async (req, res) => {
+    console.log("CREATE PARENT BODY:", req.body);
     const { parentId, studentId } = req.body;
     if (typeof parentId !== "number" ||
         typeof studentId !== "number") {
@@ -23,9 +24,11 @@ router.post("/", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRol
             message: "parentId and studentId must be numbers",
         });
     }
+    // ✅ Normalize ONCE
+    const parentIdStr = String(parentId);
     // Prevent duplicate links
     const existing = await client_1.prisma.parentStudent.findFirst({
-        where: { parentId, studentId },
+        where: { parentId: parentIdStr, studentId },
     });
     if (existing) {
         return res.status(400).json({
@@ -33,19 +36,25 @@ router.post("/", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRol
         });
     }
     const link = await client_1.prisma.parentStudent.create({
-        data: { parentId, studentId },
+        data: { parentId: parentIdStr, studentId },
     });
     res.json(link);
 });
-// GET children linked to logged-in parent
+/**
+ * ============================================================
+ * PARENT — GET LINKED STUDENTS (SELF)
+ * GET /api/parent-students
+ * ============================================================
+ */
 router.get("/", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.PARENT]), async (req, res) => {
     try {
         const user = req.user;
         if (!user || user.role !== "PARENT") {
             return res.status(403).json({ message: "Forbidden" });
         }
+        const parentIdStr = String(user.id);
         const links = await client_1.prisma.parentStudent.findMany({
-            where: { parentId: user.id },
+            where: { parentId: parentIdStr },
             include: {
                 student: {
                     include: {
@@ -58,6 +67,32 @@ router.get("/", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole
     }
     catch (err) {
         console.error("Parent students fetch error:", err);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
+/**
+ * ============================================================
+ * ADMIN — GET STUDENTS FOR A PARENT
+ * GET /api/parent-students/:parentId
+ * ============================================================
+ */
+router.get("/:parentId", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.ADMIN]), async (req, res) => {
+    const parentId = req.params.parentId;
+    try {
+        const links = await client_1.prisma.parentStudent.findMany({
+            where: { parentId: String(parentId) },
+            include: {
+                student: {
+                    include: {
+                        class: true,
+                    },
+                },
+            },
+        });
+        res.json(links);
+    }
+    catch (err) {
+        console.error("Admin fetch parent students error:", err);
         res.status(500).json({ message: "Internal server error" });
     }
 });

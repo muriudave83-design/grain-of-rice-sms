@@ -9,13 +9,24 @@ exports.requireRole = void 0;
 const requireRole = (allowedRoles) => {
     return (req, res, next) => {
         const user = req.user;
+        // ❌ Not authenticated (real failure)
         if (!user) {
-            return res.status(401).json({ message: "Not authenticated" });
+            console.warn("❌ Access denied: No user on request");
+            return res.status(401).json({
+                message: "Not authenticated",
+            });
         }
+        // ❌ Role not allowed (real failure, but now transparent)
         if (!allowedRoles.includes(user.role)) {
-            return res.status(403).json({ message: "Forbidden: insufficient privileges" });
+            console.warn(`❌ Access denied: role '${user.role}' not in [${allowedRoles.join(", ")}]`);
+            return res.status(403).json({
+                message: "Forbidden: insufficient privileges",
+                requiredRoles: allowedRoles,
+                userRole: user.role,
+            });
         }
-        next();
+        // ✅ Authorized
+        return next();
     };
 };
 exports.requireRole = requireRole;

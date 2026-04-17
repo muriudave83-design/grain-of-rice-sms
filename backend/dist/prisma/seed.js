@@ -48,6 +48,7 @@ async function main() {
         create: {
             id: 1,
             name: "Term 1",
+            classId: 1,
             academicYear: "2026",
             startDate: new Date("2026-01-10"),
             endDate: new Date("2026-04-10"),

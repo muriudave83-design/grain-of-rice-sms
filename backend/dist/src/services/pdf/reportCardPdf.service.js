@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateReportCardPdf = generateReportCardPdf;
 const pdfkit_1 = __importDefault(require("pdfkit"));
 const client_1 = require("../../prisma/client");
+const client_2 = require("@prisma/client");
 /**
  * Phase-8 v1.1 â€” Report Card PDF Generator
  * Schema-aligned to PHASE 7 (LOCKED)
@@ -32,7 +33,7 @@ async function generateReportCardPdf(reportCardId) {
     if (!reportCard) {
         throw new Error("Report card not found");
     }
-    if (reportCard.status !== "PUBLISHED") {
+    if (reportCard.status !== client_2.ReportCardStatus.PUBLISHED) {
         throw new Error("Report card is not published");
     }
     // 2ï¸âƒ£ Create PDF document
