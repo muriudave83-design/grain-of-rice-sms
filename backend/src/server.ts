@@ -187,8 +187,8 @@ app.get("/", (_req: Request, res: Response) => {
 // ----------------------------------
 // SERVER
 // ----------------------------------
-const PORT = 5055;
+const PORT = Number(process.env.PORT) || 5055;
 
-app.listen(PORT, "localhost", () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
 });
