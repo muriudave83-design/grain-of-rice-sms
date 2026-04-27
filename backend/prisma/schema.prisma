@@ -24,7 +24,6 @@ model User {
   guardians          Guardian[]          @relation("UserToGuardian")
   invoices           Invoice[]           @relation("AccountantInvoices")
   parent             Parent?
-  sponsorships       Sponsorship[]
   student            Student?
   taughtSubjects     Subject[]           @relation("TeacherSubjectsLegacy")
   teacherSubjects    TeacherSubject[]
@@ -57,8 +56,9 @@ model Student {
   isArchived        Boolean           @default(false)
   assessmentScores  AssessmentScore[]
   attendanceEntries AttendanceEntry[]
-  disciplines       Discipline[]
+  discipline        Discipline[]
   enrollments       Enrollment[]
+  fees              Fee[]
   grades            Grade[]
   guardians         Guardian[]
   invoices          Invoice[]
@@ -67,9 +67,9 @@ model Student {
   reportComments    ReportComment[]
   scores            Score[]
   sponsorships      Sponsorship[]
-  transcripts       Transcript[]
   class             Class             @relation(fields: [classId], references: [id])
   user              User?             @relation(fields: [userId], references: [id])
+  transcripts       Transcript[]
 }
 
 model Class {
@@ -115,7 +115,8 @@ model Sponsorship {
   studentId Int
   notes     String?
   createdAt DateTime @default(now())
-  sponsor   User     @relation(fields: [sponsorId], references: [id])
+  type      String
+  sponsor   Sponsor  @relation(fields: [sponsorId], references: [id])
   student   Student  @relation(fields: [studentId], references: [id])
 
   @@unique([sponsorId, studentId])
@@ -211,8 +212,10 @@ model Discipline {
   recordedById Int?
   notes        String?
   type         String
+  termId       Int?
   recordedBy   User?    @relation("UserDisciplineRecords", fields: [recordedById], references: [id])
   student      Student  @relation(fields: [studentId], references: [id])
+  term         Term?    @relation(fields: [termId], references: [id])
 }
 
 model Invoice {
@@ -229,30 +232,23 @@ model Invoice {
 }
 
 model Term {
-  id      Int    @id @default(autoincrement())
-  name    String
-  classId Int
-
-  // Academic structure
+  id           Int          @id @default(autoincrement())
+  name         String
   startDate    DateTime
   endDate      DateTime
   academicYear String
-  isActive     Boolean  @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  class Class @relation(fields: [classId], references: [id])
-
-  // Existing system
-  assessments Assessment[]
-  grades      Grade[]
-  reportCards ReportCard[]
-
-  // New system
-  assignments Assignment[]
-  transcripts Transcript[]
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  classId      Int
+  isLocked     Boolean      @default(false)
+  assessments  Assessment[]
+  assignments  Assignment[]
+  discipline   Discipline[]
+  grades       Grade[]
+  reportCards  ReportCard[]
+  class        Class        @relation(fields: [classId], references: [id])
+  transcripts  Transcript[]
 
   @@unique([name, classId])
 }
@@ -349,27 +345,23 @@ model TeacherSubject {
 }
 
 model Assignment {
-  id    Int            @id @default(autoincrement())
-  title String
-  type  AssessmentType @default(HOMEWORK)
-
+  id               Int            @id @default(autoincrement())
+  title            String
   teacherSubjectId Int
+  createdAt        DateTime       @default(now())
+  weight           Float          @default(1)
+  date             DateTime?
+  dueDate          DateTime?
+  maxScore         Float?
+  type             AssessmentType @default(ASSIGNMENT)
+  position         Int            @default(0)
+  isLocked         Boolean        @default(false)
   termId           Int
-
-  // Metadata
-  createdAt DateTime  @default(now())
-  weight    Float     @default(1)
-  date      DateTime?
-  dueDate   DateTime?
-  maxScore  Float?
-  position  Int       @default(0)
-  isLocked  Boolean   @default(false)
-
-  // Relations
-  teacherSubject TeacherSubject @relation(fields: [teacherSubjectId], references: [id], onDelete: Cascade)
-  term           Term           @relation(fields: [termId], references: [id])
-
-  scores Score[]
+  dateAssigned     DateTime?
+  maxPoints        Float          @default(100)
+  teacherSubject   TeacherSubject @relation(fields: [teacherSubjectId], references: [id], onDelete: Cascade)
+  term             Term           @relation(fields: [termId], references: [id])
+  scores           Score[]
 }
 
 model Score {
@@ -377,6 +369,8 @@ model Score {
   studentId    Int
   assignmentId Int
   score        Float
+  createdAt    DateTime   @default(now())
+  maxPoints    Float?
   assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   student      Student    @relation(fields: [studentId], references: [id])
 
@@ -397,33 +391,49 @@ model ReportComment {
 }
 
 model Transcript {
-  id Int @id @default(autoincrement())
-
+  id        Int               @id @default(autoincrement())
   studentId Int
   classId   Int
+  createdAt DateTime          @default(now())
   termId    Int
-
-  createdAt DateTime @default(now())
-
-  // Relations
-  student Student @relation(fields: [studentId], references: [id])
-  term    Term    @relation(fields: [termId], references: [id])
-
-  entries TranscriptEntry[]
+  student   Student           @relation(fields: [studentId], references: [id])
+  term      Term              @relation(fields: [termId], references: [id])
+  entries   TranscriptEntry[]
 
   @@unique([studentId, classId, termId])
 }
 
 model TranscriptEntry {
-  id           Int    @id @default(autoincrement())
+  id           Int        @id @default(autoincrement())
   transcriptId Int
   subjectName  String
+  finalGrade   Float
+  letterGrade  String
+  position     Int?
+  transcript   Transcript @relation(fields: [transcriptId], references: [id])
+}
 
-  finalGrade  Float
-  letterGrade String
-  position    Int?
+model Fee {
+  id        Int          @id @default(autoincrement())
+  studentId Int
+  amount    Float
+  paid      Float        @default(0)
+  student   Student      @relation(fields: [studentId], references: [id])
+  payments  FeePayment[]
+}
 
-  transcript Transcript @relation(fields: [transcriptId], references: [id])
+model Sponsor {
+  id           Int           @id @default(autoincrement())
+  name         String
+  sponsorships Sponsorship[]
+}
+
+model FeePayment {
+  id     Int      @id @default(autoincrement())
+  feeId  Int
+  amount Float
+  date   DateTime @default(now())
+  fee    Fee      @relation(fields: [feeId], references: [id])
 }
 
 enum Role {

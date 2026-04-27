@@ -7,6 +7,7 @@ export default function SidebarNav() {
   const [open, setOpen] = useState({
     management: true,
     academics: true,
+    finance: true, // ✅ NEW SECTION
   });
 
   const toggle = (section) => {
@@ -52,7 +53,6 @@ export default function SidebarNav() {
               🎓 Students
             </NavLink>
 
-            {/* ✅ ADDED: Parents */}
             <NavLink to={path("parents")} className={linkClass}>
               👪 Parents
             </NavLink>
@@ -69,8 +69,8 @@ export default function SidebarNav() {
               📅 Attendance
             </NavLink>
 
-            <NavLink to="/dashboard/admin/archived" className={linkClass}>
-              <span>🗂️</span> Archived
+            <NavLink to={path("archived")} className={linkClass}>
+              🗂️ Archived
             </NavLink>
           </div>
         )}
@@ -102,6 +102,36 @@ export default function SidebarNav() {
             <NavLink to={path("class-subjects")} className={linkClass}>
               🏫 Class Subject Assignment
             </NavLink>
+
+            <NavLink to={path("reports")} className={linkClass}>
+              📊 Reports
+            </NavLink>
+          </div>
+        )}
+      </div>
+
+      {/* ✅ NEW: FINANCE & WELFARE */}
+      <div className="mt-4">
+        <button
+          onClick={() => toggle("finance")}
+          className="w-full text-left text-xs font-bold text-gray-500 uppercase tracking-wide mb-2"
+        >
+          Finance & Welfare
+        </button>
+
+        {open.finance && (
+          <div className="ml-2">
+            <NavLink to={path("fees")} className={linkClass}>
+              💰 Fees
+            </NavLink>
+
+            <NavLink to={path("sponsorship")} className={linkClass}>
+              🤝 Sponsorship
+            </NavLink>
+
+            <NavLink to={path("discipline")} className={linkClass}>
+              ⚠️ Discipline
+            </NavLink>
           </div>
         )}
       </div>
@@ -110,7 +140,6 @@ export default function SidebarNav() {
       <div className="mt-6 text-xs text-gray-400">
         v0.1 — Demo
       </div>
-
     </nav>
   );
 }

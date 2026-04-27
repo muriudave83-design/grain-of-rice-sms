@@ -102,7 +102,8 @@ export async function generateReportCardsForClass({
         0
       );
 
-      const average = total / studentGrades.length;
+      const count = studentGrades.length;
+      const average = count > 0 ? total / count : 0;
 
       /**
        * Upsert report card

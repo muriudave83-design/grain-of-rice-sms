@@ -41,7 +41,7 @@ import teacherSubjectsRoutes from "./routes/admin/admin.teacherSubjects.routes";
 // ✅ Teacher assignments endpoint
 import teacherAssignmentsRoutes from "./routes/teacherAssignments.routes";
 
-// ✅ REPORT CARDS (FIXED IMPORTS)
+// ✅ REPORT CARDS
 import { reportCardReadRoutes } from "./routes/reportCardReadRoutes";
 import reportsRoutes from "./routes/reports.routes";
 
@@ -61,6 +61,15 @@ import attendanceRoutes from "./routes/attendanceRoutes";
 import classesRoutes from "./routes/classes";
 import teacherRoutes from "./routes/teacher.routes";
 
+// ✅ Fees
+import feesRoutes from "./routes/fees.routes";
+
+// ✅ NEW: Sponsorship
+import sponsorshipRoutes from "./routes/sponsorship.routes";
+
+// ✅ Discipline
+import disciplineRoutes from "./routes/discipline.routes";
+
 const app = express();
 
 // ----------------------------------
@@ -70,6 +79,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
+      "http://localhost:5174",
       "https://sms-frontend-gjfo.onrender.com",
     ],
     credentials: true,
@@ -122,7 +132,7 @@ app.use("/api/students", studentRoutes);
 app.use("/api", protectedRoutes);
 app.use("/api/assessments", assessmentRoutes);
 app.use("/api/classes", classesRoutes);
-app.use("/api/teacher", teacherRoutes); // ✅ MUST be before any generic /api routes
+app.use("/api/teacher", teacherRoutes); // MUST be before generic /api
 app.use("/api/gradebook", gradebookRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/assignment-categories", assignmentCategoryRoutes);
@@ -130,14 +140,23 @@ app.use("/api/admin/attendance", adminAttendanceRoutes);
 app.use("/api/terms", termRoutes);
 app.use("/api/attendance", attendanceRoutes);
 
-// ✅ Teacher assignments (safe)
+// ✅ Fees
+app.use("/api/fees", feesRoutes);
+
+// ✅ Sponsorship (NEW)
+app.use("/api/sponsorship", sponsorshipRoutes);
+
+// ✅ Teacher assignments
 app.use("/api/teacher-assignments", teacherAssignmentsRoutes);
 
+// ✅ Discipline
+app.use("/api/discipline", disciplineRoutes);
+
 // ----------------------------------
-// REPORT CARDS (STRICT SCOPING)
+// REPORT CARDS
 // ----------------------------------
 app.use("/api/report-cards", reportCardReadRoutes);
-app.use("/api/report-cards/pdf", reportCardPdfRoutes); // ✅ FIXED (NO MORE /api LEAK)
+app.use("/api/report-cards/pdf", reportCardPdfRoutes);
 app.use("/api/reports", reportsRoutes);
 
 // ----------------------------------
@@ -168,8 +187,8 @@ app.get("/", (_req: Request, res: Response) => {
 // ----------------------------------
 // SERVER
 // ----------------------------------
-const PORT = process.env.PORT || 5000;
+const PORT = 5055;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(PORT, "localhost", () => {
+  console.log(`Server running on http://localhost:${PORT}`);
 });

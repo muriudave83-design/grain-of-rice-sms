@@ -27,59 +27,109 @@ router.use(authenticate, requireRole(["TEACHER"]));
 // 📚 TEACHER CORE ROUTES
 //
 
-// ✅ GET teacher classes
 router.get("/classes", getTeacherClasses);
-
-// ✅ GET teacher subjects
 router.get("/subjects", getTeacherSubjects);
-
-// ✅ GET gradebook detail
 router.get("/gradebook/:id", getGradebook);
-
-// ✅ GET class students
 router.get("/class/:classId/students", getClassStudents);
 
 //
 // 🧾 REPORTS
 //
 router.post("/report/comment", saveReportComment);
-
-// 🧱 NEW — GET report data
 router.get("/report/:classId", getReportData);
+
+//
+// 🧱 FINAL GRADES (FIXED)
+//
+router.get("/final-grades/:classId", async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const { termId } = req.query;
+
+    if (!termId) {
+      return res.status(400).json({ message: "termId required" });
+    }
+
+    // ✅ REUSE EXISTING REPORT LOGIC
+    const mockReq: any = {
+      params: { classId },
+      query: { termId },
+      user: req.user,
+    };
+
+    let jsonData: any = [];
+
+    const mockRes: any = {
+      json: (data: any) => {
+        jsonData = data;
+      },
+      status: () => mockRes,
+    };
+
+    await getReportData(mockReq, mockRes);
+
+    const results = jsonData.map((student: any) => {
+      const subjects = student.subjects || [];
+
+      if (subjects.length === 0) {
+        return {
+          studentId: student.studentId,
+          name: student.name,
+          average: 0,
+          letter: "-",
+        };
+      }
+
+      const avg =
+        subjects.reduce(
+          (sum: number, s: any) => sum + (s.finalGrade || 0),
+          0
+        ) / subjects.length;
+              const rounded = Number(avg.toFixed(1));
+
+      const getLetter = (grade: number) => {
+        if (grade >= 80) return "A";
+        if (grade >= 70) return "B";
+        if (grade >= 60) return "C";
+        if (grade >= 50) return "D";
+        return "E";
+      };
+
+      return {
+        studentId: student.studentId,
+        name: student.name,
+        average: rounded,
+        letter: getLetter(rounded),
+      };
+    });
+
+    res.json(results);
+
+  } catch (err) {
+    console.error("FINAL GRADES ERROR:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
 
 //
 // 🧱 SCORES
 //
-
-// ✅ POST score (create/update single)
 router.post("/score", upsertScore);
-
-// 🧱 NEW — BULK SCORE UPDATE 🚀
 router.post("/score/bulk", bulkUpdateScores);
 
 //
-// 🧱 PHASE 5 — ASSIGNMENTS
+// 🧱 ASSIGNMENTS
 //
-
-// ✅ CREATE assignment (by class)
 router.post("/class/:classId/assignment", createAssignment);
-
-// ✅ CREATE assignment (general)
 router.post("/assignment", createAssignment);
-
-// ✅ DELETE assignment
 router.delete("/assignment/:id", deleteAssignment);
-
-// ✅ REORDER assignments
 router.put("/assignment/reorder", reorderAssignments);
-
-// ✅ UPDATE assignment
 router.put("/assignment/:id", updateAssignment);
 
 router.post("/transcript/generate", generateTranscripts);
 
 //
-// 🔒 LOCK / UNLOCK ASSIGNMENT
+// 🔒 LOCK / UNLOCK
 //
 router.put("/assignment/:id/lock", async (req, res) => {
   try {
@@ -99,7 +149,7 @@ router.put("/assignment/:id/lock", async (req, res) => {
 });
 
 //
-// 🧱 STEP 5 — TERMS ROUTE (NEW)
+// 🧱 TERMS
 //
 router.get("/terms/:classId", async (req, res) => {
   try {
@@ -110,12 +160,8 @@ router.get("/terms/:classId", async (req, res) => {
     }
 
     const terms = await prisma.term.findMany({
-      where: {
-        classId: classId,
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
+      where: { classId },
+      orderBy: { createdAt: "asc" },
     });
 
     res.json(terms);

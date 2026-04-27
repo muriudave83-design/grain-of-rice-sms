@@ -3,7 +3,7 @@ import axios from "axios";
 // 🌍 ENV CONFIG (WORKS IN DEV + PROD)
 const API_URL = import.meta.env.VITE_API_URL;
 
-// 🧠 DEBUG (optional but useful)
+// 🧠 DEBUG
 console.log("🌍 API URL:", API_URL);
 
 const apiClient = axios.create({
@@ -23,7 +23,6 @@ apiClient.interceptors.request.use(
       token === "undefined" ||
       token.trim() === ""
     ) {
-      console.warn("⚠️ No valid token found");
       return config;
     }
 
@@ -42,7 +41,7 @@ apiClient.interceptors.request.use(
 // 🧠 HELPER: EXTRACT ERROR MESSAGE
 // ==============================
 const getErrorMessage = (error) => {
-  if (!error.response) return "Network error. Check your connection.";
+  if (!error.response) return "Network error";
 
   return (
     error.response.data?.message ||
@@ -66,7 +65,7 @@ apiClient.interceptors.response.use(
       message,
     });
 
-    // 🔐 AUTH HANDLING
+    // 🔐 AUTH HANDLING (FIXED — NO AUTO LOGOUT)
     if (error.response) {
       const status = error.response.status;
       const token = localStorage.getItem("token");
@@ -77,26 +76,17 @@ apiClient.interceptors.response.use(
         token !== "null" &&
         token !== "undefined"
       ) {
-        const isOnLoginPage = window.location.pathname === "/login";
-
-        if (!isOnLoginPage) {
-          console.warn("🔁 Session expired → redirecting to login");
-
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          localStorage.removeItem("role");
-
-          window.location.href = "/login";
-        }
+        console.warn("⚠️ Unauthorized request (ignored — no forced logout)");
+        // ❌ DO NOT redirect
+        // ❌ DO NOT clear storage
       }
     }
 
-    // 🔥 GLOBAL ERROR FEEDBACK
-    if (!error.config?.silent) {
-      alert(message);
-    }
-
-    return Promise.reject(error);
+    // ❌ NO GLOBAL ALERT
+    return Promise.reject({
+      ...error,
+      message,
+    });
   }
 );
 

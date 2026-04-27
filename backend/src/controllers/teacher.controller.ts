@@ -7,7 +7,7 @@ const prisma = new PrismaClient();
 // 🧠 HELPER — VALIDATE SCORE
 const isValidScore = (score: any) => {
   const n = Number(score);
-  return !isNaN(n) && n >= 0 && n <= 100;
+  return !isNaN(n) && n >= 0;
 };
 
 // 🧠 HELPER — DEDUPLICATE
@@ -41,10 +41,11 @@ const calculateFinalGradeForStudent = (
     const score = Number(scoreObj.score);
     if (isNaN(score)) return;
 
-    const maxScore = assignment.maxScore || 100;
+    // 🔥 UPDATED: use maxPoints instead of maxScore
+    const maxPoints = assignment.maxPoints || 100;
     const weight = assignment.weight ?? 1;
 
-    const percentage = (score / maxScore) * 100;
+    const percentage = (score / maxPoints) * 100;
 
     total += percentage * weight;
     totalWeight += weight;
@@ -145,7 +146,6 @@ export const getGradebook = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Error fetching gradebook" });
   }
 };
-
 export const getClassStudents = async (req: Request, res: Response) => {
   const { classId } = req.params;
 
@@ -183,7 +183,13 @@ export const upsertScore = async (req: Request, res: Response) => {
       where: { id: assignmentId },
     });
 
-    if (assignment?.isLocked) {
+    if (!assignment) {
+      return res.status(404).json({
+        message: "Assignment not found",
+      });
+    }
+
+    if (assignment.isLocked) {
       return res.status(403).json({
         message: "Assignment is locked",
       });
@@ -196,10 +202,18 @@ export const upsertScore = async (req: Request, res: Response) => {
     const result = existing
       ? await prisma.score.update({
           where: { id: existing.id },
-          data: { score: scoreNumber },
+          data: {
+            score: scoreNumber,
+            maxPoints: assignment.maxPoints, // ✅ ADD THIS
+          },
         })
       : await prisma.score.create({
-          data: { studentId, assignmentId, score: scoreNumber },
+          data: {
+            studentId,
+            assignmentId,
+            score: scoreNumber,
+            maxPoints: assignment.maxPoints, // ✅ ADD THIS
+          },
         });
 
     res.json(result);
@@ -210,7 +224,7 @@ export const upsertScore = async (req: Request, res: Response) => {
 };
 
 //
-// 🧱 ASSIGNMENTS (FIXED)
+// 🧱 ASSIGNMENTS (🔥 UPDATED CORE)
 //
 
 export const createAssignment = async (req: Request, res: Response) => {
@@ -219,20 +233,46 @@ export const createAssignment = async (req: Request, res: Response) => {
     teacherSubjectId,
     weight,
     type,
-    date,
-    dueDate,
-    maxScore,
     termId,
+
+    // 🔥 NEW FIELDS
+    maxPoints,
+    dateAssigned,
+    dueDate,
   } = req.body;
 
-  if (!title || !teacherSubjectId || !termId) {
+  // 🔥 REQUIRED VALIDATION (as instructed)
+  if (!title) {
+    return res.status(400).json({ error: "Title required" });
+  }
+
+  if (!type) {
+    return res.status(400).json({ error: "Type required" });
+  }
+
+  if (!teacherSubjectId || !termId) {
     return res.status(400).json({ message: "Missing fields" });
   }
 
+  // 🔥 OPTIONAL VALIDATION
+  if (maxPoints && isNaN(maxPoints)) {
+    return res
+      .status(400)
+      .json({ error: "maxPoints must be a number" });
+  }
+
   try {
-    const validTypes = ["HOMEWORK", "QUIZ", "TEST", "PROJECT", "EXAM"];
+    // 🔥 UPDATED ENUM (aligned with new system)
+    const validTypes = ["ASSIGNMENT", "TEST", "PROJECT"];
     const normalizedType =
       typeof type === "string" ? type.toUpperCase() : null;
+
+      const allowedTypes = ["ASSIGNMENT", "TEST", "PROJECT"];
+      if (!normalizedType || !allowedTypes.includes(normalizedType)) {
+        return res.status(400).json({
+          error: "Invalid assignment type",
+        });
+      }
 
     const tsId = Number(teacherSubjectId);
 
@@ -251,13 +291,15 @@ export const createAssignment = async (req: Request, res: Response) => {
         title,
         teacherSubjectId: tsId,
         termId: Number(termId),
-        type:
-          normalizedType && validTypes.includes(normalizedType)
-            ? (normalizedType as AssessmentType)
-            : AssessmentType.HOMEWORK,
-        date: date ? new Date(date) : null,
+
+        type: normalizedType as AssessmentType,
+
+        // 🔥 NEW STANDARDIZED FIELDS
+        maxPoints: maxPoints ? parseFloat(maxPoints) : 100,
+        dateAssigned: dateAssigned ? new Date(dateAssigned) : null,
         dueDate: dueDate ? new Date(dueDate) : null,
-        maxScore: maxScore !== undefined ? Number(maxScore) : null,
+
+        // Existing fields (unchanged)
         position,
         ...(weight !== undefined && { weight }),
       },
@@ -289,6 +331,21 @@ export const updateAssignment = async (req: Request, res: Response) => {
       data: {
         ...(req.body.title !== undefined && { title: req.body.title }),
         ...(req.body.weight !== undefined && { weight: req.body.weight }),
+
+        // 🔥 OPTIONAL: allow updating new fields too
+        ...(req.body.maxPoints !== undefined && {
+          maxPoints: Number(req.body.maxPoints),
+        }),
+        ...(req.body.dateAssigned !== undefined && {
+          dateAssigned: req.body.dateAssigned
+            ? new Date(req.body.dateAssigned)
+            : null,
+        }),
+        ...(req.body.dueDate !== undefined && {
+          dueDate: req.body.dueDate
+            ? new Date(req.body.dueDate)
+            : null,
+        }),
       },
     });
 
@@ -476,7 +533,7 @@ export const getReportData = async (req: Request, res: Response) => {
         subject: true,
         assignments: {
           where: {
-            termId: termId, // ✅ CRITICAL FIX
+            termId: termId,
           },
           include: { scores: true },
         },
@@ -493,6 +550,7 @@ export const getReportData = async (req: Request, res: Response) => {
       const subjectResults = subjects.map((ts) => {
         const assignments = ts.assignments ?? [];
 
+        // 🔥 Uses UPDATED grading logic (maxPoints already handled)
         const avg = calculateFinalGradeForStudent(
           student.id,
           assignments
@@ -530,7 +588,7 @@ export const getReportData = async (req: Request, res: Response) => {
 };
 
 //
-// ✅ SAVE COMMENT (unchanged)
+// ✅ SAVE COMMENT
 //
 
 export const saveReportComment = async (req: Request, res: Response) => {
@@ -579,7 +637,7 @@ export const generateTranscripts = async (req: Request, res: Response) => {
         subject: true,
         assignments: {
           where: {
-            termId: Number(termId), // ✅ CRITICAL FIX
+            termId: Number(termId),
           },
           include: { scores: true },
         },
@@ -603,11 +661,12 @@ export const generateTranscripts = async (req: Request, res: Response) => {
         data: {
           studentId: student.id,
           classId,
-          termId: Number(termId), // ✅ FIXED
+          termId: Number(termId),
         },
       });
 
       for (const ts of subjects) {
+        // 🔥 Uses UPDATED grading logic
         const avg = calculateFinalGradeForStudent(
           student.id,
           ts.assignments
@@ -630,4 +689,3 @@ export const generateTranscripts = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to generate transcripts" });
   }
 };
-  

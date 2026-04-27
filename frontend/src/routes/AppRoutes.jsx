@@ -16,6 +16,12 @@ import Grades from "../pages/admin/Grades";
 import Exams from "../pages/admin/Exams";
 import Fees from "../pages/admin/Fees";
 import Payments from "../pages/admin/Payments";
+
+// ✅ NEW: FINANCIAL / DISCIPLINE MODULES
+import Sponsorship from "../pages/admin/Sponsorship";
+import Discipline from "../pages/admin/Discipline";
+import AdminStudentProfile from "../pages/admin/AdminStudentProfile";
+
 import UsersPage from "../pages/admin/UsersPage";
 import AdminStudents from "../pages/admin/AdminStudents";
 import AdminClassStudents from "../pages/admin/AdminClassStudents";
@@ -60,6 +66,7 @@ import TeacherStudentDetails from "../pages/teacher/TeacherStudentDetails";
 import TeacherAttendance from "../pages/teacher/attendance/TeacherAttendance";
 import GradebookPage from "../pages/teacher/GradebookPage";
 import GradebookDetail from "../pages/teacher/GradebookDetail";
+import FinalGrades from "../pages/teacher/FinalGrades";
 
 // =======================
 // PARENT PAGES
@@ -158,6 +165,8 @@ export default function AppRoutes() {
     <BrowserRouter>
       <Routes>
 
+        <Route path="/teacher/gradebook" element={<div>TEST PAGE</div>} />
+
         {/* ROOT */}
         <Route path="/" element={<Navigate to="/login" replace />} />
 
@@ -177,194 +186,151 @@ export default function AppRoutes() {
         </Route>
 
 
-        {/* ======================= */}
-        {/* ADMIN */}
-        {/* ======================= */}
+      {/* ======================= */}
+      {/* ADMIN */}
+      {/* ======================= */}
 
-        <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
-          <Route element={<AdminLayout />}>
+      <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
+        <Route element={<AdminLayout />}>
 
-            <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />
+          <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />
 
-            <Route path="/dashboard/admin" element={<Dashboard />} />
+          <Route path="/dashboard/admin" element={<Dashboard />} />
 
-            <Route path="/dashboard/admin/students" element={<AdminStudents />} />
-            <Route path="/dashboard/admin/teachers" element={<AdminTeachers />} />
+          <Route path="/dashboard/admin/students" element={<AdminStudents />} />
+          {/* 🔥 STUDENT PROFILE */}
+          <Route path="/dashboard/admin/students/:id" element={<AdminStudentProfile />} />
+          <Route path="/dashboard/admin/teachers" element={<AdminTeachers />} />
 
-            {/* ✅ NEW: PARENTS ROUTES */}
-            <Route path="/dashboard/admin/parents" element={<ParentsPage />} />
-            <Route path="/dashboard/admin/parents/new" element={<CreateParentPage />} />
-            <Route path="/dashboard/admin/parents/:id" element={<EditParentPage />} />
+          {/* ✅ PARENTS */}
+          <Route path="/dashboard/admin/parents" element={<ParentsPage />} />
+          <Route path="/dashboard/admin/parents/new" element={<CreateParentPage />} />
+          <Route path="/dashboard/admin/parents/:id" element={<EditParentPage />} />
 
-            <Route path="/dashboard/admin/classes" element={<Classes />} />
+          <Route path="/dashboard/admin/classes" element={<Classes />} />
 
-            <Route
-              path="/dashboard/admin/classes/:classId/students"
-              element={<AdminClassStudents />}
-            />
+          <Route
+            path="/dashboard/admin/classes/:classId/students"
+            element={<AdminClassStudents />}
+          />
 
-            <Route path="/dashboard/admin/grades" element={<Grades />} />
-            <Route path="/dashboard/admin/exams" element={<Exams />} />
-            <Route path="/dashboard/admin/fees" element={<Fees />} />
-            <Route path="/dashboard/admin/payments" element={<Payments />} />
-            <Route path="/dashboard/admin/users" element={<UsersPage />} />
-            <Route path="/dashboard/admin/subjects" element={<AdminSubjects />} />
-            <Route path="/dashboard/admin/categories" element={<AdminCategories />} />
+          <Route path="/dashboard/admin/grades" element={<Grades />} />
+          <Route path="/dashboard/admin/exams" element={<Exams />} />
 
-            <Route
-              path="/dashboard/admin/teacher-subjects"
-              element={<AdminTeacherSubjectAssignments />}
-            />
+          {/* ✅ FINANCIAL */}
+          <Route path="/dashboard/admin/fees" element={<Fees />} />
+          <Route path="/dashboard/admin/payments" element={<Payments />} />
 
-            <Route
-              path="/dashboard/admin/class-subjects"
-              element={<AdminClassSubjects />}
-            />
+          {/* ✅ NEW: SPONSORSHIP */}
+          <Route path="/dashboard/admin/sponsorship" element={<Sponsorship />} />
 
-            <Route 
-              path="/dashboard/admin/attendance" 
-              element={<AttendancePage />} 
-            />
+          {/* ✅ NEW: DISCIPLINE */}
+          <Route path="/dashboard/admin/discipline" element={<Discipline />} />
 
-            <Route
-              path="/dashboard/admin/attendance-analytics"
-              element={<AttendanceAnalytics />}
-            />
+          <Route path="/dashboard/admin/users" element={<UsersPage />} />
+          <Route path="/dashboard/admin/subjects" element={<AdminSubjects />} />
+          <Route path="/dashboard/admin/categories" element={<AdminCategories />} />
 
-            <Route
-              path="/dashboard/admin/attendance/:classId"
-              element={<AdminAttendanceClass />}
-            />
+          <Route
+            path="/dashboard/admin/teacher-subjects"
+            element={<AdminTeacherSubjectAssignments />}
+          />
 
-            <Route
-              path="/dashboard/admin/audit-logs"
-              element={<AdminAuditLogs />}
-            />
+          <Route
+            path="/dashboard/admin/class-subjects"
+            element={<AdminClassSubjects />}
+          />
 
-            <Route
-              path="/dashboard/admin/archived"
-              element={<AdminArchived />}
-            />
+          <Route 
+            path="/dashboard/admin/attendance" 
+            element={<AttendancePage />} 
+          />
 
-            <Route
-              path="/dashboard/admin/students/:id/edit"
-              element={<EditStudent />}
-            />
+          <Route
+            path="/dashboard/admin/attendance-analytics"
+            element={<AttendanceAnalytics />}
+          />
 
-            {/* ✅ REPORTS (ADMIN OWNS THIS) */}
-            <Route
-              path="/dashboard/admin/reports"
-              element={<AdminReportsPage />}
-            />
+          <Route
+            path="/dashboard/admin/attendance/:classId"
+            element={<AdminAttendanceClass />}
+          />
 
-            <Route
-              path="/dashboard/admin/reports/:studentId"
-              element={<StudentReportCardView />}
-            />
+          <Route
+            path="/dashboard/admin/audit-logs"
+            element={<AdminAuditLogs />}
+          />
 
-          </Route>
+          <Route
+            path="/dashboard/admin/archived"
+            element={<AdminArchived />}
+          />
+
+          <Route
+            path="/dashboard/admin/students/:id/edit"
+            element={<EditStudent />}
+          />
+
+          {/* ✅ REPORTS */}
+          <Route
+            path="/dashboard/admin/reports"
+            element={<AdminReportsPage />}
+          />
+
+          <Route
+            path="/dashboard/admin/reports/:studentId"
+            element={<StudentReportCardView />}
+          />
+
         </Route>
+      </Route>
 
-        {/* ======================= */}
-        {/* TEACHER */}
-        {/* ======================= */}
+      {/* ======================= */}
+      {/* TEACHER */}
+      {/* ======================= */}
 
-        <Route element={<ProtectedRoute allowedRoles={["TEACHER"]} />}>
-          <Route element={<TeacherLayout />}>
+      <Route element={<ProtectedRoute allowedRoles={["TEACHER"]} />}>
+        <Route path="/teacher" element={<TeacherLayout />}>
 
-            <Route
-              path="/teacher"
-              element={<Navigate to="/teacher/classes" replace />}
-            />
+          {/* default /teacher */}
+          <Route index element={<Navigate to="classes" replace />} />
 
-            <Route
-              path="/teacher/classes"
-              element={<TeacherClasses />}
-            />
+          {/* CLASSES */}
+          <Route path="classes" element={<TeacherClasses />} />
+          <Route path="class/:id" element={<TeacherClassDetails />} />
 
-            <Route 
-              path="/teacher/class/:id" 
-              element={<TeacherClassDetails />} 
-            />
+          {/* STUDENTS */}
+          <Route path="student/:id" element={<TeacherStudentDetails />} />
 
-            <Route 
-              path="/teacher/student/:id" 
-              element={<TeacherStudentDetails />} 
-            />
+          {/* ASSESSMENTS */}
+          <Route path="assessments" element={<TeacherAssessments />} />
+          <Route path="assessments/create" element={<CreateAssessment />} />
+          <Route path="assessments/:id/edit" element={<EditAssessmentRedirect />} />
+          <Route path="assessments/:id/scores" element={<ScoresEntry />} />
+          <Route path="assessments/:id/review" element={<AssessmentReview />} />
 
-            <Route
-              path="/teacher/assessments"
-              element={<TeacherAssessments />}
-            />
+          {/* ✅ FIXED GRADEBOOK FLOW */}
+          <Route path="gradebook" element={<TeacherClasses />} />
+          <Route path="gradebook/:id" element={<GradebookDetail />} />
 
-            <Route
-              path="/teacher/assessments/create"
-              element={<CreateAssessment />}
-            />
+          {/* LEGACY */}
+          <Route path="gradebook-legacy" element={<TeacherGradebook />} />
 
-            <Route
-              path="/teacher/assessments/:id/edit"
-              element={<EditAssessmentRedirect />}
-            />
+          {/* REPORTS */}
+          <Route path="reports" element={<Reports />} />
+          <Route path="report-cards/:classId/:term" element={<ClassReportCards />} />
+          <Route path="final-grades/:classId" element={<FinalGrades />} />
 
-            <Route
-              path="/teacher/assessments/:id/scores"
-              element={<ScoresEntry />}
-            />
+          {/* ATTENDANCE */}
+          <Route path="attendance" element={<TeacherAttendance />} />
+          <Route path="attendance/class/:classId" element={<TeacherAttendanceClass />} />
+          <Route path="attendance/session/:sessionId" element={<TeacherAttendanceSession />} />
 
-            <Route
-              path="/teacher/assessments/:id/review"
-              element={<AssessmentReview />}
-            />
+          {/* HOMEWORK */}
+          <Route path="homework/create" element={<CreateHomework />} />
 
-            <Route
-              path="/teacher/gradebook"
-              element={<GradebookPage />}
-            />
-
-            <Route
-              path="/teacher/gradebook/:id"
-              element={<GradebookDetail />}
-            />
-
-            <Route
-              path="/teacher/homework/create"
-              element={<CreateHomework />}
-            />
-
-            <Route
-              path="/teacher/gradebook-legacy"
-              element={<TeacherGradebook />}
-            />
-
-            <Route
-              path="/teacher/report-cards/:classId/:term"
-              element={<ClassReportCards />}
-            />
-
-            <Route
-              path="/teacher/reports"
-              element={<Reports />}
-            />
-
-            <Route
-              path="/teacher/attendance"
-              element={<TeacherAttendance />}
-            />
-
-            <Route
-              path="/teacher/attendance/class/:classId"
-              element={<TeacherAttendanceClass />}
-            />
-
-            <Route
-              path="/teacher/attendance/session/:sessionId"
-              element={<TeacherAttendanceSession />}
-            />
-
-          </Route>
         </Route>
-
+      </Route>
 
         {/* ======================= */}
         {/* PARENT */}

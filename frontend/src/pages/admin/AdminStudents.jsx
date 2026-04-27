@@ -247,7 +247,6 @@ export default function AdminStudents() {
                                 s.parent?.name ||
                                 "—"}
                             </td>
-
                             <td className="p-3 flex gap-2">
                               <button
                                 onClick={() => handleEdit(s)}
@@ -256,7 +255,7 @@ export default function AdminStudents() {
                                 Edit
                               </button>
 
-                              {/* ✅ NEW: VIEW REPORT */}
+                              {/* VIEW REPORT */}
                               <Link
                                 to={`/reports/student/${s.id}`}
                                 className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
@@ -264,10 +263,16 @@ export default function AdminStudents() {
                                 Report
                               </Link>
 
+                              {/* 🔥 VIEW PROFILE */}
+                              <Link
+                                to={`/dashboard/admin/students/${s.id}`}
+                                className="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                              >
+                                Profile
+                              </Link>
+
                               <button
-                                onClick={() =>
-                                  handleDelete(s)
-                                }
+                                onClick={() => handleDelete(s)}
                                 className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
                               >
                                 Delete

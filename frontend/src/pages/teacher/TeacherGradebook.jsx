@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 
 /*
 --------------------------------------------------
 Tiny Save Hook (same as ScoresEntry)
-Safe: local to this file
 --------------------------------------------------
 */
 function useSaveStatus() {
@@ -47,7 +46,7 @@ function EditableRow({ student, assessments, onSaved }) {
         if (value === "" || value === undefined) continue;
 
         await apiClient.post("/gradebook/score", {
-          assessmentId: assessment.id,
+          assignmentId: assessment.id,
           studentId: student.id,
           score: Number(value),
         });
@@ -69,12 +68,12 @@ function EditableRow({ student, assessments, onSaved }) {
           <input
             type="number"
             min={0}
-            max={a.maxScore}
-            disabled={a.status === "SUBMITTED"}
+            max={a.maxPoints}
+            disabled={a.isLocked}
             value={scores[a.id] ?? ""}
             className={`
               w-16 p-1 text-center border
-              ${a.status === "SUBMITTED" ? "bg-gray-100 cursor-not-allowed" : ""}
+              ${a.isLocked ? "bg-gray-100 cursor-not-allowed" : ""}
               ${scores[a.id] == null ? "bg-gray-50 border-dashed" : "bg-white"}
             `}
             onChange={(e) => {
@@ -85,8 +84,8 @@ function EditableRow({ student, assessments, onSaved }) {
                 return;
               }
 
-              if (Number(value) > a.maxScore) {
-                alert(`Max score is ${a.maxScore}`);
+              if (Number(value) > a.maxPoints) {
+                alert(`Max points is ${a.maxPoints}`);
                 return;
               }
 
@@ -120,33 +119,37 @@ function EditableRow({ student, assessments, onSaved }) {
     </tr>
   );
 }
-
 export default function TeacherGradebook() {
-    throw new Error("TESTING FILE ACTIVE"); // 👈 ADD THIS LINE
+  console.log("🔥 THIS IS THE REAL GRADEBOOK FILE");
 
   const navigate = useNavigate();
+  const { id } = useParams();
 
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
 
-  const [classId, setClassId] = useState("");
+  const [classId, setClassId] = useState(id || "");
   const [subjectId, setSubjectId] = useState("");
 
   const [gradebook, setGradebook] = useState(null);
-
-  const [newAssignment, setNewAssignment] = useState("");
-
-  // ✅ RIGHT CLICK CONTEXT MENU STATE
   const [contextMenu, setContextMenu] = useState(null);
+
+  // 🔥 NEW MODAL STATE
+  const [showModal, setShowModal] = useState(false);
+
+  const [form, setForm] = useState({
+    title: "",
+    type: "ASSIGNMENT",
+    maxPoints: 100,
+    dateAssigned: "",
+    dueDate: "",
+  });
 
   const handleRightClick = (e, assignment) => {
     e.preventDefault();
-
-    console.log("RIGHT CLICK WORKING", assignment); // 🧪 debug
-
     setContextMenu({
-      x: e.clientX, // ✅ FIXED
-      y: e.clientY, // ✅ FIXED
+      x: e.clientX,
+      y: e.clientY,
       assignment,
     });
   };
@@ -156,7 +159,6 @@ export default function TeacherGradebook() {
       await apiClient.delete(
         `/teacher/assignment/${contextMenu.assignment.id}`
       );
-
       setContextMenu(null);
       fetchGradebook();
     } catch (err) {
@@ -164,6 +166,9 @@ export default function TeacherGradebook() {
     }
   };
 
+  // -----------------------------
+  // FETCH FUNCTIONS
+  // -----------------------------
   const fetchClasses = async () => {
     try {
       const res = await apiClient.get("/classes/mine");
@@ -175,11 +180,13 @@ export default function TeacherGradebook() {
 
   const fetchSubjects = async (cid) => {
     if (!cid) return;
+
     try {
       const res = await apiClient.get(`/classes/${cid}/subjects`);
-      setSubjects(res.data);
+      setSubjects(res.data || []);
     } catch (err) {
       console.error("Failed to load subjects", err);
+      setSubjects([]);
     }
   };
 
@@ -187,55 +194,87 @@ export default function TeacherGradebook() {
     if (!classId || !subjectId) return;
 
     try {
-      const res = await apiClient.get(
-        `/gradebook?classId=${classId}&subjectId=${subjectId}`
-      );
+      const url = `/gradebook/${subjectId}?termId=1`;
+      const res = await apiClient.get(url);
       setGradebook(res.data);
     } catch (err) {
       console.error("Failed to load gradebook", err);
     }
   };
 
-  const handleAddAssignment = async () => {
-    if (!newAssignment.trim()) return;
+  // 🔥 NEW CREATE HANDLER
+const handleCreateAssignment = async () => {
+  if (!form.title || !subjectId) return;
 
-    try {
-      await apiClient.post(`/teacher/assignment`, {
-        title: newAssignment,
-        subjectId: subjectId,
-        maxScore: 100,
-        type: "ASSIGNMENT",
-      });
+  try {
+    await apiClient.post("/teacher/assignment", {
+      title: form.title,
+      type: form.type,
+      subjectId: subjectId,
+      maxPoints: Number(form.maxPoints),
+      dateAssigned: form.dateAssigned || null,
+      dueDate: form.dueDate || null,
+    });
 
-      setNewAssignment("");
-      fetchGradebook();
-    } catch (err) {
-      console.error("Failed to create assignment", err);
-    }
-  };
+    setShowModal(false);
 
+    setForm({
+      title: "",
+      type: "ASSIGNMENT",
+      maxPoints: 100,
+      dateAssigned: "",
+      dueDate: "",
+    });
+
+    fetchGradebook();
+  } catch (err) {
+    console.error("Failed to create assignment", err);
+  }
+};
+    // -----------------------------
+  // EFFECTS
+  // -----------------------------
   useEffect(() => {
     fetchClasses();
   }, []);
 
   useEffect(() => {
-    fetchSubjects(classId);
+    if (id) {
+      setClassId(id);
+      fetchSubjects(id);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (classId) {
+      fetchSubjects(classId);
+    }
   }, [classId]);
 
   useEffect(() => {
-    fetchGradebook();
+    if (subjects.length > 0) {
+      setSubjectId((prev) => prev || subjects[0].id);
+    }
+  }, [subjects]);
+
+  useEffect(() => {
+    if (classId && subjectId) {
+      fetchGradebook();
+    }
   }, [classId, subjectId]);
 
-  const computeClassAverageForAssessment = (assessmentId) => {
+  const computeClassAverageForAssessment = (assignmentId) => {
     if (!gradebook) return null;
 
     const values = gradebook.students
-      .map((s) => s.scores[assessmentId])
+      .map((s) => s.scores[assignmentId])
       .filter((v) => typeof v === "number");
 
     if (values.length === 0) return null;
 
-    return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1);
+    return (
+      values.reduce((a, b) => a + b, 0) / values.length
+    ).toFixed(1);
   };
 
   const computeClassOverallAverage = () => {
@@ -247,18 +286,17 @@ export default function TeacherGradebook() {
 
     if (values.length === 0) return "—";
 
-    return (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2);
+    return (
+      values.reduce((a, b) => a + b, 0) / values.length
+    ).toFixed(2);
   };
 
   return (
     <div
       className="p-6"
       onClick={() => setContextMenu(null)}
-      onContextMenu={(e) => {
-        e.stopPropagation(); // ✅ FIXED
-      }}
+      onContextMenu={(e) => e.stopPropagation()}
     >
-      {/* Breadcrumb */}
       <div className="text-sm text-gray-600 mb-2">
         Teacher / Gradebook
       </div>
@@ -272,6 +310,7 @@ export default function TeacherGradebook() {
 
       <h1 className="text-2xl font-semibold mb-6">Gradebook</h1>
 
+      {/* Selectors */}
       <div className="flex gap-4 mb-6">
         <select
           value={classId}
@@ -300,20 +339,14 @@ export default function TeacherGradebook() {
         </select>
       </div>
 
-      {/* Add Assignment */}
+      {/* 🔥 ADD BUTTON (REPLACES OLD INPUT) */}
       {gradebook && (
-        <div className="mb-4 flex gap-2">
-          <input
-            placeholder="New assignment"
-            value={newAssignment}
-            onChange={(e) => setNewAssignment(e.target.value)}
-            className="border p-2"
-          />
+        <div className="mb-4">
           <button
-            onClick={handleAddAssignment}
-            className="bg-green-600 text-white px-4 rounded"
-          >
-            Add
+            onClick={() => setShowModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              + Add Assignment
           </button>
         </div>
       )}
@@ -323,7 +356,7 @@ export default function TeacherGradebook() {
           Select class and subject to view gradebook.
         </div>
       )}
-
+            {/* Table */}
       {gradebook && (
         <div className="overflow-auto bg-white shadow rounded">
           <table className="w-full text-left">
@@ -379,18 +412,102 @@ export default function TeacherGradebook() {
         </div>
       )}
 
-      {/* ✅ CONTEXT MENU */}
+      {/* 🔥 MODAL UI */}
+      {showModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="bg-white p-6 rounded shadow w-96"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-4">
+              New Assignment
+            </h3>
+
+            <input
+              placeholder="Title"
+              value={form.title}
+              onChange={(e) =>
+                setForm({ ...form, title: e.target.value })
+              }
+              className="border p-2 w-full mb-3"
+            />
+
+            <select
+              value={form.type}
+              onChange={(e) =>
+                setForm({ ...form, type: e.target.value })
+              }
+              className="border p-2 w-full mb-3"
+            >
+              <option value="ASSIGNMENT">Assignment</option>
+              <option value="TEST">Test</option>
+              <option value="PROJECT">Project</option>
+            </select>
+
+            <input
+              type="number"
+              placeholder="Max Points"
+              value={form.maxPoints}
+              onChange={(e) =>
+                setForm({ ...form, maxPoints: e.target.value })
+              }
+              className="border p-2 w-full mb-3"
+            />
+
+            <label className="text-sm">Date Assigned</label>
+            <input
+              type="date"
+              value={form.dateAssigned}
+              onChange={(e) =>
+                setForm({ ...form, dateAssigned: e.target.value })
+              }
+              className="border p-2 w-full mb-3"
+            />
+
+            <label className="text-sm">Due Date</label>
+            <input
+              type="date"
+              value={form.dueDate}
+              onChange={(e) =>
+                setForm({ ...form, dueDate: e.target.value })
+              }
+              className="border p-2 w-full mb-4"
+            />
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowModal(false)}
+                className="border px-4 py-2 rounded"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleCreateAssignment}
+                className="bg-green-600 text-white px-4 py-2 rounded"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Context Menu */}
       {contextMenu && (
         <div
           style={{
             position: "fixed",
             top: contextMenu.y,
             left: contextMenu.x,
-            background: "red", // ✅ DEBUG
+            background: "red",
             color: "white",
             padding: "8px",
             borderRadius: "6px",
-            zIndex: 999999, // ✅ VERY HIGH
+            zIndex: 999999,
             border: "2px solid black",
           }}
           onMouseLeave={() => setContextMenu(null)}

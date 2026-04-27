@@ -7,23 +7,29 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ Logout logic (FIXED: clear ALL auth state)
+  // ✅ Logout logic
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("role");
     localStorage.removeItem("name");
-    localStorage.removeItem("user"); // ✅ IMPORTANT FIX
+    localStorage.removeItem("user");
     navigate("/login");
   };
 
-  // ✅ OPTIONAL: Dynamic page title (small UX upgrade)
+  // ✅ Dynamic page title
   const getTitle = () => {
     if (location.pathname.includes("/reports")) return "Reports";
     if (location.pathname.includes("/students")) return "Students";
     if (location.pathname.includes("/classes")) return "Classes";
     if (location.pathname.includes("/attendance")) return "Attendance";
+    if (location.pathname.includes("/fees")) return "Fees";
+    if (location.pathname.includes("/sponsorship")) return "Sponsorship";
+    if (location.pathname.includes("/discipline")) return "Discipline";
     return "Admin Dashboard";
   };
+
+  // ✅ Active link helper (🔥 NEW)
+  const isActive = (path) => location.pathname === path;
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
@@ -45,17 +51,21 @@ export default function AdminLayout() {
 
       {/* MAIN CONTENT */}
       <div className="flex-1 flex flex-col">
-        {/* 🔥 TOP BLUE BAR */}
+        {/* 🔥 TOP BAR */}
         <div className="h-14 bg-blue-600 text-white flex items-center justify-between px-6 shadow">
           <div className="font-semibold text-sm tracking-wide">
             Grain of Rice Academy
           </div>
 
-          {/* ✅ NAVIGATION LINKS (UPDATED) */}
+          {/* 🔥 NAVIGATION LINKS (FIXED + PRIORITIZED) */}
           <div className="hidden md:flex items-center gap-6 text-sm">
+
+            {/* ✅ MAIN ENTRY */}
             <span
               onClick={() => navigate("/dashboard/admin")}
-              className="hover:underline cursor-pointer"
+              className={`cursor-pointer hover:underline ${
+                isActive("/dashboard/admin") ? "font-bold underline" : ""
+              }`}
             >
               Dashboard
             </span>
@@ -81,16 +91,37 @@ export default function AdminLayout() {
               Attendance
             </span>
 
-            {/* ✅ NEW: REPORTS LINK */}
             <span
               onClick={() => navigate("/dashboard/admin/reports")}
               className="hover:underline cursor-pointer"
             >
               Reports
             </span>
+
+            {/* MODULES */}
+            <span
+              onClick={() => navigate("/dashboard/admin/fees")}
+              className="hover:underline cursor-pointer"
+            >
+              Fees
+            </span>
+
+            <span
+              onClick={() => navigate("/dashboard/admin/sponsorship")}
+              className="hover:underline cursor-pointer"
+            >
+              Sponsorship
+            </span>
+
+            <span
+              onClick={() => navigate("/dashboard/admin/discipline")}
+              className="hover:underline cursor-pointer"
+            >
+              Discipline
+            </span>
           </div>
 
-          {/* ✅ LOGOUT BUTTON */}
+          {/* LOGOUT */}
           <button
             onClick={handleLogout}
             className="bg-white text-blue-600 px-3 py-1 rounded text-sm font-medium hover:bg-gray-100"
@@ -101,7 +132,7 @@ export default function AdminLayout() {
 
         {/* TOPBAR */}
         <div className="flex items-center justify-between px-6 bg-white border-b h-14 shadow-sm">
-          <Topbar title={getTitle()} /> {/* ✅ dynamic title */}
+          <Topbar title={getTitle()} />
           <NotificationBell />
         </div>
 

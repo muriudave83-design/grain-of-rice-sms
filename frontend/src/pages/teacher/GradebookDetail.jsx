@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
+import BackButton from "../../components/BackButton";
 
 // ✅ NEW IMPORT (Drag & Drop)
 import {
@@ -13,69 +14,81 @@ import {
 import Papa from "papaparse";
 import { rankStudents } from "../../utils/ranking";
 
-
 export default function GradebookDetail() {
+  console.log("🔥 REAL GRADEBOOK DETAIL FILE");
+
   const { id } = useParams();
-  const classId = new URLSearchParams(window.location.search).get("classId");
+  const navigate = useNavigate();
+  const classId = id;
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // ❌ OLD (will be removed from UI but kept temporarily safe)
   const [newAssignment, setNewAssignment] = useState("");
-  const [newType, setNewType] = useState("HOMEWORK");
+
+  // 🔥 NEW MODAL STATE
+  const [showModal, setShowModal] = useState(false);
+
+  const [form, setForm] = useState({
+    title: "",
+    type: "ASSIGNMENT",
+    maxPoints: 100,
+    dateAssigned: "",
+    dueDate: "",
+  });
+
   const [localScores, setLocalScores] = useState({});
   const [saving, setSaving] = useState(false);
 
   const [contextMenu, setContextMenu] = useState(null);
-  // 🧱 NEW — TERMS
-const [terms, setTerms] = useState([]);
-const [selectedTerm, setSelectedTerm] = useState(null);
 
-const fetchData = async (termId) => {
-  try {
-    const res = await apiClient.get(
-      `/teacher/gradebook/${id}?termId=${termId}`
-    );
-    setData(res.data);
-  } catch (err) {
-    console.error("Failed to load gradebook:", err);
-    setError("Failed to load gradebook");
-  } finally {
-    setLoading(false);
-  }
-};
+  // 🧱 TERMS
+  const [terms, setTerms] = useState([]);
+  const [selectedTerm, setSelectedTerm] = useState(null);
 
-// 🧱 LOAD TERMS
-        useEffect(() => {
-          async function loadTerms() {
-            try {
-              const res = await apiClient.get(`/teacher/terms/${classId}`);
+  const fetchData = async (termId) => {
+    try {
+      const res = await apiClient.get(
+        `/teacher/gradebook/${id}?termId=${termId}`
+      );
+      setData(res.data);
+    } catch (err) {
+      console.error("Failed to load gradebook:", err);
+      setError("Failed to load gradebook");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-              setTerms(res.data);
+  // 🧱 LOAD TERMS
+  useEffect(() => {
+    async function loadTerms() {
+      try {
+        const res = await apiClient.get(`/teacher/terms/${classId}`);
 
-              if (res.data.length > 0) {
-                setSelectedTerm(res.data[0].id);
-              }
-            } catch (err) {
-              console.error("Failed to load terms", err);
-            }
-          }
+        setTerms(res.data);
 
-          if (classId) {
-            loadTerms();
-          }
-        }, [classId]);
+        if (res.data.length > 0) {
+          setSelectedTerm(res.data[0].id);
+        }
+      } catch (err) {
+        console.error("Failed to load terms", err);
+      }
+    }
 
+    if (classId) {
+      loadTerms();
+    }
+  }, [classId]);
 
-    // 🧱 FETCH GRADEBOOK WHEN TERM CHANGES
-    useEffect(() => {
-      if (!selectedTerm) return;
-
-      fetchData(selectedTerm);
-    }, [id, selectedTerm]);
-
-  const handleRightClick = (e, assignment) => {
+  // 🧱 FETCH GRADEBOOK
+  useEffect(() => {
+    if (!selectedTerm) return;
+    fetchData(selectedTerm);
+  }, [id, selectedTerm]);
+    const handleRightClick = (e, assignment) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -89,30 +102,35 @@ const fetchData = async (termId) => {
   const students = data?.class?.students || [];
   const assignments = data?.assignments || [];
 
-  // ✅ DRAG HANDLER
-  const handleDragEnd = async (result) => {
-    if (!result.destination) return;
+// ✅ DRAG HANDLER
+const handleDragEnd = async (result) => {
+  if (!result.destination) return;
 
-    const items = Array.from(assignments);
-    const [moved] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, moved);
+  const items = Array.from(assignments);
+  const [moved] = items.splice(result.source.index, 1);
+  items.splice(result.destination.index, 0, moved);
 
-    setData((prev) => ({
-      ...prev,
-      assignments: items,
-    }));
+  try {
+    await apiClient.put("/teacher/assignment/reorder", {
+      assignments: items.map((a, index) => ({
+        id: a.id,
+        position: index,
+      })),
+    });
 
-    try {
-      await apiClient.put("/teacher/assignment/reorder", {
-        assignments: items.map((a, index) => ({
-          id: a.id,
-          position: index,
-        })),
-      });
-    } catch (err) {
-      console.error("Reorder failed", err);
-    }
-  };
+    // ✅ Only update state AFTER successful API call
+    setData((prev) => {
+      if (!prev) return prev;
+
+      return {
+        ...prev,
+        assignments: items,
+      };
+    });
+  } catch (err) {
+    console.error("Reorder failed", err);
+  }
+};
 
   // ✅ CATEGORY AVERAGES
   const getCategoryAverages = (student) => {
@@ -131,7 +149,10 @@ const fetchData = async (termId) => {
         categories[type] = { total: 0, count: 0 };
       }
 
-      categories[type].total += scoreObj.score;
+      const maxPoints = a.maxPoints || 100;
+      const percentage = (scoreObj.score / maxPoints) * 100;
+
+      categories[type].total += percentage;
       categories[type].count += 1;
     });
 
@@ -145,33 +166,55 @@ const fetchData = async (termId) => {
     return result;
   };
 
-  // ✅ CATEGORY WEIGHTS
-  const getCategoryWeights = () => {
-    const weights = data?.categoryWeights;
+// ✅ CATEGORY WEIGHTS
+const getCategoryWeights = () => {
+  const weights = data?.categoryWeights;
 
-    if (!weights || weights.length === 0) {
-      const uniqueTypes = [
-        ...new Set(assignments.map((a) => a.type || "HOMEWORK")),
-      ];
-      const equal = 1 / (uniqueTypes.length || 1);
+  // 🔥 No weights → fallback to equal distribution
+  if (!weights || weights.length === 0) {
+    const uniqueTypes = [
+      ...new Set(assignments.map((a) => a.type || "HOMEWORK")),
+    ];
 
-      return uniqueTypes.map((type) => ({ type, weight: equal }));
-    }
+    const equal = uniqueTypes.length > 0 ? 1 / uniqueTypes.length : 1;
 
-    const totalWeight = weights.reduce((sum, w) => sum + w.weight, 0);
+    return uniqueTypes.map((type) => ({ type, weight: equal }));
+  }
 
-    if (Math.abs(totalWeight - 1) > 0.01) {
-      console.warn("⚠️ Category weights do not sum to 1. Auto-normalizing...");
+  const totalWeight = weights.reduce(
+    (sum, w) => sum + (Number(w.weight) || 0),
+    0
+  );
 
-      return weights.map((w) => ({
-        ...w,
-        weight: w.weight / totalWeight,
-      }));
-    }
+  // 🔥 Prevent divide-by-zero + normalize if needed
+  if (totalWeight <= 0) {
+    console.warn("⚠️ Invalid category weights. Falling back to equal weights.");
 
-    return weights;
-  };
-    // ✅ FINAL GRADE CORE
+    const uniqueTypes = [
+      ...new Set(assignments.map((a) => a.type || "HOMEWORK")),
+    ];
+
+    const equal = uniqueTypes.length > 0 ? 1 / uniqueTypes.length : 1;
+
+    return uniqueTypes.map((type) => ({ type, weight: equal }));
+  }
+
+  if (Math.abs(totalWeight - 1) > 0.01) {
+    console.warn("⚠️ Category weights do not sum to 1. Auto-normalizing...");
+
+    return weights.map((w) => ({
+      ...w,
+      weight: (Number(w.weight) || 0) / totalWeight,
+    }));
+  }
+
+  return weights.map((w) => ({
+    ...w,
+    weight: Number(w.weight) || 0,
+  }));
+};
+
+  // ✅ FINAL GRADE
   const calculateFinalGrade = (categoryAverages, weights) => {
     if (!categoryAverages || !weights) return 0;
 
@@ -198,7 +241,40 @@ const fetchData = async (termId) => {
     return calculateFinalGrade(categoryAverages, weights);
   };
 
-  const getStudentTotal = (student) => {
+  // 🔥 FIXED ADD ASSIGNMENT (MODAL VERSION)
+  const handleAddAssignment = async () => {
+    if (!form.title) return;
+
+    try {
+      const res = await apiClient.post("/teacher/assignment", {
+        title: form.title,
+        teacherSubjectId: id,
+        type: form.type,
+        maxPoints: Number(form.maxPoints),
+        dateAssigned: form.dateAssigned,
+        dueDate: form.dueDate,
+        termId: selectedTerm,
+      });
+
+      setData((prev) => ({
+        ...prev,
+        assignments: [...prev.assignments, { ...res.data, scores: [] }],
+      }));
+
+      setShowModal(false);
+
+      setForm({
+        title: "",
+        type: "ASSIGNMENT",
+        maxPoints: 100,
+        dateAssigned: "",
+        dueDate: "",
+      });
+    } catch (err) {
+      console.error("Failed to create assignment", err);
+    }
+  };
+    const getStudentTotal = (student) => {
     if (!assignments) return 0;
 
     let total = 0;
@@ -255,16 +331,14 @@ const fetchData = async (termId) => {
     return "text-red-600";
   };
 
+  // ✅ RANKING
+  const { ranked: rankedStudents, positionMap } = useMemo(() => {
+    return rankStudents(students || [], getFinalGrade);
+  }, [students, assignments, data?.categoryWeights]);
 
-  // ✅ RANKING (FIXED — PRODUCTION SAFE)
+  const getPosition = (studentId) => positionMap[studentId] || "-";
 
-const { ranked: rankedStudents, positionMap } = useMemo(() => {
-  return rankStudents(students || [], getFinalGrade);
-}, [students, assignments, data?.categoryWeights]);
-
-const getPosition = (studentId) => positionMap[studentId] || "-";
-
-  // 🧱 NEW — LOCK TOGGLE HANDLER
+  // 🔒 LOCK TOGGLE
   const handleToggleLock = async (assignment) => {
     try {
       const res = await apiClient.put(
@@ -282,29 +356,6 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
       setContextMenu(null);
     } catch (err) {
       console.error("Lock toggle failed", err);
-    }
-  };
-
-  const handleAddAssignment = async () => {
-    if (!newAssignment) return;
-
-    try {
-          const res = await apiClient.post("/teacher/assignment", {
-            title: newAssignment,
-            teacherSubjectId: id,
-            type: newType,
-            termId: selectedTerm,
-          });
-
-          setData((prev) => ({
-            ...prev,
-            assignments: [...prev.assignments, { ...res.data, scores: [] }],
-          }));
-
-      setNewAssignment("");
-      setNewType("HOMEWORK");
-    } catch (err) {
-      console.error("Failed to create assignment", err);
     }
   };
 
@@ -345,29 +396,34 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
       console.error("Rename failed", err);
     }
   };
-    const handleWeightChange = async (id, weight) => {
-    const weightNumber = Number(weight);
-    if (isNaN(weightNumber)) return;
 
-    try {
-      await apiClient.put(`/teacher/assignment/${id}`, {
-        weight: weightNumber,
-      });
+const handleWeightChange = async (id, weight) => {
+  const weightNumber = Number(weight);
+  if (isNaN(weightNumber)) return;
 
-      setData((prev) => {
-        const updated = { ...prev };
-        const assignment = updated.assignments.find(
-          (a) => a.id === id
-        );
-        if (assignment) assignment.weight = weightNumber;
-        return updated;
-      });
-    } catch (err) {
-      console.error("Weight update failed", err);
-    }
-  };
+  try {
+    await apiClient.put(`/teacher/assignment/${id}`, {
+      weight: weightNumber,
+    });
 
-  // 🧱 CSV EXPORT
+    setData((prev) => {
+      if (!prev) return prev;
+
+      return {
+        ...prev,
+        assignments: prev.assignments.map((a) =>
+          a.id === id
+            ? { ...a, weight: weightNumber }
+            : a
+        ),
+      };
+    });
+  } catch (err) {
+    console.error("Weight update failed", err);
+  }
+};
+
+    // 🧱 CSV EXPORT
   const handleExportCSV = () => {
     if (!data) return;
 
@@ -410,7 +466,7 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
     link.click();
   };
 
-  // 🧱 CSV IMPORT (BULK GRADING 🚀)
+  // 🧱 CSV IMPORT
   const handleImportCSV = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -436,7 +492,8 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
           const studentName = row[0]?.trim();
 
           const student = students.find(
-            (s) => `${s.firstName} ${s.lastName}`.trim() === studentName
+            (s) =>
+              `${s.firstName} ${s.lastName}`.trim() === studentName
           );
 
           if (!student) return;
@@ -451,7 +508,7 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
 
             const score = Number(value);
 
-            if (isNaN(score) || score < 0 || score > 100) return;
+            if (isNaN(score) || score < 0) return;
 
             updates.push({
               studentId: student.id,
@@ -473,7 +530,7 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
     });
   };
 
-  // 🧾 GENERATE TRANSCRIPTS (✅ FIXED LOCATION)
+  // 🧾 GENERATE TRANSCRIPTS
   const handleGenerateTranscript = async () => {
     if (!data?.class?.id) {
       alert("Class not loaded");
@@ -493,71 +550,96 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
     }
   };
 
-  const handleScoreChange = async (
-    studentId,
-    assignmentId,
-    value,
-    isLocked
-  ) => {
-    if (isLocked) return;
+  // 🧠 SCORE SAVE
+// 🧠 SCORE SAVE
+const handleScoreChange = async (
+  studentId,
+  assignmentId,
+  value,
+  isLocked
+) => {
+  if (isLocked) return;
+  if (value === "") return;
 
-    if (value === "") return;
+  const score = Number(value);
+  const assignment = assignments.find((a) => a.id === assignmentId);
 
-    const score = Number(value);
-    if (isNaN(score) || score < 0 || score > 100) return;
+  if (!assignment) return;
+  if (isNaN(score) || score < 0) return;
 
-    try {
-      setSaving(true);
+  // 🔥 VALIDATION
+  if (score > (assignment.maxPoints || 100)) {
+    alert("Score cannot exceed max points");
+    return;
+  }
 
-      await apiClient.post("/teacher/score", {
-        studentId,
-        assignmentId,
-        score,
-      });
+  try {
+    setSaving(true);
 
-      setData((prev) => {
-        const updated = { ...prev };
-        const assignment = updated.assignments.find(
-          (a) => a.id === assignmentId
-        );
+    await apiClient.post("/teacher/score", {
+      studentId,
+      assignmentId,
+      score,
+    });
 
-        if (!assignment) return prev;
+    setData((prev) => {
+      if (!prev) return prev;
 
-        const existing = assignment.scores.find(
-          (s) => String(s.studentId) === String(studentId)
-        );
+      return {
+        ...prev,
+        assignments: prev.assignments.map((a) => {
+          if (a.id !== assignmentId) return a;
 
-        if (existing) {
-          existing.score = score;
-        } else {
-          assignment.scores.push({ studentId, score });
-        }
+          const existing = a.scores?.find(
+            (s) => String(s.studentId) === String(studentId)
+          );
 
-        return updated;
-      });
+          let updatedScores;
 
-      setLocalScores((prev) => {
-        const copy = { ...prev };
-        delete copy[`${studentId}-${assignmentId}`];
-        return copy;
-      });
+          if (existing) {
+            updatedScores = a.scores.map((s) =>
+              String(s.studentId) === String(studentId)
+                ? { ...s, score }
+                : s
+            );
+          } else {
+            updatedScores = [...(a.scores || []), { studentId, score }];
+          }
 
-      setSaving(false);
-    } catch (err) {
-      console.error("Failed to save score", err);
-      setSaving(false);
-    }
-  };
+          return {
+            ...a,
+            scores: updatedScores,
+          };
+        }),
+      };
+    });
 
-  if (loading) return <div className="p-6">Loading...</div>;
-  if (error) return <div className="p-6 text-red-500">{error}</div>;
-  if (!data) return <div className="p-6">No data found</div>;
+    setLocalScores((prev) => {
+      const copy = { ...prev };
+      delete copy[`${studentId}-${assignmentId}`];
+      return copy;
+    });
+  } catch (err) {
+    console.error("Failed to save score", err);
+  } finally {
+    setSaving(false);
+  }
+};
 
-  return (
-    <div className="p-6" onClick={() => setContextMenu(null)}>
-      <h1 className="text-2xl font-bold mb-4">
-        {data.class?.name} - {data.subject?.name}
-      </h1>
+console.log("RENDER STATE:", { loading, error, data });
+
+if (loading) return <div className="p-6">Loading...</div>;
+if (error) return <div className="p-6 text-red-500">{error}</div>;
+if (!data) return <div className="p-6">No data found</div>;
+
+return (
+  <div className="p-6" onClick={() => setContextMenu(null)}>
+
+    <BackButton />
+
+    <h1 className="text-2xl font-bold mb-4">
+      {data.class?.name} - {data.subject?.name}
+    </h1>
 
       {/* 🧱 TERM SELECTOR */}
       <div className="mb-4">
@@ -600,45 +682,22 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
         </button>
       </div>
 
-      {/* EXISTING CONTROLS */}
-      <div className="mb-4 flex gap-2">
-        <input
-          type="text"
-          placeholder="New assignment"
-          value={newAssignment}
-          onChange={(e) => setNewAssignment(e.target.value)}
-          className="border p-2"
-        />
-
-        <select
-          value={newType}
-          onChange={(e) => setNewType(e.target.value)}
-          className="border p-2"
-        >
-          <option value="HOMEWORK">Homework</option>
-          <option value="QUIZ">Quiz</option>
-          <option value="TEST">Test</option>
-          <option value="PROJECT">Project</option>
-          <option value="EXAM">Exam</option>
-        </select>
-
+      {/* 🔥 NEW BUTTON (REPLACES OLD INPUT BAR) */}
+      <div className="mb-4">
         <button
-          onClick={handleAddAssignment}
-          className="bg-blue-500 text-white px-4"
+          onClick={() => setShowModal(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded"
         >
-          Add
+          + New Assignment
         </button>
       </div>
 
-      {/* TABLE */}
+      {/* TABLE (UNCHANGED) */}
       <div>
         <table className="min-w-full border border-gray-300">
           <thead>
             <DragDropContext onDragEnd={handleDragEnd}>
-              <Droppable
-                droppableId="assignments"
-                direction="horizontal"
-              >
+              <Droppable droppableId="assignments" direction="horizontal">
                 {(provided) => (
                   <tr
                     ref={provided.innerRef}
@@ -668,7 +727,6 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
                           >
                             <div className="flex flex-col items-center gap-1">
 
-                              {/* TOP BAR */}
                               <div className="flex justify-between items-center w-full">
                                 <span
                                   {...provided.dragHandleProps}
@@ -688,7 +746,6 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
                                 </button>
                               </div>
 
-                              {/* TITLE */}
                               <input
                                 id={`title-${a.id}`}
                                 defaultValue={a.title}
@@ -701,17 +758,14 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
                                 className="border p-1 w-24 text-sm text-center"
                               />
 
-                              {/* TYPE */}
                               <span className="text-xs text-gray-500">
                                 {a.type || "HOMEWORK"}
                               </span>
 
-                              {/* 🔒 LOCK */}
                               <span className="text-xs">
                                 {a.isLocked ? "🔒" : ""}
                               </span>
 
-                              {/* WEIGHT */}
                               <input
                                 type="number"
                                 value={a.weight || 1}
@@ -741,7 +795,8 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
               </Droppable>
             </DragDropContext>
           </thead>
-                    <tbody>
+
+          <tbody>
             {rankedStudents.map((student) => {
               const total = getStudentTotal(student);
               const avg = getStudentAverage(student);
@@ -756,7 +811,8 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
                   </td>
 
                   {assignments.map((a) => {
-                    const key = `${student.id}-${a.id}`;
+                    const sid = student.id || student.studentId;
+                    const key = `${sid}-${a.id}`;
                     const scoreObj = a.scores?.find(
                       (s) =>
                         String(s.studentId) === String(student.id)
@@ -796,6 +852,11 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
                               : ""
                           }`}
                         />
+
+                        {/* 🔥 ADD THIS DIRECTLY UNDER INPUT */}
+                        <div className="text-xs text-gray-500">
+                          / {a.maxPoints || 100}
+                        </div>
                       </td>
                     );
                   })}
@@ -826,7 +887,94 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
         </table>
       </div>
 
-      {/* CONTEXT MENU */}
+      {/* 🔥 MODAL */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded w-96 space-y-3">
+
+            <h2 className="text-lg font-semibold">New Assignment</h2>
+
+            <input
+              placeholder="Title"
+              value={form.title}
+              onChange={(e) =>
+                setForm({ ...form, title: e.target.value })
+              }
+              className="w-full border p-2"
+            />
+
+            <select
+              value={form.type}
+              onChange={(e) =>
+                setForm({ ...form, type: e.target.value })
+              }
+              className="w-full border p-2"
+            >
+              <option value="ASSIGNMENT">Assignment</option>
+              <option value="TEST">Test</option>
+              <option value="PROJECT">Project</option>
+            </select>
+
+            <input
+              type="number"
+              placeholder="Max Points"
+              value={form.maxPoints}
+              onChange={(e) =>
+                setForm({ ...form, maxPoints: e.target.value })
+              }
+              className="w-full border p-2"
+            />
+
+            <div>
+              <label className="block text-sm font-semibold">
+                Date Assigned
+              </label>
+              <input
+                type="date"
+                title="Select assigned date"
+                value={form.dateAssigned}
+                onChange={(e) =>
+                  setForm({ ...form, dateAssigned: e.target.value })
+                }
+                className="w-full border p-2"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold">
+                Due Date
+              </label>
+              <input
+                type="date"
+                title="Select due date"
+                value={form.dueDate}
+                onChange={(e) =>
+                  setForm({ ...form, dueDate: e.target.value })
+                }
+                className="w-full border p-2"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-3 py-1 border"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleAddAssignment}
+                className="bg-green-600 text-white px-3 py-1"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONTEXT MENU (UNCHANGED) */}
       {contextMenu && (
         <div
           style={{
@@ -837,7 +985,6 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
           }}
         >
           <div className="bg-white shadow-lg rounded-md border w-40 py-1">
-            {/* RENAME */}
             <div
               onClick={() => {
                 const input = document.getElementById(
@@ -851,7 +998,6 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
               ✏️ Rename
             </div>
 
-            {/* LOCK / UNLOCK */}
             <div
               onClick={() =>
                 handleToggleLock(contextMenu.assignment)
@@ -863,7 +1009,6 @@ const getPosition = (studentId) => positionMap[studentId] || "-";
                 : "🔒 Lock"}
             </div>
 
-            {/* DELETE */}
             <div
               onClick={() =>
                 handleDeleteAssignment(

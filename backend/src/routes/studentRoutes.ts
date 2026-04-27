@@ -198,7 +198,7 @@ router.get(
           enrollments: { include: { subject: true } },
           grades: true,
           invoices: true,
-          disciplines: true,
+          discipline: true,
         },
       });
 

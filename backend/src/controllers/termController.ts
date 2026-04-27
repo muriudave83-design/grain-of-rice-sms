@@ -30,3 +30,20 @@ export async function createTerm(req: Request, res: Response) {
 
   res.status(201).json(term);
 }
+
+export const toggleTermLock = async (req: Request, res: Response) => {
+  const id = Number(req.params.id);
+
+  const term = await prisma.term.findUnique({
+    where: { id },
+  });
+
+  const updated = await prisma.term.update({
+    where: { id },
+    data: {
+      isLocked: !term?.isLocked,
+    },
+  });
+
+  res.json(updated);
+};

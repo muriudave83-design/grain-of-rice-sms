@@ -3,21 +3,19 @@ import { useNavigate } from "react-router-dom";
 import api from "../../../services/apiClient";
 
 export default function TeacherAttendance() {
-  console.log("🚀 Attendance page mounted");
-
   const [classes, setClasses] = useState([]);
   const [sessions, setSessions] = useState({});
   const [loadingClassId, setLoadingClassId] = useState(null);
 
   const navigate = useNavigate();
 
-  // ✅ Fetch classes
+  // ✅ Fetch classes (runs once)
   useEffect(() => {
-    api.get("/teacher/classes")
-      .then(res => {
+    async function fetchClasses() {
+      try {
+        const res = await api.get("/teacher/classes");
         const data = res.data || [];
 
-        // Sort by last used class (localStorage)
         const lastUsed = localStorage.getItem("lastAttendanceClassId");
 
         const sorted = [...data].sort((a, b) => {
@@ -27,27 +25,41 @@ export default function TeacherAttendance() {
         });
 
         setClasses(sorted);
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error("CLASSES FETCH ERROR:", err);
-      });
+      }
+    }
+
+    fetchClasses();
   }, []);
 
-  // ✅ Check today's sessions for all classes
+  // ✅ Fetch today's sessions (clean + fast + correct)
   useEffect(() => {
     async function fetchSessions() {
       const map = {};
 
-      for (let c of classes) {
-        try {
-          const res = await api.get(`/attendance/sessions/today/${c.id}`);
-          if (res.data) {
-            map[c.id] = res.data;
+      await Promise.all(
+        classes.map(async (c) => {
+          try {
+            const res = await api.get(
+              `/attendance/sessions/today/${c.id}`
+            );
+
+            if (res.data) {
+              map[c.id] = res.data;
+            }
+          } catch (err) {
+            if (err.response?.status === 404) {
+              // ✅ NORMAL: no session yet → do nothing
+            } else {
+              console.error(
+                `Session fetch error for class ${c.id}:`,
+                err
+              );
+            }
           }
-        } catch (err) {
-          // 404 = no session → ignore
-        }
-      }
+        })
+      );
 
       setSessions(map);
     }
@@ -57,9 +69,52 @@ export default function TeacherAttendance() {
     }
   }, [classes]);
 
+  // ✅ START / RESUME ATTENDANCE
+  async function startAttendance(classId) {
+    setLoadingClassId(classId);
+
+    try {
+      // STEP 1: Check existing session
+      try {
+        const existing = await api.get(
+          `/attendance/sessions/today/${classId}`
+        );
+
+        if (existing.data) {
+          localStorage.setItem("lastAttendanceClassId", classId);
+
+          navigate(
+            `/teacher/attendance/session/${existing.data.id}`
+          );
+          return;
+        }
+      } catch (err) {
+        if (err.response?.status !== 404) {
+          console.error("Session check error:", err);
+        }
+        // ✅ 404 = continue to create
+      }
+
+      // STEP 2: Create session
+      const res = await api.post("/attendance/sessions", {
+        classId,
+      });
+
+      const sessionId = res.data.id;
+
+      localStorage.setItem("lastAttendanceClassId", classId);
+
+      navigate(`/teacher/attendance/session/${sessionId}`);
+    } catch (err) {
+      console.error("Start attendance error:", err);
+      alert("Could not start attendance");
+    } finally {
+      setLoadingClassId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
-
       <h2 className="text-xl font-semibold">Attendance</h2>
 
       <table className="w-full border border-gray-200">
@@ -67,7 +122,7 @@ export default function TeacherAttendance() {
           <tr>
             <th className="p-2 border text-left">Class</th>
             <th className="p-2 border text-left">Today</th>
-            <th className="p-2 border">Action</th>
+            <th className="p-2 border text-center">Action</th>
           </tr>
         </thead>
 
@@ -82,15 +137,19 @@ export default function TeacherAttendance() {
                   <div className="font-medium">{c.name}</div>
                 </td>
 
-                <td className="p-2 border text-sm text-gray-600">
+                <td className="p-2 border text-sm">
                   {session ? (
-                    <span className="text-green-600">Session exists (Today)</span>
+                    <span className="text-green-600">
+                      Session exists (Today)
+                    </span>
                   ) : (
-                    <span className="text-gray-400">No session yet</span>
+                    <span className="text-gray-400">
+                      No attendance session started today
+                    </span>
                   )}
                 </td>
 
-                <td className="p-2 border">
+                <td className="p-2 border text-center">
                   <button
                     disabled={isLoading}
                     onClick={() => startAttendance(c.id)}
@@ -114,44 +173,6 @@ export default function TeacherAttendance() {
           })}
         </tbody>
       </table>
-
     </div>
   );
-
-  // ✅ START / RESUME ATTENDANCE
-  async function startAttendance(classId) {
-    setLoadingClassId(classId);
-
-    try {
-      // STEP 1: Check existing session
-      const existing = await api.get(`/attendance/sessions/today/${classId}`);
-
-      if (existing.data) {
-        localStorage.setItem("lastAttendanceClassId", classId);
-
-        navigate(`/teacher/attendance/session/${existing.data.id}`);
-        return;
-      }
-
-    } catch (err) {
-      // 404 → continue
-    }
-
-    try {
-      // STEP 2: Create session
-      const res = await api.post("/attendance/sessions", { classId });
-
-      const sessionId = res.data.id;
-
-      localStorage.setItem("lastAttendanceClassId", classId);
-
-      navigate(`/teacher/attendance/session/${sessionId}`);
-
-    } catch (err) {
-      console.error("Start attendance error:", err);
-      alert("Could not start attendance");
-    } finally {
-      setLoadingClassId(null);
-    }
-  }
 }

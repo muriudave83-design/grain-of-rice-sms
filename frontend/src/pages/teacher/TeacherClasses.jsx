@@ -30,8 +30,9 @@ export default function TeacherClasses() {
       }}
     >
       <h2 style={{ marginBottom: "10px" }}>My Classes</h2>
+
       <p style={{ color: "#9ca3af", marginBottom: "20px" }}>
-        Select a class & subject to manage assignments and grades
+        Select an action below
       </p>
 
       {subjects.length === 0 ? (
@@ -47,12 +48,10 @@ export default function TeacherClasses() {
           {subjects.map((ts) => (
             <div
               key={ts.id}
-              onClick={() => navigate(`/teacher/gradebook/${ts.id}`)}
               style={{
                 padding: "20px",
                 borderRadius: "12px",
                 background: "#111827",
-                cursor: "pointer",
                 border: "1px solid #1f2937",
                 transition: "0.2s",
               }}
@@ -63,6 +62,7 @@ export default function TeacherClasses() {
                 (e.currentTarget.style.background = "#111827")
               }
             >
+              {/* CLASS INFO */}
               <h3 style={{ margin: 0 }}>
                 {ts.class?.name || "Class"}
               </h3>
@@ -71,15 +71,53 @@ export default function TeacherClasses() {
                 {ts.subject?.name || "Subject"}
               </p>
 
-              <p
+              {/* DIVIDER */}
+              <hr
                 style={{
-                  marginTop: "10px",
-                  fontSize: "12px",
-                  color: "#6b7280",
+                  margin: "10px 0",
+                  border: "0.5px solid #1f2937",
                 }}
-              >
-                Click to manage assignments & grades
-              </p>
+              />
+
+              {/* ACTIONS */}
+              <div style={{ marginTop: "10px" }}>
+                {/* PRIMARY */}
+                <button
+                  onClick={() =>
+                    navigate(`/teacher/gradebook/${ts.id}`)
+                  }
+                  style={{
+                    background: "#1976d2",
+                    color: "white",
+                    padding: "8px 12px",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Open Gradebook
+                </button>
+
+                {/* SECONDARY */}
+                <button
+                  onClick={() =>
+                    navigate(
+                      `/teacher/final-grades/${ts.classId}?termId=1`
+                    )
+                  }
+                  style={{
+                    marginLeft: "10px",
+                    background: "#e5e7eb",
+                    color: "#111827",
+                    padding: "8px 12px",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Final Grades
+                </button>
+              </div>
             </div>
           ))}
         </div>

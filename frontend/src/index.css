@@ -18,18 +18,62 @@
   animation: fadeIn 0.15s ease-out;
 }
 
-/* 🧾 PRINT STYLES — REPORT CARDS */
+/* 🧾 PRINT STYLES — FIXED (GLOBAL, CORRECT) */
 @media print {
+
+  html, body {
+    background: white !important;
+    color: black !important;
+  }
+
+  * {
+    background: white !important;
+    color: black !important;
+    box-shadow: none !important;
+  }
+
+  /* ❌ Hide EVERYTHING by default */
   body * {
     visibility: hidden;
   }
 
-  .report-card,
-  .report-card * {
+  /* ✅ Only show report content */
+  .print-area, .print-area * {
     visibility: visible;
   }
 
-  .report-card {
+  /* ✅ Position printable area correctly */
+  .print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+
+  /* ✅ FORCE HARD PAGE BREAKS (FIXED) */
+  .print-card {
     page-break-after: always;
+    break-after: page;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    display: block;
+    padding: 20px;
+    border: none;
+  }
+
+  /* ✅ Hide non-print UI */
+  button, select, input {
+    display: none !important;
+  }
+
+  textarea {
+    border: none !important;
+    resize: none !important;
+    color: black !important;
+  }
+
+  /* ✅ Optional: hide top header */
+  .print-hidden {
+    display: none !important;
   }
 }
