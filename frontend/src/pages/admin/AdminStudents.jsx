@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import apiClient from "../../services/apiClient";
+import Papa from "papaparse";
 
 export default function AdminStudents() {
   const [students, setStudents] = useState([]);
@@ -20,6 +21,9 @@ export default function AdminStudents() {
   });
 
   const [openClasses, setOpenClasses] = useState({});
+  const [expandedStudentId, setExpandedStudentId] = useState(null);
+
+  const [studentDetails, setStudentDetails] = useState({});
 
   const navigate = useNavigate();
 
@@ -47,7 +51,51 @@ export default function AdminStudents() {
     }
   }
 
-  // filtering
+    // ✅ FIXED CSV IMPORT HANDLER
+      const handleImportCSV = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+
+          complete: async (results) => {
+            try {
+              console.log("RAW PARSED:", results.data);
+
+              const cleaned = results.data
+                .map((row) => {
+                  if (!row.firstName || !row.admissionNo) return null;
+
+                  return {
+                    firstName: row.firstName.trim(),
+                    lastName: row.lastName?.trim() || "",
+                    admissionNo: row.admissionNo.toString().trim(),
+                    className: row.className?.trim() || "PP1",
+                    parentName: row.parentName?.trim() || "",
+                    userId: 1,
+                  };
+                })
+                .filter(Boolean);
+
+              console.log("CLEANED CSV:", cleaned);
+
+              const res = await apiClient.post("/students/bulk", cleaned);
+
+              console.log("IMPORT RESULT:", res.data);
+
+              alert(`Created: ${res.data.created}, Failed: ${res.data.failed}`);
+
+              fetchData();
+            } catch (err) {
+              console.error("IMPORT FAILED:", err);
+              alert("Import failed");
+            }
+          },
+        });
+      };
+
   const filteredStudents = students.filter((s) => {
     const query = search.toLowerCase();
 
@@ -60,7 +108,6 @@ export default function AdminStudents() {
     );
   });
 
-  // grouping
   const groupedStudents = filteredStudents.reduce((acc, student) => {
     const className =
       student.className ||
@@ -76,14 +123,36 @@ export default function AdminStudents() {
     return acc;
   }, {});
 
-  const toggleClass = (className) => {
-    setOpenClasses((prev) => ({
-      ...prev,
-      [className]: !prev[className],
-    }));
-  };
+const toggleClass = (className) => {
+  setOpenClasses((prev) => ({
+    ...prev,
+    [className]: !prev[className],
+  }));
+};
 
-  useEffect(() => {
+// ✅ FIXED TO FETCH DATA (STEP 2)
+const toggleExpand = async (id) => {
+    if (expandedStudentId === id) {
+      setExpandedStudentId(null);
+      return;
+    }
+
+    setExpandedStudentId(id);
+
+    if (!studentDetails[id]) {
+      try {
+        const res = await apiClient.get(`/admin/students/${id}/details`);
+
+        setStudentDetails((prev) => ({
+          ...prev,
+          [id]: res.data,
+        }));
+      } catch (err) {
+        console.error("Failed to load student details", err);
+      }
+    }
+  };
+    useEffect(() => {
     const initialState = {};
     Object.keys(groupedStudents).forEach((cls) => {
       initialState[cls] = true;
@@ -91,13 +160,12 @@ export default function AdminStudents() {
     setOpenClasses(initialState);
   }, [students]);
 
-  // ✅ EDIT (NOW PASSES PARENT CONTEXT)
   const handleEdit = (student) => {
     navigate(`/dashboard/admin/students/${student.id}/edit`, {
       state: {
         student,
-        parents, // 🔥 pass parents list to edit page
-        classes, // 🔥 pass classes too (prevents refetch bugs)
+        parents,
+        classes,
       },
     });
   };
@@ -113,7 +181,6 @@ export default function AdminStudents() {
 
     try {
       await apiClient.delete(`/admin/students/${student.id}`);
-
       setStudents((prev) => prev.filter((s) => s.id !== student.id));
     } catch (err) {
       console.error("Failed to delete student", err);
@@ -155,24 +222,33 @@ export default function AdminStudents() {
       fetchData();
     } catch (err) {
       console.error("CREATE STUDENT ERROR:", err);
-
-      alert(
-        err?.response?.data?.message ||
-          "Failed to create student"
-      );
+      alert(err?.response?.data?.message || "Failed to create student");
     }
   }
 
   return (
     <div className="space-y-6">
+
+      {/* 🔥 UPDATED HEADER WITH CSV IMPORT */}
       <div className="flex justify-between items-center">
         <h1 className="text-xl font-semibold">Students</h1>
-        <button
-          onClick={() => setShowForm(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded text-sm"
-        >
-          + Create Student
-        </button>
+
+        <div className="flex gap-2 items-center">
+          {/* ✅ CSV IMPORT */}
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleImportCSV}
+            className="text-sm"
+          />
+
+          <button
+            onClick={() => setShowForm(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded text-sm"
+          >
+            + Create Student
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -220,8 +296,7 @@ export default function AdminStudents() {
                     </span>
                   </div>
                 </div>
-
-                {openClasses[className] && (
+                                {openClasses[className] && (
                   <div className="bg-white border rounded-lg overflow-hidden mt-2">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-100 text-left">
@@ -235,62 +310,123 @@ export default function AdminStudents() {
 
                       <tbody>
                         {classStudents.map((s) => (
-                          <tr key={s.id} className="border-t">
-                            <td className="p-3">
-                              {s.firstName} {s.lastName}
-                            </td>
-                            <td className="p-3">
-                              {s.admissionNo}
-                            </td>
-                            <td className="p-3">
-                              {s.parentName ||
-                                s.parent?.name ||
-                                "—"}
-                            </td>
-                            <td className="p-3 flex gap-2">
-                              <button
-                                onClick={() => handleEdit(s)}
-                                className="px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
-                              >
-                                Edit
-                              </button>
+                          <React.Fragment key={s.id}>
+                            {/* MAIN ROW */}
+                            <tr className="border-t">
+                              <td className="p-3">
+                                {s.firstName} {s.lastName}
+                              </td>
 
-                              {/* VIEW REPORT */}
-                              <Link
-                                to={`/reports/student/${s.id}`}
-                                className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-                              >
-                                Report
-                              </Link>
+                              <td className="p-3">
+                                {s.admissionNo}
+                              </td>
 
-                              {/* 🔥 VIEW PROFILE */}
-                              <Link
-                                to={`/dashboard/admin/students/${s.id}`}
-                                className="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
-                              >
-                                Profile
-                              </Link>
+                              <td className="p-3">
+                                {s.parentName ||
+                                  s.parent?.name ||
+                                  "—"}
+                              </td>
 
-                              <button
-                                onClick={() => handleDelete(s)}
-                                className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-                              >
-                                Delete
-                              </button>
-                            </td>
+                              <td className="p-3 flex gap-2">
+                                {/* VIEW */}
+                                <button
+                                  onClick={() => toggleExpand(s.id)}
+                                  className="px-2 py-1 text-xs bg-gray-700 text-white rounded"
+                                >
+                                  {expandedStudentId === s.id ? "Hide" : "View"}
+                                </button>
+
+                                <button
+                                  onClick={() => handleEdit(s)}
+                                  className="px-2 py-1 text-xs bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                                >
+                                  Edit
+                                </button>
+
+                                <Link
+                                  to={`/reports/student/${s.id}`}
+                                  className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+                                >
+                                  Report
+                                </Link>
+
+                                <Link
+                                  to={`/dashboard/admin/students/${s.id}`}
+                                  className="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700"
+                                >
+                                  Profile
+                                </Link>
+
+                                <button
+                                  onClick={() => handleDelete(s)}
+                                  className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                                >
+                                  Delete
+                                </button>
+                              </td>
                             </tr>
-                            ))}
-                            </tbody>
-                            </table>
-                            </div>
-                            )}
-                            </div>
-                            )
-                            )
-                            )}
-                            </div>
 
-      {showForm && (
+                            {/* EXPANDED */}
+                            {expandedStudentId === s.id && (
+                              <tr>
+                                <td colSpan="4">
+                                  <div className="bg-gray-900 text-white p-4 rounded-md mt-2">
+
+                                    {/* ATTENDANCE */}
+                                    <div className="mb-3">
+                                      <strong>Attendance</strong>
+                                      <div className="text-sm mt-1">
+                                        Present: {studentDetails[s.id]?.attendance?.present ?? "--"} |{" "}
+                                        Absent: {studentDetails[s.id]?.attendance?.absent ?? "--"}
+                                      </div>
+                                    </div>
+
+                                    {/* PARENT LOG */}
+                                    <div className="mb-3">
+                                      <strong>Parent Contact Log</strong>
+
+                                      <div className="text-sm opacity-70 mt-1">
+                                        {studentDetails[s.id]?.parentLogs?.length
+                                          ? studentDetails[s.id].parentLogs.map((log, i) => (
+                                              <div key={i}>{log.note}</div>
+                                            ))
+                                          : "No logs yet"}
+                                      </div>
+
+                                      <input
+                                        type="text"
+                                        placeholder="Add note..."
+                                        className="w-full mt-2 p-2 text-black rounded"
+                                      />
+                                    </div>
+
+                                    {/* HEALTH */}
+                                    <div>
+                                      <strong>Health Notes</strong>
+                                      <textarea
+                                        value={studentDetails[s.id]?.healthNotes || ""}
+                                        readOnly
+                                        placeholder="Allergies, medication, etc..."
+                                        className="w-full mt-2 p-2 text-black rounded"
+                                      />
+                                    </div>
+
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )
+          )
+        )}
+      </div>
+            {showForm && (
         <form
           onSubmit={submitForm}
           className="fixed inset-0 bg-black/30 flex items-center justify-center"
@@ -386,6 +522,7 @@ export default function AdminStudents() {
               >
                 Cancel
               </button>
+
               <button
                 type="submit"
                 className="px-3 py-1 bg-blue-600 text-white rounded"

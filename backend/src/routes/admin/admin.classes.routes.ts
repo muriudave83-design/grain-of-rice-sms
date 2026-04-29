@@ -7,7 +7,6 @@ const router = Router();
 
 /**
  * ✅ POST /api/admin/classes
- * Create a new class
  */
 router.post(
   "/classes",
@@ -40,6 +39,7 @@ router.post(
       return res.status(201).json(schoolClass);
     } catch (error) {
       console.error("Create class failed:", error);
+
       return res.status(500).json({
         message: "Failed to create class",
       });
@@ -49,22 +49,45 @@ router.post(
 
 /**
  * ✅ GET /api/admin/classes
- * Fetch all classes
+ * Supports archived toggle
  */
 router.get(
   "/classes",
   authenticate,
   requireRole(["ADMIN"]),
-  async (_req, res) => {
+  async (req, res) => {
     try {
+      const includeArchived =
+        req.query.includeArchived === "true";
+
       const classes = await prisma.class.findMany({
-        where: { isArchived: false }, // ✅ hide archived
-        orderBy: { createdAt: "asc" },
+        where: includeArchived
+          ? {}
+          : { isArchived: false },
+
+        orderBy: {
+          createdAt: "asc",
+        },
+
+        include: {
+          _count: {
+            select: {
+              students: true,
+            },
+          },
+        },
       });
 
-      return res.json(classes);
+      // ✅ Normalize response
+      const formatted = classes.map((cls) => ({
+        ...cls,
+        studentCount: cls._count.students,
+      }));
+
+      return res.json(formatted);
     } catch (error) {
       console.error("Fetch classes failed:", error);
+
       return res.status(500).json({
         message: "Failed to fetch classes",
       });
@@ -73,8 +96,57 @@ router.get(
 );
 
 /**
+ * ✏️ PUT /api/admin/classes/:id
+ */
+router.put(
+  "/classes/:id",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { name } = req.body;
+
+      if (isNaN(id)) {
+        return res.status(400).json({
+          message: "Invalid class ID",
+        });
+      }
+
+      if (!name || name.trim() === "") {
+        return res.status(400).json({
+          message: "Class name is required",
+        });
+      }
+
+      const existing = await prisma.class.findUnique({
+        where: { id },
+      });
+
+      if (!existing) {
+        return res.status(404).json({
+          message: "Class not found",
+        });
+      }
+
+      const updated = await prisma.class.update({
+        where: { id },
+        data: { name },
+      });
+
+      return res.json(updated);
+    } catch (error) {
+      console.error("Update class failed:", error);
+
+      return res.status(500).json({
+        message: "Failed to update class",
+      });
+    }
+  }
+);
+
+/**
  * ✅ GET /api/admin/classes/:classId/students
- * Fetch students belonging to a specific class
  */
 router.get(
   "/classes/:classId/students",
@@ -99,9 +171,9 @@ router.get(
           message: "Class not found",
         });
       }
-
-      const students = await prisma.student.findMany({
+            const students = await prisma.student.findMany({
         where: { classId },
+
         include: {
           parentLinks: {
             include: {
@@ -111,10 +183,10 @@ router.get(
         },
       });
 
-      // Return raw students array (matches your frontend)
       return res.json(students);
     } catch (error) {
       console.error("Fetch class students failed:", error);
+
       return res.status(500).json({
         message: "Failed to fetch students",
       });
@@ -123,20 +195,78 @@ router.get(
 );
 
 /**
+ * ❌ DELETE /api/admin/classes/:id
+ */
+router.delete(
+  "/classes/:id",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    try {
+      const classId = Number(req.params.id);
+
+      if (isNaN(classId)) {
+        return res.status(400).json({
+          message: "Invalid class ID",
+        });
+      }
+
+      const existing = await prisma.class.findUnique({
+        where: { id: classId },
+      });
+
+      if (!existing) {
+        return res.status(404).json({
+          message: "Class not found",
+        });
+      }
+
+      await prisma.class.delete({
+        where: { id: classId },
+      });
+
+      return res.json({
+        message: "Class deleted successfully",
+      });
+    } catch (error) {
+      console.error("DELETE CLASS ERROR:", error);
+
+      return res.status(500).json({
+        message: "Failed to delete class",
+      });
+    }
+  }
+);
+
+/**
  * 🗂️ PATCH /api/admin/classes/:id/archive
- * Archive a class (safe delete)
  */
 router.patch(
   "/classes/:id/archive",
   authenticate,
   requireRole(["ADMIN"]),
   async (req, res) => {
-    const { id } = req.params;
-
     try {
-      // 🔒 Prevent archiving if students exist
+      const id = Number(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({
+          message: "Invalid class ID",
+        });
+      }
+
+      const existing = await prisma.class.findUnique({
+        where: { id },
+      });
+
+      if (!existing) {
+        return res.status(404).json({
+          message: "Class not found",
+        });
+      }
+
       const studentCount = await prisma.student.count({
-        where: { classId: Number(id) },
+        where: { classId: id },
       });
 
       if (studentCount > 0) {
@@ -147,14 +277,19 @@ router.patch(
       }
 
       await prisma.class.update({
-        where: { id: Number(id) },
-        data: { isArchived: true },
+        where: { id },
+        data: {
+          isArchived: true,
+        },
       });
 
-      res.json({ message: "Class archived" });
-    } catch (err) {
-      console.error("Failed to archive class", err);
-      res.status(500).json({
+      return res.json({
+        message: "Class archived successfully",
+      });
+    } catch (error) {
+      console.error("Failed to archive class", error);
+
+      return res.status(500).json({
         message: "Failed to archive class",
       });
     }

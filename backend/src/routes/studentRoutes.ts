@@ -253,4 +253,161 @@ router.put(
   }
 );
 
+// 🔥 GET STUDENT DETAILS (ATTENDANCE + LOGS + HEALTH)
+router.get(
+  "/:id/details",
+  authenticate,
+  requireRole(["ADMIN", "TEACHER"]),
+  async (req, res) => {
+    const studentId = Number(req.params.id);
+
+    try {
+      // ✅ TEMP: no attendance system yet
+      const present = 0;
+      const absent = 0;
+
+      // ✅ TEMP: no logs/health tables yet
+      const parentLogs: any[] = [];
+      const healthNotes = "";
+
+      res.json({
+        attendance: {
+          present,
+          absent,
+        },
+        parentLogs,
+        healthNotes,
+      });
+    } catch (err) {
+      console.error("STUDENT DETAILS ERROR:", err);
+      res.status(500).json({
+        message: "Failed to load student details",
+      });
+    }
+  }
+);
+
+// 🔥 BULK CREATE STUDENTS FROM CSV
+router.post(
+  "/bulk",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    const rows = req.body;
+
+    if (!Array.isArray(rows)) {
+      return res.status(400).json({
+        message: "Invalid data format",
+      });
+    }
+
+    let created = 0;
+    let failed = 0;
+    const errors: any[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+
+      try {
+        const {
+          firstName,
+          lastName,
+          admissionNo,
+          className,
+          parentName,
+        } = row;
+
+        // ✅ BASIC VALIDATION
+        if (!firstName || !lastName || !admissionNo || !className) {
+          failed++;
+          errors.push({
+            row: i + 1,
+            message: "Missing required fields",
+          });
+          continue;
+        }
+
+        // ✅ FIND CLASS BY NAME
+        const foundClass = await prisma.class.findFirst({
+          where: {
+            name: className.trim(),
+          },
+        });
+
+        if (!foundClass) {
+          failed++;
+          errors.push({
+            row: i + 1,
+            message: `Class "${className}" not found`,
+          });
+          continue;
+        }
+
+        // ✅ CHECK DUPLICATE ADMISSION NUMBER
+        const existing = await prisma.student.findFirst({
+          where: { admissionNo: admissionNo.trim() },
+        });
+
+        if (existing) {
+          failed++;
+          errors.push({
+            row: i + 1,
+            message: `Admission number "${admissionNo}" already exists`,
+          });
+          continue;
+        }
+
+        // ✅ FIND PARENT (CORRECT MODEL + TYPE)
+        let parentId: string | null = null;
+
+        if (parentName) {
+          const parent = await prisma.parent.findFirst({
+            where: {
+              name: parentName.trim(),
+            },
+          });
+
+          if (parent) {
+            parentId = parent.id; // ✅ STRING
+          }
+        }
+
+        // ✅ CREATE STUDENT
+        const student = await prisma.student.create({
+          data: {
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            admissionNo: admissionNo.trim(),
+            classId: foundClass.id,
+          },
+        });
+
+        // ✅ LINK PARENT
+        if (parentId) {
+          await prisma.parentStudent.create({
+            data: {
+              studentId: student.id,
+              parentId: parentId, // ✅ STRING matches schema
+            },
+          });
+        }
+
+        created++;
+      } catch (err: any) {
+        failed++;
+        errors.push({
+          row: i + 1,
+          message: err.message || "Unknown error",
+        });
+      }
+    }
+
+    return res.json({
+      created,
+      failed,
+      errors,
+    });
+  }
+);
+
 export default router;

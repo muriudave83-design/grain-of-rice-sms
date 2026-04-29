@@ -1,22 +1,34 @@
 import axios from "axios";
 
-// 🌍 ENV CONFIG (WORKS IN DEV + PROD)
+// =====================================
+// 🌍 ENV CONFIG (DEV + PROD SAFE)
+// =====================================
 const API_URL = import.meta.env.VITE_API_URL;
+
+// ❗ Fail fast if missing
+if (!API_URL) {
+  throw new Error("❌ VITE_API_URL is not defined in .env");
+}
 
 // 🧠 DEBUG
 console.log("🌍 API URL:", API_URL);
 
+// =====================================
+// 🚀 AXIOS INSTANCE
+// =====================================
 const apiClient = axios.create({
   baseURL: API_URL,
+  withCredentials: true, // future-proof (cookies if needed)
 });
 
-// ==============================
+// =====================================
 // 🔐 REQUEST INTERCEPTOR
-// ==============================
+// =====================================
 apiClient.interceptors.request.use(
   (config) => {
     let token = localStorage.getItem("token");
 
+    // 🧼 Clean invalid tokens
     if (
       !token ||
       token === "null" ||
@@ -37,9 +49,9 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ==============================
+// =====================================
 // 🧠 HELPER: EXTRACT ERROR MESSAGE
-// ==============================
+// =====================================
 const getErrorMessage = (error) => {
   if (!error.response) return "Network error";
 
@@ -50,9 +62,9 @@ const getErrorMessage = (error) => {
   );
 };
 
-// ==============================
+// =====================================
 // 🚨 RESPONSE INTERCEPTOR
-// ==============================
+// =====================================
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -65,7 +77,7 @@ apiClient.interceptors.response.use(
       message,
     });
 
-    // 🔐 AUTH HANDLING (FIXED — NO AUTO LOGOUT)
+    // 🔐 AUTH HANDLING (NO AUTO LOGOUT — GOOD DESIGN)
     if (error.response) {
       const status = error.response.status;
       const token = localStorage.getItem("token");
@@ -77,12 +89,9 @@ apiClient.interceptors.response.use(
         token !== "undefined"
       ) {
         console.warn("⚠️ Unauthorized request (ignored — no forced logout)");
-        // ❌ DO NOT redirect
-        // ❌ DO NOT clear storage
       }
     }
 
-    // ❌ NO GLOBAL ALERT
     return Promise.reject({
       ...error,
       message,
