@@ -72,7 +72,7 @@ export default function AdminStudents() {
                     firstName: row.firstName.trim(),
                     lastName: row.lastName?.trim() || "",
                     admissionNo: row.admissionNo.toString().trim(),
-                    className: row.className?.trim() || "PP1",
+                    className: row.className?.trim(),
                     parentName: row.parentName?.trim() || "",
                     userId: 1,
                   };
@@ -109,11 +109,7 @@ export default function AdminStudents() {
   });
 
   const groupedStudents = filteredStudents.reduce((acc, student) => {
-    const className =
-      student.className ||
-      student.class?.name ||
-      student.class ||
-      "Unassigned";
+    const className = student.class?.name?.trim() || "Unassigned";
 
     if (!acc[className]) {
       acc[className] = [];

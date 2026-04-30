@@ -309,7 +309,7 @@ router.post(
       const row = rows[i];
 
       try {
-        const {
+        let {
           firstName,
           lastName,
           admissionNo,
@@ -317,68 +317,87 @@ router.post(
           parentName,
         } = row;
 
-        // ✅ BASIC VALIDATION
-        if (!firstName || !lastName || !admissionNo || !className) {
+        // ✅ NORMALIZE INPUT
+        firstName = firstName?.trim();
+        lastName = lastName?.trim();
+        admissionNo = admissionNo?.trim();
+        className = className?.trim();
+        parentName = parentName?.trim();
+
+        // ✅ VALIDATION (aligned with system rules)
+        if (!firstName || !admissionNo || !className) {
           failed++;
           errors.push({
             row: i + 1,
-            message: "Missing required fields",
+            message: "Missing required fields (firstName, admissionNo, className)",
           });
           continue;
         }
 
-        // ✅ FIND CLASS BY NAME
-        const foundClass = await prisma.class.findFirst({
+        // 🔥 NORMALIZE CLASS NAME (THE FIX)
+        const normalizedClassName = className
+          ?.trim()
+          .toUpperCase()
+          .replace(/\s+/g, " ")
+          .replace(/GRADE(\d+)/, "GRADE $1");
+
+        // 🔍 FIND CLASS USING NORMALIZED VALUE
+        let cls = await prisma.class.findFirst({
           where: {
-            name: className.trim(),
+            name: normalizedClassName,
           },
         });
 
-        if (!foundClass) {
-          failed++;
-          errors.push({
-            row: i + 1,
-            message: `Class "${className}" not found`,
+        // ➕ AUTO-CREATE CLEAN CLASS NAME ONLY
+        if (!cls) {
+          cls = await prisma.class.create({
+            data: {
+              name: normalizedClassName,
+            },
           });
-          continue;
+
+          console.log(`✅ Created new class: ${normalizedClassName}`);
         }
 
         // ✅ CHECK DUPLICATE ADMISSION NUMBER
         const existing = await prisma.student.findFirst({
-          where: { admissionNo: admissionNo.trim() },
+          where: { admissionNo },
         });
 
         if (existing) {
           failed++;
           errors.push({
             row: i + 1,
-            message: `Admission number "${admissionNo}" already exists`,
+            message: `Admission number already exists: ${admissionNo}`,
           });
           continue;
         }
 
-        // ✅ FIND PARENT (CORRECT MODEL + TYPE)
+        // ✅ OPTIONAL: FIND PARENT
         let parentId: string | null = null;
 
         if (parentName) {
           const parent = await prisma.parent.findFirst({
             where: {
-              name: parentName.trim(),
+              name: {
+                equals: parentName,
+                mode: "insensitive",
+              },
             },
           });
 
           if (parent) {
-            parentId = parent.id; // ✅ STRING
+            parentId = parent.id;
           }
         }
 
-        // ✅ CREATE STUDENT
+        // ✅ CREATE STUDENT WITH CORRECT RELATION
         const student = await prisma.student.create({
           data: {
-            firstName: firstName.trim(),
-            lastName: lastName.trim(),
-            admissionNo: admissionNo.trim(),
-            classId: foundClass.id,
+            firstName,
+            lastName: lastName || "",
+            admissionNo,
+            classId: cls.id, // 🔥 THIS IS THE FIX
           },
         });
 
@@ -387,7 +406,7 @@ router.post(
           await prisma.parentStudent.create({
             data: {
               studentId: student.id,
-              parentId: parentId, // ✅ STRING matches schema
+              parentId,
             },
           });
         }
