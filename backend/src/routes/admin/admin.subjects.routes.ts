@@ -2,7 +2,7 @@ import { Router } from "express";
 import { prisma } from "../../prisma/client";
 import { authenticate } from "../../middlewares/authMiddleware";
 import { requireRole } from "../../middlewares/rolesMiddleware";
-import { Role } from "@prisma/client";
+import { Role, Prisma } from "@prisma/client";
 
 const router = Router();
 
@@ -17,20 +17,25 @@ router.get(
   authenticate,
   requireRole([Role.ADMIN]),
   async (_req, res) => {
-    const subjects = await prisma.subject.findMany({
-      include: {
-        teacher: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    try {
+      const subjects = await prisma.subject.findMany({
+        include: {
+          teacher: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
 
-    res.json(subjects);
+      res.json(subjects);
+    } catch (error) {
+      console.error("FETCH SUBJECTS ERROR:", error);
+      res.status(500).json({ error: "Failed to fetch subjects" });
+    }
   }
 );
 
 /**
  * ============================================================
- * ADMIN — CREATE SUBJECT
+ * ADMIN — CREATE SUBJECT (FIXED ✅)
  * POST /api/admin/subjects
  * ============================================================
  */
@@ -39,26 +44,44 @@ router.post(
   authenticate,
   requireRole([Role.ADMIN]),
   async (req, res) => {
-    const { name, code } = req.body;
+    try {
+      const { name, code } = req.body;
 
-    if (!name) {
-      return res.status(400).json({ message: "Subject name required" });
+      if (!name) {
+        return res.status(400).json({ error: "Subject name required" });
+      }
+
+      const subject = await prisma.subject.create({
+        data: {
+          name,
+          code: code || null,
+        },
+      });
+
+      res.status(201).json(subject);
+    } catch (error: any) {
+      console.error("CREATE SUBJECT ERROR:", error);
+
+      // ✅ HANDLE UNIQUE CONSTRAINT (P2002)
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        return res.status(400).json({
+          error: "Subject with this code already exists",
+        });
+      }
+
+      res.status(500).json({
+        error: "Failed to create subject",
+      });
     }
-
-    const subject = await prisma.subject.create({
-      data: {
-        name,
-        code: code || null,
-      },
-    });
-
-    res.status(201).json(subject);
   }
 );
 
 /**
  * ============================================================
- * ✅ ADMIN — ASSIGN TEACHER TO SUBJECT (CRITICAL FIX)
+ * ADMIN — ASSIGN TEACHER TO SUBJECT
  * PUT /api/admin/subjects/:id/assign-teacher
  * ============================================================
  */
@@ -67,27 +90,32 @@ router.put(
   authenticate,
   requireRole([Role.ADMIN]),
   async (req, res) => {
-    const subjectId = Number(req.params.id);
-    const { teacherId } = req.body;
+    try {
+      const subjectId = Number(req.params.id);
+      const { teacherId } = req.body;
 
-    if (!teacherId) {
-      return res.status(400).json({ message: "teacherId required" });
+      if (!teacherId) {
+        return res.status(400).json({ message: "teacherId required" });
+      }
+
+      const teacher = await prisma.user.findUnique({
+        where: { id: teacherId },
+      });
+
+      if (!teacher || teacher.role !== Role.TEACHER) {
+        return res.status(400).json({ message: "Invalid teacher" });
+      }
+
+      const updated = await prisma.subject.update({
+        where: { id: subjectId },
+        data: { teacherId },
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("ASSIGN TEACHER ERROR:", error);
+      res.status(500).json({ error: "Failed to assign teacher" });
     }
-
-    const teacher = await prisma.user.findUnique({
-      where: { id: teacherId },
-    });
-
-    if (!teacher || teacher.role !== Role.TEACHER) {
-      return res.status(400).json({ message: "Invalid teacher" });
-    }
-
-    const updated = await prisma.subject.update({
-      where: { id: subjectId },
-      data: { teacherId },
-    });
-
-    res.json(updated);
   }
 );
 

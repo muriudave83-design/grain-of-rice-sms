@@ -71,6 +71,13 @@ export default function SubjectsPage() {
       fetchData();
     } catch (err) {
       console.error("Failed to save subject", err);
+
+      // ✅ SHOW REAL BACKEND ERROR
+      if (err.response?.data?.error) {
+        alert(err.response.data.error);
+      } else {
+        alert("Failed to save subject");
+      }
     }
   }
 
