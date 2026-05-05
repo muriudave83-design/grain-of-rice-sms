@@ -17,13 +17,9 @@ import { assessmentRoutes } from "./routes/assessmentRoutes";
 import gradebookRoutes from "./routes/gradebookRoutes";
 import dashboardRoutes from "./routes/dashboardRoutes";
 
-// ✅ Assignment Categories
 import assignmentCategoryRoutes from "./routes/assignmentCategory.routes";
-
-// ✅ Terms route
 import termRoutes from "./routes/termRoutes";
 
-// ✅ Admin routes
 import adminAuditLogRoutes from "./routes/admin.auditLogs.routes";
 import adminUsersRoutes from "./routes/admin.users.routes";
 import adminClassesRoutes from "./routes/admin/admin.classes.routes";
@@ -34,57 +30,45 @@ import adminClassSubjectsRoutes from "./routes/admin/admin.classSubjects.routes"
 import adminAttendanceRoutes from "./routes/adminAttendance.routes";
 
 import parentRoutes from "./routes/parentRoutes";
-
-// ✅ Teacher ↔ Subject assignments
 import teacherSubjectsRoutes from "./routes/admin/admin.teacherSubjects.routes";
-
-// ✅ Teacher assignments endpoint
 import teacherAssignmentsRoutes from "./routes/teacherAssignments.routes";
 
-// ✅ REPORT CARDS
 import { reportCardReadRoutes } from "./routes/reportCardReadRoutes";
 import reportsRoutes from "./routes/reports.routes";
 
-// ✅ Parent ↔ Student linking
 import { parentStudentRoutes } from "./routes/parentStudentRoutes";
-
-// ✅ Parent routes
 import adminParentRoutes from "./routes/admin.parents.routes";
 
-// ✅ Report Card PDF
 import reportCardPdfRoutes from "./routes/reportCardPdf.routes";
-
-// ✅ Attendance
 import attendanceRoutes from "./routes/attendanceRoutes";
 
-// ✅ Teacher-visible classes
 import classesRoutes from "./routes/classes";
 import teacherRoutes from "./routes/teacher.routes";
 
-// ✅ Fees
 import feesRoutes from "./routes/fees.routes";
-
-// ✅ NEW: Sponsorship
 import sponsorshipRoutes from "./routes/sponsorship.routes";
-
-// ✅ Discipline
 import disciplineRoutes from "./routes/discipline.routes";
 
 const app = express();
 
 // ----------------------------------
-// CORS
+// ✅ CORS (FIXED FOR RENDER)
 // ----------------------------------
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:5174",
-      "https://sms-frontend-gjfo.onrender.com",
-    ],
-    credentials: true,
-  })
-);
+const corsOptions = {
+  origin: [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:3000",
+    "https://sms-frontend-gjfo.onrender.com",
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
+
+// ✅ CRITICAL: handle preflight requests
+app.options("*", cors(corsOptions));
 
 // ----------------------------------
 // MIDDLEWARE
@@ -132,7 +116,7 @@ app.use("/api/students", studentRoutes);
 app.use("/api", protectedRoutes);
 app.use("/api/assessments", assessmentRoutes);
 app.use("/api/classes", classesRoutes);
-app.use("/api/teacher", teacherRoutes); // MUST be before generic /api
+app.use("/api/teacher", teacherRoutes);
 app.use("/api/gradebook", gradebookRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/assignment-categories", assignmentCategoryRoutes);
@@ -140,16 +124,9 @@ app.use("/api/admin/attendance", adminAttendanceRoutes);
 app.use("/api/terms", termRoutes);
 app.use("/api/attendance", attendanceRoutes);
 
-// ✅ Fees
 app.use("/api/fees", feesRoutes);
-
-// ✅ Sponsorship (NEW)
 app.use("/api/sponsorship", sponsorshipRoutes);
-
-// ✅ Teacher assignments
 app.use("/api/teacher-assignments", teacherAssignmentsRoutes);
-
-// ✅ Discipline
 app.use("/api/discipline", disciplineRoutes);
 
 // ----------------------------------
