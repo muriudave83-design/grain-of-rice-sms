@@ -19,7 +19,7 @@ export default function GradebookDetail() {
 
   const { id } = useParams();
   const navigate = useNavigate();
-  const classId = id;
+  const [classId, setClassId] = useState(null);
 
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -50,17 +50,40 @@ export default function GradebookDetail() {
 
   const fetchData = async (termId) => {
     try {
+      // 🔥 BLOCK BAD REQUEST
+      if (!termId && classId !== null) {
+        console.log("⛔ Prevented fetch without termId");
+        return;
+      }
+
       const res = await apiClient.get(
-        `/teacher/gradebook/${id}?termId=${termId}`
+        `/teacher/gradebook/${id}`,
+        {
+          params: termId ? { termId } : {},
+        }
       );
       setData(res.data);
-    } catch (err) {
-      console.error("Failed to load gradebook:", err);
-      setError("Failed to load gradebook");
-    } finally {
-      setLoading(false);
-    }
-  };
+
+      // ✅ CRITICAL FIX — extract real classId from backend
+      const realClassId = res.data?.class?.id;
+
+      console.log("🎯 Extracted classId from gradebook:", realClassId);
+
+      if (realClassId === null || realClassId === undefined) {
+        console.warn("⚠️ No classId found in gradebook response");
+      } else {
+        setClassId(realClassId);
+      }
+
+      } catch (err) {
+        console.error("Failed to load gradebook:", err);
+        setError("Failed to load gradebook");
+      } finally {
+        setLoading(false);
+      }
+      };
+
+      // 🧱 LOAD TERMS
 
   // 🧱 LOAD TERMS
   useEffect(() => {
@@ -68,13 +91,24 @@ export default function GradebookDetail() {
       try {
         const res = await apiClient.get(`/teacher/terms/${classId}`);
 
+        console.log("📦 TERMS RESPONSE:", res.data);
+
         setTerms(res.data);
 
         if (res.data.length > 0) {
-          setSelectedTerm(res.data[0].id);
+          const firstTermId = res.data[0].id;
+
+          console.log("✅ Auto-selecting term:", firstTermId);
+
+          setSelectedTerm(firstTermId);
+        } else {
+          console.warn("⚠️ No terms found for this class");
+
+          setSelectedTerm(null);
         }
       } catch (err) {
-        console.error("Failed to load terms", err);
+        console.error("❌ Failed to load terms", err);
+        setLoading(false); // ✅ ALSO prevent freeze on error
       }
     }
 
@@ -83,24 +117,81 @@ export default function GradebookDetail() {
     }
   }, [classId]);
 
-  // 🧱 FETCH GRADEBOOK
-  useEffect(() => {
-    if (!selectedTerm) return;
-    fetchData(selectedTerm);
-  }, [id, selectedTerm]);
-    const handleRightClick = (e, assignment) => {
-    e.preventDefault();
-    e.stopPropagation();
+// 🧱 FETCH GRADEBOOK (DETERMINISTIC — NO RACE CONDITIONS)
+// 🧱 FETCH GRADEBOOK (CORRECT ID FLOW)
+useEffect(() => {
+  const init = async () => {
+    try {
+      setLoading(true);
+      console.log("🚀 START INIT");
 
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      assignment,
-    });
+      // ✅ STEP 1: get gradebook (to extract classId)
+      const baseRes = await apiClient.get(
+        `/teacher/gradebook/${id}`
+      );
+
+      const classId = baseRes.data?.class?.id;
+
+      if (!classId) {
+        throw new Error("classId not found in gradebook");
+      }
+
+      console.log("✅ classId:", classId);
+
+      // ✅ STEP 2: get terms using REAL classId
+      const termRes = await apiClient.get(
+        `/teacher/terms/${classId}`
+      );
+
+      const terms = termRes.data;
+
+      if (!terms || terms.length === 0) {
+        throw new Error("No terms returned");
+      }
+
+      const termId = terms[0].id;
+
+      console.log("✅ termId:", termId);
+
+      // ✅ STEP 3: fetch gradebook with term
+      const finalRes = await apiClient.get(
+        `/teacher/gradebook/${id}`,
+        {
+          params: { termId },
+        }
+      );
+
+      setSelectedTerm(termId);
+      setData(finalRes.data);
+
+      console.log("✅ Gradebook loaded");
+
+    } catch (err) {
+      console.error("💥 INIT FAILED", err);
+      setError(err.message || "Failed to load gradebook");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const students = data?.class?.students || [];
-  const assignments = data?.assignments || [];
+  if (id) init();
+}, [id]);
+
+const handleRightClick = (e, assignment) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  setContextMenu({
+    x: e.clientX,
+    y: e.clientY,
+    assignment,
+  });
+};
+
+const students = data?.class?.students || [];
+const assignments = data?.assignments || [];
+
+// ✅ DRAG HANDLER
 
 // ✅ DRAG HANDLER
 const handleDragEnd = async (result) => {
@@ -628,9 +719,17 @@ const handleScoreChange = async (
 
 console.log("RENDER STATE:", { loading, error, data });
 
-if (loading) return <div className="p-6">Loading...</div>;
-if (error) return <div className="p-6 text-red-500">{error}</div>;
-if (!data) return <div className="p-6">No data found</div>;
+if (!selectedTerm && terms.length === 0)
+  return <div className="p-6">Setting up gradebook...</div>;
+
+if (loading)
+  return <div className="p-6">Loading gradebook...</div>;
+
+if (error)
+  return <div className="p-6 text-red-500">{error}</div>;
+
+if (!data)
+  return <div className="p-6">No gradebook data</div>;
 
 return (
   <div className="p-6" onClick={() => setContextMenu(null)}>
@@ -648,6 +747,10 @@ return (
           onChange={(e) => setSelectedTerm(Number(e.target.value))}
           className="border p-2"
         >
+          {terms.length === 0 && (
+            <option value="">Setting up term...</option>
+          )}
+
           {terms.map((t) => (
             <option key={t.id} value={t.id}>
               {t.name}

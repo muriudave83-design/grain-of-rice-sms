@@ -114,11 +114,7 @@ export const getTeacherSubjects = async (req: Request, res: Response) => {
 
 export const getGradebook = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const termId = Number(req.query.termId);
-
-  if (!termId) {
-    return res.status(400).json({ error: "termId is required" });
-  }
+  const termId = req.query.termId ? Number(req.query.termId) : null;
 
   try {
     const gradebook = await prisma.teacherSubject.findUnique({
@@ -128,11 +124,13 @@ export const getGradebook = async (req: Request, res: Response) => {
           include: { students: true },
         },
         subject: true,
-        assignments: {
-          where: { termId },
-          orderBy: { position: "asc" },
-          include: { scores: true },
-        },
+        assignments: termId
+          ? {
+              where: { termId },
+              orderBy: { position: "asc" },
+              include: { scores: true },
+            }
+          : false,
       },
     });
 
@@ -140,12 +138,17 @@ export const getGradebook = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Not found" });
     }
 
-    res.json(gradebook);
+    return res.json({
+      ...gradebook,
+      assignments: gradebook.assignments || [],
+    });
+
   } catch (err) {
     console.error("GET GRADEBOOK ERROR:", err);
     res.status(500).json({ message: "Error fetching gradebook" });
   }
 };
+
 export const getClassStudents = async (req: Request, res: Response) => {
   const { classId } = req.params;
 

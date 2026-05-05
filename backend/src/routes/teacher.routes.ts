@@ -159,10 +159,46 @@ router.get("/terms/:classId", async (req, res) => {
       return res.status(400).json({ error: "Invalid classId" });
     }
 
+    // ✅ STEP 1 — VERIFY CLASS EXISTS
+    const existingClass = await prisma.class.findUnique({
+      where: { id: classId },
+    });
+
+    if (!existingClass) {
+      return res.status(404).json({
+        error: "Class not found",
+      });
+    }
+
+    // ✅ STEP 2 — FETCH TERMS
     const terms = await prisma.term.findMany({
       where: { classId },
       orderBy: { createdAt: "asc" },
     });
+
+    // ✅ STEP 3 — AUTO-CREATE IF EMPTY
+    if (terms.length === 0) {
+      console.warn("⚠️ No terms found — auto-creating one");
+
+      const now = new Date();
+
+      const newTerm = await prisma.term.create({
+        data: {
+          name: "Term 1",
+          classId,
+
+          startDate: now,
+          endDate: new Date(
+            now.getFullYear(),
+            now.getMonth() + 3,
+            now.getDate()
+          ),
+          academicYear: `${now.getFullYear()}/${now.getFullYear() + 1}`,
+        },
+      });
+
+      return res.json([newTerm]);
+    }
 
     res.json(terms);
   } catch (err) {
