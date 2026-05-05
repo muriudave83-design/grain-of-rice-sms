@@ -51,6 +51,19 @@ router.post(
         return res.status(400).json({ error: "Subject name required" });
       }
 
+      // ✅ PREVENT DUPLICATE SUBJECT NAMES
+      const existing = await prisma.subject.findFirst({
+        where: {
+          name: name,
+        },
+      });
+
+      if (existing) {
+        return res.status(400).json({
+          error: "Subject already exists",
+        });
+      }
+
       const subject = await prisma.subject.create({
         data: {
           name,
@@ -62,7 +75,7 @@ router.post(
     } catch (error: any) {
       console.error("CREATE SUBJECT ERROR:", error);
 
-      // ✅ HANDLE UNIQUE CONSTRAINT (P2002)
+      // ✅ HANDLE UNIQUE CONSTRAINT (if still exists anywhere)
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
