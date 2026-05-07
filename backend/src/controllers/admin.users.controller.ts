@@ -95,12 +95,19 @@ export const archiveUser = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id: userId },
-      data: {
-        isArchived: !existingUser.isArchived,
-        isActive: existingUser.isArchived,
-      },
+      data: existingUser.isArchived
+        ? {
+            // ✅ RESTORE USER
+            isArchived: false,
+            isActive: true,
+          }
+        : {
+            // ✅ ARCHIVE USER
+            isArchived: true,
+            isActive: false,
+          },
     });
 
     await createAuditLog({

@@ -8,6 +8,32 @@ import StudentsPanel from "../../components/admin/users/StudentsPanel";
 
 const ROLES = ["ADMIN", "TEACHER", "PARENT", "STUDENT"];
 
+/**
+ * 🔥 CRITICAL FIX — NEVER BREAK AGAIN
+ * This function normalizes user status across the app.
+ */
+function normalizeUsers(users) {
+  return users.map((u) => {
+    const isArchived = Boolean(u.isArchived);
+    const isActive = Boolean(u.isActive);
+
+    let status = "inactive";
+
+    if (isArchived) {
+      status = "archived";
+    } else if (isActive) {
+      status = "active";
+    }
+
+    return {
+      ...u,
+      isArchived,
+      isActive,
+      status, // 🔥 SINGLE SOURCE OF TRUTH
+    };
+  });
+}
+
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,12 +75,21 @@ export default function UsersPage() {
     fetchStudents();
     fetchClasses();
   }, []);
-
-  async function fetchUsers() {
+    async function fetchUsers() {
     setLoading(true);
     try {
       const res = await apiClient.get("/admin/users");
-      setUsers(res.data);
+
+      // 🔥 ALWAYS NORMALIZE HERE (CRITICAL)
+      const safeUsers = normalizeUsers(res.data);
+
+      // DEBUG (safe now)
+      console.log(
+        "MARY DEBUG:",
+        safeUsers.find((u) => u.name === "Mary")
+      );
+
+      setUsers(safeUsers);
     } catch (err) {
       console.error("Failed to load users", err);
     } finally {
@@ -117,13 +152,10 @@ export default function UsersPage() {
   async function submitForm(e) {
     e.preventDefault();
 
-    console.log("🚀 SUBMIT FORM:", form);
-
     try {
       if (editingUser) {
         const { password, ...safeData } = form;
 
-        // ✅ FIXED: PUT → PATCH
         await apiClient.patch(
           `/admin/users/${editingUser.id}`,
           safeData
@@ -159,33 +191,42 @@ export default function UsersPage() {
       }
 
       setShowForm(false);
-
-      // ✅ CLEAN UX FIX
       setEditingUser(null);
 
+      // 🔥 REFRESH WITH NORMALIZATION
       fetchUsers();
     } catch (err) {
-      console.error("❌ CREATE USER ERROR FULL:", err);
-      console.error("❌ RESPONSE DATA:", err?.response?.data);
-      console.error("❌ STATUS:", err?.response?.status);
-
+      console.error("❌ SAVE ERROR:", err);
       alert(
-        JSON.stringify(err?.response?.data, null, 2) ||
+        err?.response?.data?.message ||
           err.message ||
           "Failed to save user"
       );
     }
   }
-    async function handleArchive(userId) {
-    if (!window.confirm("Are you sure you want to archive this user?"))
-      return;
+
+  async function handleArchive(userId) {
+    if (!window.confirm("Archive this user?")) return;
 
     try {
       await apiClient.patch(`/admin/users/${userId}/archive`);
-      fetchUsers();
+      fetchUsers(); // 🔥 re-normalizes
     } catch (err) {
       console.error("Archive failed", err);
-      alert(err?.response?.data?.message || "Failed to archive user.");
+      alert(err?.response?.data?.message || "Archive failed.");
+    }
+  }
+
+  // 🔥 NEW — RESTORE (MISSING BEFORE)
+  async function handleRestore(userId) {
+    if (!window.confirm("Restore this user?")) return;
+
+    try {
+      await apiClient.patch(`/admin/users/${userId}/restore`);
+      fetchUsers(); // 🔥 re-normalizes
+    } catch (err) {
+      console.error("Restore failed", err);
+      alert(err?.response?.data?.message || "Restore failed.");
     }
   }
 
@@ -198,15 +239,14 @@ export default function UsersPage() {
       );
 
       alert(
-        `Temporary Password:\n\n${res.data.temporaryPassword}\n\nUser will be required to change it on first login.`
+        `Temporary Password:\n\n${res.data.temporaryPassword}\n\nUser must change it on login.`
       );
     } catch (err) {
       console.error("Reset failed", err);
       alert(err?.response?.data?.message || "Reset failed.");
     }
   }
-
-  return (
+    return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-xl font-semibold">Users</h1>
@@ -224,11 +264,13 @@ export default function UsersPage() {
         counts={counts}
       />
 
+      {/* 🔥 PASS FULL USERS (WITH NORMALIZED STATUS) */}
       {activeTab === "admins" && (
         <TeachersPanel
           teachers={admins}
           onEdit={openEdit}
           onArchive={handleArchive}
+          onRestore={handleRestore} // 🔥 NEW
           onReset={resetPassword}
         />
       )}
@@ -238,6 +280,7 @@ export default function UsersPage() {
           teachers={teachers}
           onEdit={openEdit}
           onArchive={handleArchive}
+          onRestore={handleRestore} // 🔥 NEW
           onReset={resetPassword}
         />
       )}
@@ -247,6 +290,7 @@ export default function UsersPage() {
           students={studentUsers}
           onEdit={openEdit}
           onArchive={handleArchive}
+          onRestore={handleRestore} // 🔥 NEW
           onReset={resetPassword}
         />
       )}
@@ -256,6 +300,7 @@ export default function UsersPage() {
           parents={parents}
           onEdit={openEdit}
           onArchive={handleArchive}
+          onRestore={handleRestore} // 🔥 NEW
           onReset={resetPassword}
         />
       )}
@@ -270,7 +315,7 @@ export default function UsersPage() {
               {editingUser ? "Edit User" : "Create User"}
             </h2>
 
-            {/* FULL NAME (non-students) */}
+            {/* NAME */}
             {form.role !== "STUDENT" && (
               <input
                 required
@@ -282,7 +327,8 @@ export default function UsersPage() {
                 }
               />
             )}
-                        {/* EMAIL */}
+
+            {/* EMAIL */}
             <input
               required
               type="email"
@@ -294,7 +340,7 @@ export default function UsersPage() {
               }
             />
 
-            {/* 🔥 PASSWORD — ONLY ON CREATE */}
+            {/* PASSWORD (CREATE ONLY) */}
             {!editingUser && form.role !== "STUDENT" && (
               <input
                 required
@@ -384,7 +430,6 @@ export default function UsersPage() {
                   }
                 />
 
-                {/* 🔥 PASSWORD — ONLY ON CREATE */}
                 {!editingUser && (
                   <input
                     required
@@ -400,7 +445,6 @@ export default function UsersPage() {
               </>
             )}
 
-            {/* ACTION BUTTONS */}
             <div className="flex justify-end space-x-2">
               <button
                 type="button"

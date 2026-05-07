@@ -85,11 +85,16 @@ export const getAttendanceReport = async (req: any, res: any) => {
 
     // ✅ Step 3: Format records (FIXED admission 🔥)
     const report = absentRecords.map((r: any) => ({
+      // 🆕 REQUIRED FOR FRONTEND ATTENDANCE MAP
+      studentId: r.student.id,
+
       studentName: `${r.student.firstName} ${r.student.lastName}`,
+
       admissionNumber:
         r.student.admissionNumber ||
         r.student.admissionNo ||
         "N/A",
+
       status: r.status,
       date: r.session.date,
     }));

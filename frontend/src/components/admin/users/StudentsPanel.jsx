@@ -4,7 +4,7 @@ import UserSearch from "./UserSearch";
 export default function StudentsPanel({
   students = [],
   onEdit = () => {},
-  onArchive = () => {},   // ✅ replaced onToggle
+  onArchive = () => {}, // toggle archive/restore
   onReset = () => {},
 }) {
   const [search, setSearch] = useState("");
@@ -51,7 +51,13 @@ export default function StudentsPanel({
               {filtered.map((user) => {
                 const name = user?.name || "—";
                 const email = user?.email || "—";
-                const isActive = !!user?.isActive;
+
+                // 🔥 SINGLE SOURCE OF TRUTH (DERIVED STATUS)
+                const status = user?.isArchived
+                  ? "archived"
+                  : user?.isActive
+                  ? "active"
+                  : "inactive";
 
                 return (
                   <tr
@@ -61,20 +67,27 @@ export default function StudentsPanel({
                     <td className="p-3">{name}</td>
                     <td className="p-3">{email}</td>
 
+                    {/* ✅ BULLETPROOF STATUS */}
                     <td className="p-3">
-                      {isActive ? (
-                        <span className="text-green-600 text-xs">
-                          Active
-                        </span>
-                      ) : (
+                      {status === "archived" && (
                         <span className="text-red-600 text-xs">
                           Archived
                         </span>
                       )}
+                      {status === "active" && (
+                        <span className="text-green-600 text-xs">
+                          Active
+                        </span>
+                      )}
+                      {status === "inactive" && (
+                        <span className="text-gray-500 text-xs">
+                          Inactive
+                        </span>
+                      )}
                     </td>
 
+                    {/* ✅ BULLETPROOF ACTIONS */}
                     <td className="p-3 space-x-3">
-                      {/* Edit */}
                       <button
                         onClick={() => onEdit(user)}
                         className="text-blue-600 text-xs hover:underline"
@@ -82,8 +95,14 @@ export default function StudentsPanel({
                         Edit
                       </button>
 
-                      {/* Archive (only if active) */}
-                      {isActive && (
+                      {status === "archived" ? (
+                        <button
+                          onClick={() => onArchive(user.id)}
+                          className="text-green-600 text-xs hover:underline"
+                        >
+                          Restore
+                        </button>
+                      ) : (
                         <button
                           onClick={() => onArchive(user.id)}
                           className="text-red-600 text-xs hover:underline"
@@ -92,7 +111,6 @@ export default function StudentsPanel({
                         </button>
                       )}
 
-                      {/* Reset Password */}
                       <button
                         onClick={() => onReset(user)}
                         className="text-orange-600 text-xs hover:underline"

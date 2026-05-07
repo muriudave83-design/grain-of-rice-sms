@@ -69,12 +69,18 @@ export default function TeachersPanel({
                   <td className="px-4 py-3">
                     <span
                       className={`text-sm ${
-                        teacher.isActive
+                        teacher.isArchived
+                          ? "text-red-600"
+                          : teacher.isActive
                           ? "text-green-600"
-                          : "text-red-600"
+                          : "text-gray-500"
                       }`}
                     >
-                      {teacher.isActive ? "Active" : "Archived"}
+                      {teacher.isArchived
+                        ? "Archived"
+                        : teacher.isActive
+                        ? "Active"
+                        : "Inactive"}
                     </span>
                   </td>
 
@@ -88,14 +94,21 @@ export default function TeachersPanel({
                     </button>
 
                     {/* Archive (only if active) */}
-                    {teacher.isActive && (
-                      <button
-                        onClick={() => onArchive?.(teacher.id)}
-                        className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-                      >
-                        Archive
-                      </button>
-                    )}
+                      {teacher.isArchived ? (
+                        <button
+                          onClick={() => onArchive?.(teacher.id)}
+                          className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+                        >
+                          Restore
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => onArchive?.(teacher.id)}
+                          className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                        >
+                          Archive
+                        </button>
+                      )}
 
                     {/* Reset Password */}
                     <button

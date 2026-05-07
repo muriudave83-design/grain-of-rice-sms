@@ -34,14 +34,6 @@ export default function SidebarNav() {
         <span>🏠</span> Dashboard
       </NavLink>
 
-      {/* ✅ MOVED TO TOP FOR DEBUG + PERMANENT VISIBILITY */}
-      <NavLink
-        to={path("attendance-reports")}
-        className={linkClass}
-      >
-        📄 Attendance Reports
-      </NavLink>
-
       {/* MANAGEMENT */}
       <div className="mt-4">
 
@@ -77,6 +69,13 @@ export default function SidebarNav() {
 
             <NavLink to={path("attendance")} className={linkClass}>
               📅 Attendance
+            </NavLink>
+
+            <NavLink
+              to={path("attendance-reports")}
+              className={linkClass}
+            >
+              📄 Attendance Reports
             </NavLink>
 
             <NavLink to={path("archived")} className={linkClass}>

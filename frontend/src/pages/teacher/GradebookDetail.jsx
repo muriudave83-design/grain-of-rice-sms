@@ -48,37 +48,63 @@ export default function GradebookDetail() {
   const [terms, setTerms] = useState([]);
   const [selectedTerm, setSelectedTerm] = useState(null);
 
+  // 🆕 FULL TERM OBJECT
+  const [selectedTermData, setSelectedTermData] = useState(null);
+
   // 🆕 ATTENDANCE STATE
   const [attendanceMap, setAttendanceMap] = useState({});
 
   // 🆕 FETCH ATTENDANCE
-  const fetchAttendance = async (classId, termId) => {
-    try {
-      if (!classId || !termId) return;
+    const fetchAttendance = async (classId, term) => {
+      try {
+        if (!classId || !term) return;
 
-      const res = await apiClient.get(
-        `/teacher/attendance/report`, // ✅ FIXED (teacher route)
-        {
-          params: {
-            classId,
-            startDate: "2026-01-01",
-            endDate: "2026-12-31",
-          },
+        const startDate =
+          term.startDate || term.start || term.termStartDate;
+
+        const endDate =
+          term.endDate || term.end || term.termEndDate;
+
+        if (!startDate || !endDate) {
+          console.warn("⚠️ Term dates missing");
+          return;
         }
-      );
 
-      const map = {};
-      res.data.forEach((r) => {
-        map[r.studentId] = r.absentDays || 0;
-      });
+        const res = await apiClient.get(
+          `/teacher/attendance/report`,
+          {
+            params: {
+              classId,
+              startDate,
+              endDate,
+            },
+          }
+        );
 
-      console.log("📊 Attendance Map:", map);
+        // 🔥 Build attendance map
+        const map = {};
 
-      setAttendanceMap(map);
-    } catch (err) {
-      console.error("❌ Failed to fetch attendance", err);
-    }
-  };
+        const records = res.data.records || res.data || [];
+
+        records.forEach((r) => {
+          const key = r.studentId;
+
+          if (!key) return;
+
+          if (!map[key]) {
+            map[key] = 0;
+          }
+
+          map[key] += 1;
+        });
+
+        console.log("📊 Attendance Map:", map);
+
+        setAttendanceMap(map);
+      } catch (err) {
+        console.error("❌ Failed to fetch attendance", err);
+      }
+    };
 
   const fetchData = async (termId) => {
     try {
@@ -119,14 +145,17 @@ export default function GradebookDetail() {
         console.log("📦 TERMS RESPONSE:", res.data);
 
         setTerms(res.data);
+      if (res.data.length > 0) {
+        const firstTerm = res.data[0];
+        const firstTermId = firstTerm.id;
 
-        if (res.data.length > 0) {
-          const firstTermId = res.data[0].id;
+        console.log("✅ Auto-selecting term:", firstTermId);
 
-          console.log("✅ Auto-selecting term:", firstTermId);
+        setSelectedTerm(firstTermId);
 
-          setSelectedTerm(firstTermId);
-        } else {
+        // ✅ SAVE FULL TERM
+        setSelectedTermData(firstTerm);
+      }else {
           console.warn("⚠️ No terms found for this class");
 
           setSelectedTerm(null);
@@ -173,8 +202,14 @@ export default function GradebookDetail() {
           throw new Error("No terms returned");
         }
 
-        const termId = terms[0].id;
+        const firstTerm = terms[0];
+
+        const termId = firstTerm.id;
+
         console.log("✅ termId:", termId);
+
+        // ✅ SAVE FULL TERM
+        setSelectedTermData(firstTerm);
 
         // ✅ STEP 3: fetch gradebook with term
         const finalRes = await apiClient.get(
@@ -188,7 +223,7 @@ export default function GradebookDetail() {
         setData(finalRes.data);
 
         // 🆕 FETCH ATTENDANCE (RIGHT PLACE)
-        await fetchAttendance(classId, termId);
+        await fetchAttendance(classId, firstTerm);
 
         console.log("✅ Gradebook loaded");
 

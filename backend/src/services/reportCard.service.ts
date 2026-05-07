@@ -106,6 +106,35 @@ export async function generateReportCardsForClass({
       const average = count > 0 ? total / count : 0;
 
       /**
+       * Attendance Absence Count
+       */
+      const term = await tx.term.findUnique({
+        where: { id: termId },
+      });
+
+      if (!term) {
+        throw new Error("Term not found");
+      }
+
+      const attendanceAbsent = await tx.attendanceEntry.count({
+        where: {
+          studentId: student.id,
+          status: "ABSENT",
+          session: {
+            date: {
+              gte: term.startDate,
+              lte: term.endDate,
+            },
+          },
+        },
+      });
+
+      console.log(
+        `📅 Student ${student.id} absent days:`,
+        attendanceAbsent
+      );
+
+      /**
        * Upsert report card
        */
       const reportCard = await tx.reportCard.upsert({
@@ -118,6 +147,7 @@ export async function generateReportCardsForClass({
         update: {
           total,
           average,
+          attendanceAbsent,
           status: ReportCardStatus.GENERATED,
         },
         create: {
@@ -126,6 +156,7 @@ export async function generateReportCardsForClass({
           termId,
           total,
           average,
+          attendanceAbsent,
           status: ReportCardStatus.GENERATED,
         },
       });

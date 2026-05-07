@@ -128,6 +128,9 @@ export default function ParentReportCardView() {
           <p className="text-lg font-semibold">
             {reportCard.average ?? "-"}
           </p>
+          <div className="mt-1 text-sm text-gray-600">
+            Days Absent: {reportCard.attendanceAbsent ?? 0}
+          </div>
         </div>
       </div>
 

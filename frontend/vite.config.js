@@ -4,15 +4,31 @@ import path from "path";
 
 export default defineConfig({
   plugins: [react()],
+
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
     },
   },
+
   server: {
+    host: "0.0.0.0",
     port: 5173,
+
+    watch: {
+      usePolling: true,
+      interval: 100,
+    },
+
+    hmr: {
+      overlay: true,
+    },
+
     proxy: {
-      "/api": "http://localhost:5000",
+      "/api": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+      },
     },
   },
 });

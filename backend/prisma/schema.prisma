@@ -101,9 +101,8 @@ model Guardian {
 
 model ParentStudent {
   id        Int     @id @default(autoincrement())
-  parentId  String  
+  parentId  String
   studentId Int
-
   parent    Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
   student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
@@ -126,7 +125,7 @@ model Sponsorship {
 model Subject {
   id              Int                      @id @default(autoincrement())
   name            String
-  code            String?                  
+  code            String?
   createdAt       DateTime                 @default(now())
   teacherId       Int?
   assessments     Assessment[]
@@ -260,6 +259,7 @@ model ReportCard {
   termId      Int
   classId     Int
   average     Float
+  attendanceAbsent Int                 @default(0)
   generatedAt DateTime                 @default(now())
   publishedAt DateTime?
   total       Float
