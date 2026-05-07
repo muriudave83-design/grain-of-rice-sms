@@ -6,6 +6,7 @@ import { requireRole } from "../middlewares/rolesMiddleware";
 import {
   listUsers,
   archiveUser,
+  updateUser,
 } from "../controllers/admin.users.controller";
 
 const router = Router();
@@ -60,6 +61,16 @@ router.get(
   authenticate,
   requireRole(["ADMIN"]),
   listUsers
+);
+
+/**
+ * ✏️ PATCH /api/admin/users/:id (Update user)
+ */
+router.patch(
+  "/users/:id",
+  authenticate,
+  requireRole(["ADMIN"]),
+  updateUser
 );
 
 /**

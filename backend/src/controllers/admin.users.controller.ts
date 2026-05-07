@@ -87,11 +87,19 @@ export const archiveUser = async (req: Request, res: Response) => {
       }
     }
 
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     await prisma.user.update({
       where: { id: userId },
       data: {
-        isArchived: true,
-        isActive: false,
+        isArchived: !existingUser.isArchived,
+        isActive: existingUser.isArchived,
       },
     });
 
@@ -271,3 +279,73 @@ export async function createParent(req: Request, res: Response) {
 export async function createStudent(req: Request, res: Response) {
   return createUserInternal(req, res, "STUDENT");
 }
+
+/**
+ * ✏️ ADMIN: Update User (Edit Name / Email)
+ * PATCH /api/admin/users/:id
+ */
+export const updateUser = async (req: Request, res: Response) => {
+  try {
+    const userId = Number(req.params.id);
+    const { name, email } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Normalize email
+    const normalizedEmail = email?.toLowerCase();
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Prevent duplicate email
+    if (normalizedEmail && normalizedEmail !== user.email) {
+      const existing = await prisma.user.findUnique({
+        where: { email: normalizedEmail },
+      });
+
+      if (existing) {
+        return res.status(409).json({ message: "Email already in use" });
+      }
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: name ?? user.name,
+        email: normalizedEmail ?? user.email,
+      },
+    });
+
+    await createAuditLog({
+      action: AuditAction.USER_UPDATED,
+      entityType: "User",
+      entityId: String(user.id),
+      actorUserId: String(req.user.id),
+      actorRole: req.user.role,
+      metadata: {
+        updatedFields: { name, email },
+      },
+    });
+
+    return res.json({
+      message: "User updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Failed to update user:", error);
+    return res.status(500).json({
+      message: "Failed to update user",
+    });
+  }
+};

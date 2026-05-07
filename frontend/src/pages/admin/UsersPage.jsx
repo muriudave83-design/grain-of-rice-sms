@@ -109,7 +109,7 @@ export default function UsersPage() {
       admissionNo: "",
       classId: "",
       dob: "",
-      password: "", // 🚫 password NOT used in edit anymore
+      password: "",
     });
     setShowForm(true);
   }
@@ -121,15 +121,14 @@ export default function UsersPage() {
 
     try {
       if (editingUser) {
-        // 🚫 DO NOT send password on edit
         const { password, ...safeData } = form;
 
-        await apiClient.put(
+        // ✅ FIXED: PUT → PATCH
+        await apiClient.patch(
           `/admin/users/${editingUser.id}`,
           safeData
         );
       } else {
-        // ✅ CREATE FLOW WITH FORCE PASSWORD CHANGE
         if (form.role === "STUDENT") {
           await apiClient.post("/admin/users/student", {
             name: `${form.firstName} ${form.lastName}`,
@@ -140,26 +139,30 @@ export default function UsersPage() {
             dob: form.dob || null,
             email: form.email,
             password: form.password,
-            forcePasswordChange: true, // ✅ NEW
+            forcePasswordChange: true,
           });
         } else if (form.role === "TEACHER") {
           await apiClient.post("/admin/users/teacher", {
             name: form.name,
             email: form.email,
             password: form.password,
-            forcePasswordChange: true, // ✅ NEW
+            forcePasswordChange: true,
           });
         } else if (form.role === "PARENT") {
           await apiClient.post("/admin/users/parent", {
             name: form.name,
             email: form.email,
             password: form.password,
-            forcePasswordChange: true, // ✅ NEW
+            forcePasswordChange: true,
           });
         }
       }
 
       setShowForm(false);
+
+      // ✅ CLEAN UX FIX
+      setEditingUser(null);
+
       fetchUsers();
     } catch (err) {
       console.error("❌ CREATE USER ERROR FULL:", err);
@@ -279,8 +282,7 @@ export default function UsersPage() {
                 }
               />
             )}
-
-            {/* EMAIL */}
+                        {/* EMAIL */}
             <input
               required
               type="email"
@@ -290,7 +292,6 @@ export default function UsersPage() {
               onChange={(e) =>
                 setForm({ ...form, email: e.target.value })
               }
-              disabled={!!editingUser}
             />
 
             {/* 🔥 PASSWORD — ONLY ON CREATE */}
@@ -321,7 +322,8 @@ export default function UsersPage() {
                 </option>
               ))}
             </select>
-                        {/* STUDENT FIELDS */}
+
+            {/* STUDENT FIELDS */}
             {form.role === "STUDENT" && (
               <>
                 <input
