@@ -48,9 +48,40 @@ export default function GradebookDetail() {
   const [terms, setTerms] = useState([]);
   const [selectedTerm, setSelectedTerm] = useState(null);
 
+  // 🆕 ATTENDANCE STATE
+  const [attendanceMap, setAttendanceMap] = useState({});
+
+  // 🆕 FETCH ATTENDANCE
+  const fetchAttendance = async (classId, termId) => {
+    try {
+      if (!classId || !termId) return;
+
+      const res = await apiClient.get(
+        `/teacher/attendance/report`, // ✅ FIXED (teacher route)
+        {
+          params: {
+            classId,
+            startDate: "2026-01-01",
+            endDate: "2026-12-31",
+          },
+        }
+      );
+
+      const map = {};
+      res.data.forEach((r) => {
+        map[r.studentId] = r.absentDays || 0;
+      });
+
+      console.log("📊 Attendance Map:", map);
+
+      setAttendanceMap(map);
+    } catch (err) {
+      console.error("❌ Failed to fetch attendance", err);
+    }
+  };
+
   const fetchData = async (termId) => {
     try {
-      // 🔥 BLOCK BAD REQUEST
       if (!termId && classId !== null) {
         console.log("⛔ Prevented fetch without termId");
         return;
@@ -62,30 +93,24 @@ export default function GradebookDetail() {
           params: termId ? { termId } : {},
         }
       );
+
       setData(res.data);
 
-      // ✅ CRITICAL FIX — extract real classId from backend
       const realClassId = res.data?.class?.id;
 
       console.log("🎯 Extracted classId from gradebook:", realClassId);
 
-      if (realClassId === null || realClassId === undefined) {
-        console.warn("⚠️ No classId found in gradebook response");
-      } else {
+      if (realClassId !== null && realClassId !== undefined) {
         setClassId(realClassId);
       }
-
-      } catch (err) {
-        console.error("Failed to load gradebook:", err);
-        setError("Failed to load gradebook");
-      } finally {
-        setLoading(false);
-      }
-      };
-
-      // 🧱 LOAD TERMS
-
-  // 🧱 LOAD TERMS
+    } catch (err) {
+      console.error("Failed to load gradebook:", err);
+      setError("Failed to load gradebook");
+    } finally {
+      setLoading(false);
+    }
+  };
+    // 🧱 LOAD TERMS
   useEffect(() => {
     async function loadTerms() {
       try {
@@ -108,7 +133,7 @@ export default function GradebookDetail() {
         }
       } catch (err) {
         console.error("❌ Failed to load terms", err);
-        setLoading(false); // ✅ ALSO prevent freeze on error
+        setLoading(false);
       }
     }
 
@@ -117,111 +142,113 @@ export default function GradebookDetail() {
     }
   }, [classId]);
 
-// 🧱 FETCH GRADEBOOK (DETERMINISTIC — NO RACE CONDITIONS)
-// 🧱 FETCH GRADEBOOK (CORRECT ID FLOW)
-useEffect(() => {
-  const init = async () => {
-    try {
-      setLoading(true);
-      console.log("🚀 START INIT");
+  // 🧱 FETCH GRADEBOOK (DETERMINISTIC — NO RACE CONDITIONS)
+  useEffect(() => {
+    const init = async () => {
+      try {
+        setLoading(true);
+        console.log("🚀 START INIT");
 
-      // ✅ STEP 1: get gradebook (to extract classId)
-      const baseRes = await apiClient.get(
-        `/teacher/gradebook/${id}`
-      );
+        // ✅ STEP 1: get gradebook (to extract classId)
+        const baseRes = await apiClient.get(
+          `/teacher/gradebook/${id}`
+        );
 
-      const classId = baseRes.data?.class?.id;
+        const classId = baseRes.data?.class?.id;
 
-      if (!classId) {
-        throw new Error("classId not found in gradebook");
-      }
-
-      console.log("✅ classId:", classId);
-
-      // ✅ STEP 2: get terms using REAL classId
-      const termRes = await apiClient.get(
-        `/teacher/terms/${classId}`
-      );
-
-      const terms = termRes.data;
-
-      if (!terms || terms.length === 0) {
-        throw new Error("No terms returned");
-      }
-
-      const termId = terms[0].id;
-
-      console.log("✅ termId:", termId);
-
-      // ✅ STEP 3: fetch gradebook with term
-      const finalRes = await apiClient.get(
-        `/teacher/gradebook/${id}`,
-        {
-          params: { termId },
+        if (!classId) {
+          throw new Error("classId not found in gradebook");
         }
-      );
 
-      setSelectedTerm(termId);
-      setData(finalRes.data);
+        console.log("✅ classId:", classId);
 
-      console.log("✅ Gradebook loaded");
+        // ✅ STEP 2: get terms
+        const termRes = await apiClient.get(
+          `/teacher/terms/${classId}`
+        );
 
+        const terms = termRes.data;
+
+        if (!terms || terms.length === 0) {
+          throw new Error("No terms returned");
+        }
+
+        const termId = terms[0].id;
+        console.log("✅ termId:", termId);
+
+        // ✅ STEP 3: fetch gradebook with term
+        const finalRes = await apiClient.get(
+          `/teacher/gradebook/${id}`,
+          {
+            params: { termId },
+          }
+        );
+
+        setSelectedTerm(termId);
+        setData(finalRes.data);
+
+        // 🆕 FETCH ATTENDANCE (RIGHT PLACE)
+        await fetchAttendance(classId, termId);
+
+        console.log("✅ Gradebook loaded");
+
+      } catch (err) {
+        console.error("💥 INIT FAILED", err);
+        setError(err.message || "Failed to load gradebook");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) init();
+  }, [id]);
+
+  const handleRightClick = (e, assignment) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      assignment,
+    });
+  };
+
+  const students = data?.class?.students || [];
+  const assignments = data?.assignments || [];
+    // ✅ DRAG HANDLER
+  const handleDragEnd = async (result) => {
+    if (!result.destination) return;
+
+    const items = Array.from(assignments);
+    const [moved] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, moved);
+
+    try {
+      await apiClient.put("/teacher/assignment/reorder", {
+        assignments: items.map((a, index) => ({
+          id: a.id,
+          position: index,
+        })),
+      });
+
+      setData((prev) => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          assignments: items,
+        };
+      });
     } catch (err) {
-      console.error("💥 INIT FAILED", err);
-      setError(err.message || "Failed to load gradebook");
-    } finally {
-      setLoading(false);
+      console.error("Reorder failed", err);
     }
   };
 
-  if (id) init();
-}, [id]);
-
-const handleRightClick = (e, assignment) => {
-  e.preventDefault();
-  e.stopPropagation();
-
-  setContextMenu({
-    x: e.clientX,
-    y: e.clientY,
-    assignment,
-  });
-};
-
-const students = data?.class?.students || [];
-const assignments = data?.assignments || [];
-
-// ✅ DRAG HANDLER
-
-// ✅ DRAG HANDLER
-const handleDragEnd = async (result) => {
-  if (!result.destination) return;
-
-  const items = Array.from(assignments);
-  const [moved] = items.splice(result.source.index, 1);
-  items.splice(result.destination.index, 0, moved);
-
-  try {
-    await apiClient.put("/teacher/assignment/reorder", {
-      assignments: items.map((a, index) => ({
-        id: a.id,
-        position: index,
-      })),
-    });
-
-    // ✅ Only update state AFTER successful API call
-    setData((prev) => {
-      if (!prev) return prev;
-
-      return {
-        ...prev,
-        assignments: items,
-      };
-    });
-  } catch (err) {
-    console.error("Reorder failed", err);
-  }
-};
+  // 🆕 GET ABSENT DAYS (HELPER)
+  const getAbsentDays = (studentId) => {
+    return attendanceMap[studentId] || 0;
+  };
 
   // ✅ CATEGORY AVERAGES
   const getCategoryAverages = (student) => {
@@ -257,55 +284,52 @@ const handleDragEnd = async (result) => {
     return result;
   };
 
-// ✅ CATEGORY WEIGHTS
-const getCategoryWeights = () => {
-  const weights = data?.categoryWeights;
+  // ✅ CATEGORY WEIGHTS
+  const getCategoryWeights = () => {
+    const weights = data?.categoryWeights;
 
-  // 🔥 No weights → fallback to equal distribution
-  if (!weights || weights.length === 0) {
-    const uniqueTypes = [
-      ...new Set(assignments.map((a) => a.type || "HOMEWORK")),
-    ];
+    if (!weights || weights.length === 0) {
+      const uniqueTypes = [
+        ...new Set(assignments.map((a) => a.type || "HOMEWORK")),
+      ];
 
-    const equal = uniqueTypes.length > 0 ? 1 / uniqueTypes.length : 1;
+      const equal = uniqueTypes.length > 0 ? 1 / uniqueTypes.length : 1;
 
-    return uniqueTypes.map((type) => ({ type, weight: equal }));
-  }
+      return uniqueTypes.map((type) => ({ type, weight: equal }));
+    }
 
-  const totalWeight = weights.reduce(
-    (sum, w) => sum + (Number(w.weight) || 0),
-    0
-  );
+    const totalWeight = weights.reduce(
+      (sum, w) => sum + (Number(w.weight) || 0),
+      0
+    );
 
-  // 🔥 Prevent divide-by-zero + normalize if needed
-  if (totalWeight <= 0) {
-    console.warn("⚠️ Invalid category weights. Falling back to equal weights.");
+    if (totalWeight <= 0) {
+      console.warn("⚠️ Invalid category weights. Falling back to equal weights.");
 
-    const uniqueTypes = [
-      ...new Set(assignments.map((a) => a.type || "HOMEWORK")),
-    ];
+      const uniqueTypes = [
+        ...new Set(assignments.map((a) => a.type || "HOMEWORK")),
+      ];
 
-    const equal = uniqueTypes.length > 0 ? 1 / uniqueTypes.length : 1;
+      const equal = uniqueTypes.length > 0 ? 1 / uniqueTypes.length : 1;
 
-    return uniqueTypes.map((type) => ({ type, weight: equal }));
-  }
+      return uniqueTypes.map((type) => ({ type, weight: equal }));
+    }
 
-  if (Math.abs(totalWeight - 1) > 0.01) {
-    console.warn("⚠️ Category weights do not sum to 1. Auto-normalizing...");
+    if (Math.abs(totalWeight - 1) > 0.01) {
+      console.warn("⚠️ Category weights do not sum to 1. Auto-normalizing...");
+
+      return weights.map((w) => ({
+        ...w,
+        weight: (Number(w.weight) || 0) / totalWeight,
+      }));
+    }
 
     return weights.map((w) => ({
       ...w,
-      weight: (Number(w.weight) || 0) / totalWeight,
+      weight: Number(w.weight) || 0,
     }));
-  }
-
-  return weights.map((w) => ({
-    ...w,
-    weight: Number(w.weight) || 0,
-  }));
-};
-
-  // ✅ FINAL GRADE
+  };
+    // ✅ FINAL GRADE
   const calculateFinalGrade = (categoryAverages, weights) => {
     if (!categoryAverages || !weights) return 0;
 
@@ -365,7 +389,8 @@ const getCategoryWeights = () => {
       console.error("Failed to create assignment", err);
     }
   };
-    const getStudentTotal = (student) => {
+
+  const getStudentTotal = (student) => {
     if (!assignments) return 0;
 
     let total = 0;
@@ -421,8 +446,7 @@ const getCategoryWeights = () => {
     if (grade === "D") return "text-orange-600";
     return "text-red-600";
   };
-
-  // ✅ RANKING
+    // ✅ RANKING
   const { ranked: rankedStudents, positionMap } = useMemo(() => {
     return rankStudents(students || [], getFinalGrade);
   }, [students, assignments, data?.categoryWeights]);
@@ -488,33 +512,33 @@ const getCategoryWeights = () => {
     }
   };
 
-const handleWeightChange = async (id, weight) => {
-  const weightNumber = Number(weight);
-  if (isNaN(weightNumber)) return;
+  const handleWeightChange = async (id, weight) => {
+    const weightNumber = Number(weight);
+    if (isNaN(weightNumber)) return;
 
-  try {
-    await apiClient.put(`/teacher/assignment/${id}`, {
-      weight: weightNumber,
-    });
+    try {
+      await apiClient.put(`/teacher/assignment/${id}`, {
+        weight: weightNumber,
+      });
 
-    setData((prev) => {
-      if (!prev) return prev;
+      setData((prev) => {
+        if (!prev) return prev;
 
-      return {
-        ...prev,
-        assignments: prev.assignments.map((a) =>
-          a.id === id
-            ? { ...a, weight: weightNumber }
-            : a
-        ),
-      };
-    });
-  } catch (err) {
-    console.error("Weight update failed", err);
-  }
-};
+        return {
+          ...prev,
+          assignments: prev.assignments.map((a) =>
+            a.id === id
+              ? { ...a, weight: weightNumber }
+              : a
+          ),
+        };
+      });
+    } catch (err) {
+      console.error("Weight update failed", err);
+    }
+  };
 
-    // 🧱 CSV EXPORT
+  // 🧱 CSV EXPORT
   const handleExportCSV = () => {
     if (!data) return;
 
@@ -522,6 +546,7 @@ const handleWeightChange = async (id, weight) => {
       "Student Name",
       ...assignments.map((a) => a.title),
       "Final",
+      "Absent", // 🆕 ADDED
     ];
 
     const rows = students.map((student) => {
@@ -533,11 +558,13 @@ const handleWeightChange = async (id, weight) => {
       });
 
       const final = getStudentAverage(student);
+      const absent = getAbsentDays(student.id);
 
       return [
         `${student.firstName} ${student.lastName}`,
         ...scores,
         final ? final.toFixed(1) : "",
+        absent,
       ];
     });
 
@@ -556,8 +583,7 @@ const handleWeightChange = async (id, weight) => {
     link.download = "gradebook.csv";
     link.click();
   };
-
-  // 🧱 CSV IMPORT
+    // 🧱 CSV IMPORT
   const handleImportCSV = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -642,103 +668,99 @@ const handleWeightChange = async (id, weight) => {
   };
 
   // 🧠 SCORE SAVE
-// 🧠 SCORE SAVE
-const handleScoreChange = async (
-  studentId,
-  assignmentId,
-  value,
-  isLocked
-) => {
-  if (isLocked) return;
-  if (value === "") return;
+  const handleScoreChange = async (
+    studentId,
+    assignmentId,
+    value,
+    isLocked
+  ) => {
+    if (isLocked) return;
+    if (value === "") return;
 
-  const score = Number(value);
-  const assignment = assignments.find((a) => a.id === assignmentId);
+    const score = Number(value);
+    const assignment = assignments.find((a) => a.id === assignmentId);
 
-  if (!assignment) return;
-  if (isNaN(score) || score < 0) return;
+    if (!assignment) return;
+    if (isNaN(score) || score < 0) return;
 
-  // 🔥 VALIDATION
-  if (score > (assignment.maxPoints || 100)) {
-    alert("Score cannot exceed max points");
-    return;
-  }
+    if (score > (assignment.maxPoints || 100)) {
+      alert("Score cannot exceed max points");
+      return;
+    }
 
-  try {
-    setSaving(true);
+    try {
+      setSaving(true);
 
-    await apiClient.post("/teacher/score", {
-      studentId,
-      assignmentId,
-      score,
-    });
+      await apiClient.post("/teacher/score", {
+        studentId,
+        assignmentId,
+        score,
+      });
 
-    setData((prev) => {
-      if (!prev) return prev;
+      setData((prev) => {
+        if (!prev) return prev;
 
-      return {
-        ...prev,
-        assignments: prev.assignments.map((a) => {
-          if (a.id !== assignmentId) return a;
+        return {
+          ...prev,
+          assignments: prev.assignments.map((a) => {
+            if (a.id !== assignmentId) return a;
 
-          const existing = a.scores?.find(
-            (s) => String(s.studentId) === String(studentId)
-          );
-
-          let updatedScores;
-
-          if (existing) {
-            updatedScores = a.scores.map((s) =>
-              String(s.studentId) === String(studentId)
-                ? { ...s, score }
-                : s
+            const existing = a.scores?.find(
+              (s) => String(s.studentId) === String(studentId)
             );
-          } else {
-            updatedScores = [...(a.scores || []), { studentId, score }];
-          }
 
-          return {
-            ...a,
-            scores: updatedScores,
-          };
-        }),
-      };
-    });
+            let updatedScores;
 
-    setLocalScores((prev) => {
-      const copy = { ...prev };
-      delete copy[`${studentId}-${assignmentId}`];
-      return copy;
-    });
-  } catch (err) {
-    console.error("Failed to save score", err);
-  } finally {
-    setSaving(false);
-  }
-};
+            if (existing) {
+              updatedScores = a.scores.map((s) =>
+                String(s.studentId) === String(studentId)
+                  ? { ...s, score }
+                  : s
+              );
+            } else {
+              updatedScores = [...(a.scores || []), { studentId, score }];
+            }
 
-console.log("RENDER STATE:", { loading, error, data });
+            return {
+              ...a,
+              scores: updatedScores,
+            };
+          }),
+        };
+      });
 
-if (!selectedTerm && terms.length === 0)
-  return <div className="p-6">Setting up gradebook...</div>;
+      setLocalScores((prev) => {
+        const copy = { ...prev };
+        delete copy[`${studentId}-${assignmentId}`];
+        return copy;
+      });
+    } catch (err) {
+      console.error("Failed to save score", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+    console.log("RENDER STATE:", { loading, error, data });
 
-if (loading)
-  return <div className="p-6">Loading gradebook...</div>;
+  if (!selectedTerm && terms.length === 0)
+    return <div className="p-6">Setting up gradebook...</div>;
 
-if (error)
-  return <div className="p-6 text-red-500">{error}</div>;
+  if (loading)
+    return <div className="p-6">Loading gradebook...</div>;
 
-if (!data)
-  return <div className="p-6">No gradebook data</div>;
+  if (error)
+    return <div className="p-6 text-red-500">{error}</div>;
 
-return (
-  <div className="p-6" onClick={() => setContextMenu(null)}>
+  if (!data)
+    return <div className="p-6">No gradebook data</div>;
 
-    <BackButton />
+  return (
+    <div className="p-6" onClick={() => setContextMenu(null)}>
+      <BackButton />
 
-    <h1 className="text-2xl font-bold mb-4">
-      {data.class?.name} - {data.subject?.name}
-    </h1>
+      <h1 className="text-2xl font-bold mb-4">
+        {data.class?.name} - {data.subject?.name}
+      </h1>
 
       {/* 🧱 TERM SELECTOR */}
       <div className="mb-4">
@@ -785,7 +807,7 @@ return (
         </button>
       </div>
 
-      {/* 🔥 NEW BUTTON (REPLACES OLD INPUT BAR) */}
+      {/* 🔥 NEW BUTTON */}
       <div className="mb-4">
         <button
           onClick={() => setShowModal(true)}
@@ -794,8 +816,7 @@ return (
           + New Assignment
         </button>
       </div>
-
-      {/* TABLE (UNCHANGED) */}
+            {/* TABLE */}
       <div>
         <table className="min-w-full border border-gray-300">
           <thead>
@@ -810,6 +831,9 @@ return (
                     <th className="border px-4 py-2 text-left">
                       Student
                     </th>
+
+                    {/* 🆕 ABSENT COLUMN */}
+                    <th className="border p-2">Absent</th>
 
                     {assignments.map((a, index) => (
                       <Draggable
@@ -898,19 +922,24 @@ return (
               </Droppable>
             </DragDropContext>
           </thead>
-
-          <tbody>
+                    <tbody>
             {rankedStudents.map((student) => {
               const total = getStudentTotal(student);
               const avg = getStudentAverage(student);
               const final = getFinalGrade(student);
               const grade = getGrade(final);
               const position = getPosition(student.id);
+              const absent = getAbsentDays(student.id); // 🆕
 
               return (
                 <tr key={student.id}>
                   <td className="border px-4 py-2">
                     {student.firstName} {student.lastName}
+                  </td>
+
+                  {/* 🆕 ABSENT CELL */}
+                  <td className="border p-2 font-semibold text-center">
+                    {absent}
                   </td>
 
                   {assignments.map((a) => {
@@ -956,7 +985,6 @@ return (
                           }`}
                         />
 
-                        {/* 🔥 ADD THIS DIRECTLY UNDER INPUT */}
                         <div className="text-xs text-gray-500">
                           / {a.maxPoints || 100}
                         </div>
@@ -989,8 +1017,7 @@ return (
           </tbody>
         </table>
       </div>
-
-      {/* 🔥 MODAL */}
+            {/* 🔥 MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded w-96 space-y-3">
@@ -1034,7 +1061,6 @@ return (
               </label>
               <input
                 type="date"
-                title="Select assigned date"
                 value={form.dateAssigned}
                 onChange={(e) =>
                   setForm({ ...form, dateAssigned: e.target.value })
@@ -1049,7 +1075,6 @@ return (
               </label>
               <input
                 type="date"
-                title="Select due date"
                 value={form.dueDate}
                 onChange={(e) =>
                   setForm({ ...form, dueDate: e.target.value })
@@ -1077,7 +1102,7 @@ return (
         </div>
       )}
 
-      {/* CONTEXT MENU (UNCHANGED) */}
+      {/* CONTEXT MENU */}
       {contextMenu && (
         <div
           style={{

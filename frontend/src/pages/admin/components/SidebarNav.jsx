@@ -7,7 +7,7 @@ export default function SidebarNav() {
   const [open, setOpen] = useState({
     management: true,
     academics: true,
-    finance: true, // ✅ NEW SECTION
+    finance: true,
   });
 
   const toggle = (section) => {
@@ -27,15 +27,24 @@ export default function SidebarNav() {
   const path = (p) => (p ? `${BASE_PATH}/${p}` : BASE_PATH);
 
   return (
-    <nav className="p-3 flex-1 overflow-y-auto">
+    <nav className="p-3">
 
       {/* DASHBOARD */}
       <NavLink to={BASE_PATH} end className={linkClass}>
         <span>🏠</span> Dashboard
       </NavLink>
 
+      {/* ✅ MOVED TO TOP FOR DEBUG + PERMANENT VISIBILITY */}
+      <NavLink
+        to={path("attendance-reports")}
+        className={linkClass}
+      >
+        📄 Attendance Reports
+      </NavLink>
+
       {/* MANAGEMENT */}
       <div className="mt-4">
+
         <button
           onClick={() => toggle("management")}
           className="w-full text-left text-xs font-bold text-gray-500 uppercase tracking-wide mb-2"
@@ -45,6 +54,7 @@ export default function SidebarNav() {
 
         {open.management && (
           <div className="ml-2">
+
             <NavLink to={path("users")} className={linkClass}>
               👤 Users
             </NavLink>
@@ -72,12 +82,14 @@ export default function SidebarNav() {
             <NavLink to={path("archived")} className={linkClass}>
               🗂️ Archived
             </NavLink>
+
           </div>
         )}
       </div>
 
       {/* ACADEMICS */}
       <div className="mt-4">
+
         <button
           onClick={() => toggle("academics")}
           className="w-full text-left text-xs font-bold text-gray-500 uppercase tracking-wide mb-2"
@@ -87,6 +99,7 @@ export default function SidebarNav() {
 
         {open.academics && (
           <div className="ml-2">
+
             <NavLink to={path("subjects")} className={linkClass}>
               📚 Subjects
             </NavLink>
@@ -106,12 +119,14 @@ export default function SidebarNav() {
             <NavLink to={path("reports")} className={linkClass}>
               📊 Reports
             </NavLink>
+
           </div>
         )}
       </div>
 
-      {/* ✅ NEW: FINANCE & WELFARE */}
+      {/* FINANCE */}
       <div className="mt-4">
+
         <button
           onClick={() => toggle("finance")}
           className="w-full text-left text-xs font-bold text-gray-500 uppercase tracking-wide mb-2"
@@ -121,6 +136,7 @@ export default function SidebarNav() {
 
         {open.finance && (
           <div className="ml-2">
+
             <NavLink to={path("fees")} className={linkClass}>
               💰 Fees
             </NavLink>
@@ -132,14 +148,16 @@ export default function SidebarNav() {
             <NavLink to={path("discipline")} className={linkClass}>
               ⚠️ Discipline
             </NavLink>
+
           </div>
         )}
       </div>
 
       {/* FOOTER */}
-      <div className="mt-6 text-xs text-gray-400">
+      <div className="mt-6 text-xs text-gray-400 pb-10">
         v0.1 — Demo
       </div>
+
     </nav>
   );
 }

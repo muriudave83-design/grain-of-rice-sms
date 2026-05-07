@@ -38,6 +38,7 @@ import AdminArchived from "../pages/admin/AdminArchived";
 import EditStudent from "../pages/admin/EditStudent";
 import AttendancePage from "../pages/admin/AttendancePage";
 import AdminReportsPage from "../pages/admin/AdminReportsPage";
+import AttendanceReport from "../pages/admin/AttendanceReport";
 
 
 // ✅ NEW: PARENTS PAGES
@@ -275,6 +276,11 @@ export default function AppRoutes() {
           <Route
             path="/dashboard/admin/reports"
             element={<AdminReportsPage />}
+          />
+
+          <Route
+            path="/dashboard/admin/attendance-reports"
+            element={<AttendanceReport />}
           />
 
           <Route

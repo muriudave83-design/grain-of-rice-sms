@@ -28,8 +28,107 @@ export class AttendanceController {
 
 /**
  * ============================================================
- * STUDENT — ATTENDANCE SUMMARY (NEW)
- * GET /api/attendance/student
+ * ✅ ATTENDANCE REPORT (ADMIN / INSPECTION)
+ * ============================================================
+ */
+export const getAttendanceReport = async (req: any, res: any) => {
+  try {
+    const { classId, startDate, endDate } = req.query;
+
+    if (!classId || !startDate || !endDate) {
+      return res.status(400).json({
+        message: "classId, startDate and endDate are required",
+      });
+    }
+
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    // ✅ Step 1: Get ALL sessions in range
+    const sessions = await prisma.attendanceSession.findMany({
+      where: {
+        classId: Number(classId),
+        date: {
+          gte: start,
+          lte: end,
+        },
+      },
+      select: {
+        id: true,
+        date: true,
+      },
+    });
+
+    if (sessions.length === 0) {
+      return res.json({
+        records: [],
+        summary: [],
+      });
+    }
+
+    const sessionIds = sessions.map((s) => s.id);
+
+    // ✅ Step 2: Get ALL absent records across sessions
+    const absentRecords = await prisma.attendanceEntry.findMany({
+      where: {
+        attendanceSessionId: { in: sessionIds },
+        status: "ABSENT",
+      },
+      include: {
+        student: true,
+        session: true,
+      },
+    });
+
+    // ✅ Step 3: Format records (FIXED admission 🔥)
+    const report = absentRecords.map((r: any) => ({
+      studentName: `${r.student.firstName} ${r.student.lastName}`,
+      admissionNumber:
+        r.student.admissionNumber ||
+        r.student.admissionNo ||
+        "N/A",
+      status: r.status,
+      date: r.session.date,
+    }));
+
+    // ✅ Step 4: Build summary (VERY IMPORTANT 🚀)
+    const summary: any = {};
+
+    report.forEach((r) => {
+      if (!summary[r.studentName]) {
+        summary[r.studentName] = {
+          studentName: r.studentName,
+          admissionNumber: r.admissionNumber,
+          totalAbsent: 0,
+        };
+      }
+
+      summary[r.studentName].totalAbsent += 1;
+    });
+
+    const summaryList = Object.values(summary);
+
+    // ✅ FINAL RESPONSE (NEW STRUCTURE)
+    return res.json({
+      records: report,
+      summary: summaryList,
+    });
+  } catch (err: any) {
+    console.error("🔥 REPORT ERROR:", err);
+
+    return res.status(500).json({
+      message: "Server error",
+      error: err.message,
+    });
+  }
+};
+
+/**
+ * ============================================================
+ * STUDENT — ATTENDANCE SUMMARY
  * ============================================================
  */
 export const getStudentAttendanceSummary = async (
@@ -39,7 +138,6 @@ export const getStudentAttendanceSummary = async (
   try {
     const studentId = (req as any).user.id;
 
-    // Fetch attendance entries for this student
     const records = await prisma.attendanceEntry.findMany({
       where: {
         studentId,
@@ -69,15 +167,13 @@ export const getStudentAttendanceSummary = async (
 
 /**
  * ============================================================
- * PARENT — GET ATTENDANCE FOR ALL OWN CHILDREN
- * GET /api/attendance/parent
+ * PARENT — GET ATTENDANCE
  * ============================================================
  */
 export const getParentAttendance = async (req: Request, res: Response) => {
   try {
     const parentId = (req as any).user.id;
 
-    // 1. Get linked students
     const links = await prisma.parentStudent.findMany({
       where: { parentId },
       select: { studentId: true },
@@ -89,7 +185,6 @@ export const getParentAttendance = async (req: Request, res: Response) => {
       return res.json([]);
     }
 
-    // 2. Get attendance entries
     const entries = await prisma.attendanceEntry.findMany({
       where: {
         studentId: { in: studentIds },
@@ -111,5 +206,49 @@ export const getParentAttendance = async (req: Request, res: Response) => {
   } catch (err) {
     console.error("getParentAttendance error:", err);
     res.status(500).json({ message: "Failed to fetch attendance" });
+  }
+};
+
+export const getStudentAbsenceCount = async (req: Request, res: Response) => {
+  try {
+    const { studentId, startDate, endDate } = req.query;
+
+    if (!studentId || !startDate || !endDate) {
+      return res.status(400).json({
+        message: "studentId, startDate and endDate are required",
+      });
+    }
+
+    const start = new Date(startDate as string);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(endDate as string);
+    end.setHours(23, 59, 59, 999);
+
+    // ✅ Count ABSENT entries
+    const absentCount = await prisma.attendanceEntry.count({
+      where: {
+        studentId: Number(studentId),
+        status: "ABSENT",
+        session: {
+          date: {
+            gte: start,
+            lte: end,
+          },
+        },
+      },
+    });
+
+    return res.json({
+      studentId,
+      totalAbsent: absentCount,
+    });
+  } catch (err: any) {
+    console.error("ABSENCE COUNT ERROR:", err);
+
+    return res.status(500).json({
+      message: "Server error",
+      error: err.message,
+    });
   }
 };

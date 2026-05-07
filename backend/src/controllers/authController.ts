@@ -105,6 +105,13 @@ export const loginUser = async (req: Request, res: Response) => {
       });
     }
 
+    if (user.mustChangePassword) {
+      return res.json({
+        requirePasswordChange: true,
+        userId: user.id,
+      });
+    }
+
     // 🛡️ BLOCK DEACTIVATED ACCOUNTS
     if (!user.isActive) {
       return res.status(403).json({
@@ -168,16 +175,7 @@ export const loginUser = async (req: Request, res: Response) => {
 // ======================================================
 export const changePassword = async (req: Request, res: Response) => {
   try {
-    if (!req.user) {
-      return res.status(401).json({
-        message: "Unauthorized",
-      });
-    }
-
-    const userId = req.user.id;
-    const userRole = req.user.role;
-
-    const { currentPassword, newPassword } = req.body;
+    const { currentPassword, newPassword, userId } = req.body;
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
@@ -185,55 +183,79 @@ export const changePassword = async (req: Request, res: Response) => {
       });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    // ✅ USE userId FROM BODY (TEMP FLOW FIX)
+    let targetUserId = userId;
 
-    if (!user) {
-      return res.status(404).json({
-        message: "User not found.",
+    // ✅ FALLBACK TO AUTH USER (NORMAL FLOW)
+    if (!targetUserId && req.user) {
+      targetUserId = req.user.id;
+    }
+
+    if (!targetUserId) {
+      return res.status(401).json({
+        message: "Unauthorized",
       });
     }
 
-    const isValid = await verifyPassword(
-      currentPassword,
-      user.password
-    );
+    // ✅ FIX: ensure ID is a number
+const numericUserId = Number(targetUserId);
 
-    if (!isValid) {
-      return res.status(400).json({
-        message: "Current password is incorrect.",
-      });
-    }
+if (isNaN(numericUserId)) {
+  return res.status(400).json({
+    message: "Invalid user ID",
+  });
+}
 
-    const hashedNewPassword = await hashPassword(newPassword);
+const user = await prisma.user.findUnique({
+  where: { id: numericUserId },
+});
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        password: hashedNewPassword,
-        mustChangePassword: false,
-        updatedAt: new Date(),
-      },
-    });
+if (!user) {
+  return res.status(404).json({
+    message: "User not found.",
+  });
+}
 
-    await createAuditLog({
-      action: AuditAction.PASSWORD_CHANGED,
-      entityType: "User",
-      entityId: String(userId),
-      actorUserId: String(userId),
-      actorRole: userRole,
-    });
+const isValid = await verifyPassword(
+  currentPassword,
+  user.password
+);
 
-    return res.json({
-      message: "Password updated successfully.",
-    });
-  } catch (err: any) {
-    console.error("🔥 CHANGE PASSWORD ERROR:", err);
+if (!isValid) {
+  return res.status(400).json({
+    message: "Current password is incorrect.",
+  });
+}
 
-    return res.status(500).json({
-      message: "Server error.",
-      error: err.message,
-    });
-  }
+const hashedNewPassword = await hashPassword(newPassword);
+
+await prisma.user.update({
+  where: { id: numericUserId }, // ✅ FIXED HERE TOO
+  data: {
+    password: hashedNewPassword,
+    mustChangePassword: false,
+    updatedAt: new Date(),
+  },
+});
+
+await createAuditLog({
+  action: AuditAction.PASSWORD_CHANGED,
+  entityType: "User",
+  entityId: String(numericUserId),
+  actorUserId: String(numericUserId),
+  actorRole: user.role,
+});
+
+return res.json({
+  message: "Password updated successfully.",
+});
+
+} catch (err: any) {
+  console.error("🔥 CHANGE PASSWORD ERROR:", err);
+
+  return res.status(500).json({
+    message: "Server error.",
+    error: err.message,
+  });
+}
 };

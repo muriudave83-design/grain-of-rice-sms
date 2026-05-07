@@ -61,7 +61,7 @@ const corsOptions = {
     "http://localhost:3000",
     "https://sms-frontend-gjfo.onrender.com",
   ],
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   credentials: true,
 };
 

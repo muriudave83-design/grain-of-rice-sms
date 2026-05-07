@@ -39,37 +39,48 @@ export default function Login() {
 
       console.log("✅ LOGIN RESPONSE:", res.data);
 
-      const { token, user, mustChangePassword } = res.data;
+      const {
+        token,
+        user,
+        requirePasswordChange,
+        mustChangePassword,
+        userId,
+      } = res.data;
 
-      // 🚨 HARD VALIDATION
+      // 🚨 HANDLE FORCED PASSWORD CHANGE (NO TOKEN / NO USER CASE)
+      if (requirePasswordChange || mustChangePassword) {
+        console.log("🔐 Password change required");
+
+        // ✅ clear any previous state
+        localStorage.clear();
+
+        // ✅ store temp userId for change-password request
+        if (userId) {
+          localStorage.setItem("tempUserId", userId);
+        }
+
+        navigate("/change-password", { replace: true });
+        return;
+      }
+
+      // 🚨 VALIDATE NORMAL LOGIN RESPONSE
       if (!token || !user || !user.id) {
         console.error("🚨 Invalid login response:", res.data);
         throw new Error("Invalid server response. Please contact admin.");
       }
 
-      console.log("🔥 TOKEN BEFORE SAVE:", token);
-      console.log("👤 USER:", user);
-      console.log("👉 ROLE:", user.role);
-      console.log("🔐 mustChangePassword:", mustChangePassword);
-
       // ✅ CLEAR OLD STATE
       localStorage.clear();
 
-      // ✅ STORE TOKEN FIRST (CRITICAL FOR RACE CONDITIONS)
+      // ✅ STORE AUTH
       localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
-
-      console.log("💾 Token after save:", localStorage.getItem("token"));
 
       // ✅ SYNC CONTEXT
       login(user, token);
 
-      // 🔐 PASSWORD ENFORCEMENT
-      if (mustChangePassword) {
-        console.log("➡️ Redirecting to /change-password");
-        navigate("/change-password", { replace: true });
-        return;
-      }
+      console.log("🔥 TOKEN AFTER SAVE:", localStorage.getItem("token"));
+      console.log("👤 USER:", user);
 
       // ✅ ROLE-BASED REDIRECT
       const normalizedRole = user.role?.toUpperCase();

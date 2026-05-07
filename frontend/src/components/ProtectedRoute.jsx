@@ -2,10 +2,10 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 export default function ProtectedRoute({ allowedRoles }) {
-  const { user, loading } = useAuth(); // 🔥 token not from context
+  const { user, loading } = useAuth();
   const location = useLocation();
 
-  const token = localStorage.getItem("token"); // ✅ single source of truth
+  const token = localStorage.getItem("token");
 
   // ⏳ Wait for auth restoration
   if (loading) {
@@ -20,9 +20,14 @@ export default function ProtectedRoute({ allowedRoles }) {
     path: location.pathname,
   });
 
-  // 🚨 CRITICAL: INVALID AUTH STATE (MOST IMPORTANT FIX)
-  if (!token || !user) {
-    console.error("🚨 Invalid auth state → forcing logout from:", location.pathname);
+  const isChangePasswordRoute = location.pathname === "/change-password";
+
+  // ✅ ALLOW ACCESS TO CHANGE PASSWORD EVEN IF TOKEN IS MISSING
+  if ((!token || !user) && !isChangePasswordRoute) {
+    console.error(
+      "🚨 Invalid auth state → forcing logout from:",
+      location.pathname
+    );
 
     localStorage.clear();
 
@@ -35,19 +40,21 @@ export default function ProtectedRoute({ allowedRoles }) {
     );
   }
 
-  // 🔐 FORCE PASSWORD CHANGE
+  // 🔐 FORCE PASSWORD CHANGE (FIXED FIELD NAME)
   if (
-    user.forcePasswordChange &&
-    location.pathname !== "/change-password"
+    user?.mustChangePassword &&
+    !isChangePasswordRoute
   ) {
+    console.log("🔐 Redirecting to forced password change");
+
     return <Navigate to="/change-password" replace />;
   }
 
   // 🚫 ROLE CHECK
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
+  if (allowedRoles && !allowedRoles.includes(user?.role)) {
     console.warn("🚫 Role mismatch", {
       required: allowedRoles,
-      actual: user.role,
+      actual: user?.role,
     });
 
     return <div>Access restricted</div>;

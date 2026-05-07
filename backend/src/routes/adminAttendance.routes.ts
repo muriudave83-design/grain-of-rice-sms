@@ -1,6 +1,7 @@
 import express from "express"
 import { PrismaClient } from "@prisma/client"
 import { markAttendance } from "../controllers/attendance/markAttendance.controller"
+import { getAttendanceReport } from "../controllers/attendance.controller"
 
 const router = express.Router()
 const prisma = new PrismaClient()
@@ -176,6 +177,7 @@ router.get("/class/:classId", async (req, res) => {
       }
     })
 
+    console.log("STUDENT SAMPLE:", students[0])
     const result = students.map(student => {
       let status = "NOT_MARKED"
 
@@ -190,7 +192,7 @@ router.get("/class/:classId", async (req, res) => {
 
       return {
         studentId: student.id,
-        name: student.user?.name || "Unknown",
+        name: `${student.firstName} ${student.lastName}`,
         status
       }
     })
@@ -211,5 +213,10 @@ Admin Mark Attendance
 POST /admin/attendance/mark
 */
 router.post("/mark", markAttendance)
+/*
+Admin Attendance Report (DATE RANGE + SUMMARY)
+GET /admin/attendance/report
+*/
+router.get("/report", getAttendanceReport)
 
 export default router

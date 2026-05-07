@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import apiClient from "../services/apiClient"; // ✅ USE THIS
+import apiClient from "../services/apiClient";
 import { useAuth } from "../context/AuthContext";
 
 export default function ChangePassword() {
@@ -12,6 +12,17 @@ export default function ChangePassword() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // ✅ GET TEMP USER ID (CRITICAL FIX)
+  const tempUserId = localStorage.getItem("tempUserId");
+
+  // ✅ ENSURE USER EXISTS (but allow temp flow)
+  useEffect(() => {
+    if (!user && !tempUserId) {
+      console.warn("⚠️ No user or tempUserId → redirecting to login");
+      navigate("/login", { replace: true });
+    }
+  }, [user, tempUserId, navigate]);
 
   const passwordStrength = useMemo(() => {
     if (!newPassword) return { label: "", color: "" };
@@ -36,25 +47,28 @@ export default function ChangePassword() {
       return setError("New passwords do not match.");
     }
 
+    if (!currentPassword) {
+      return setError("Current password is required.");
+    }
+
     try {
       setLoading(true);
 
       console.log("🚀 Sending change-password request");
 
-      // ✅ USE apiClient (INTERCEPTOR ATTACHES TOKEN)
       await apiClient.patch("/auth/change-password", {
+        userId: tempUserId, // ✅ CRITICAL FIX
         currentPassword,
         newPassword,
       });
 
       console.log("✅ Password updated successfully");
-
-      // 🔐 FORCE RE-LOGIN AFTER PASSWORD CHANGE
+            // 🔐 CLEAR ALL AUTH STATE
       localStorage.removeItem("token");
       localStorage.removeItem("user");
+      localStorage.removeItem("tempUserId");
 
       navigate("/login", { replace: true });
-      return;
 
     } catch (err: any) {
       console.error("❌ Change password error:", err);
@@ -171,16 +185,6 @@ export default function ChangePassword() {
               borderRadius: "6px",
               cursor: loading ? "not-allowed" : "pointer",
               transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              if (!loading)
-                (e.target as HTMLButtonElement).style.backgroundColor =
-                  "#1a252f";
-            }}
-            onMouseLeave={(e) => {
-              if (!loading)
-                (e.target as HTMLButtonElement).style.backgroundColor =
-                  "#2c3e50";
             }}
           >
             {loading ? "Updating..." : "Update Password"}

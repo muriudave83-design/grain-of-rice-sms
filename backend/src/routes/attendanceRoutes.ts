@@ -8,9 +8,16 @@ import { getAttendanceSession } from "../controllers/attendance/getAttendanceSes
 import { saveAttendanceRecords } from "../controllers/attendance/saveAttendanceRecords.controller";
 import { getAttendanceByClass } from "../controllers/attendance/getAttendanceByClass.controller";
 import { getParentAttendanceSummary } from "../controllers/attendance/getParentAttendanceSummary.controller";
-import { getParentAttendance, getStudentAttendanceSummary } from "../controllers/attendance.controller";
 
-// ✅ NEW IMPORT
+// ✅ UPDATED IMPORT (added new controller here)
+import { 
+  getParentAttendance, 
+  getStudentAttendanceSummary,
+  getAttendanceReport,
+  getStudentAbsenceCount
+} from "../controllers/attendance.controller";
+
+// ✅ EXISTING IMPORTS
 import { getTodaySession } from "../controllers/attendance/getTodaySession.controller";
 import { getClassAttendance } from "../controllers/attendance/getClassAttendance.controller";
 
@@ -86,7 +93,7 @@ router.get("/classes/:classId", authenticate, async (req, res) => {
   }
 });
 
-// ✅ NEW: ADMIN CLASS ATTENDANCE (matches frontend)
+// ✅ ADMIN CLASS ATTENDANCE (matches frontend)
 router.get("/class/:classId", authenticate, async (req, res) => {
   try {
     return await getClassAttendance(req, res);
@@ -95,6 +102,32 @@ router.get("/class/:classId", authenticate, async (req, res) => {
     return res.status(500).json({
       students: [],
       message: "Could not load admin class attendance",
+    });
+  }
+});
+
+// ✅ NEW: ATTENDANCE REPORT (FILTER BY CLASS + DATE + ABSENTEES)
+router.get("/report", authenticate, async (req, res) => {
+  try {
+    return await getAttendanceReport(req, res);
+  } catch (err) {
+    console.error("Attendance report error:", err);
+    return res.status(500).json({
+      data: [],
+      message: "Could not generate attendance report",
+    });
+  }
+});
+
+// ✅ NEW: STUDENT ABSENCE COUNT (FOR REPORT CARD)
+router.get("/student-absence", authenticate, async (req, res) => {
+  try {
+    return await getStudentAbsenceCount(req, res);
+  } catch (err) {
+    console.error("Student absence count error:", err);
+    return res.status(500).json({
+      count: 0,
+      message: "Could not fetch student absence count",
     });
   }
 });

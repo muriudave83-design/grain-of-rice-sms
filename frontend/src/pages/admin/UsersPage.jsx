@@ -109,7 +109,7 @@ export default function UsersPage() {
       admissionNo: "",
       classId: "",
       dob: "",
-      password: "",
+      password: "", // 🚫 password NOT used in edit anymore
     });
     setShowForm(true);
   }
@@ -121,11 +121,18 @@ export default function UsersPage() {
 
     try {
       if (editingUser) {
-        await apiClient.put(`/admin/users/${editingUser.id}`, form);
+        // 🚫 DO NOT send password on edit
+        const { password, ...safeData } = form;
+
+        await apiClient.put(
+          `/admin/users/${editingUser.id}`,
+          safeData
+        );
       } else {
+        // ✅ CREATE FLOW WITH FORCE PASSWORD CHANGE
         if (form.role === "STUDENT") {
           await apiClient.post("/admin/users/student", {
-            name: `${form.firstName} ${form.lastName}`, // ✅ FIXED
+            name: `${form.firstName} ${form.lastName}`,
             firstName: form.firstName,
             lastName: form.lastName,
             admissionNo: form.admissionNo,
@@ -133,18 +140,21 @@ export default function UsersPage() {
             dob: form.dob || null,
             email: form.email,
             password: form.password,
+            forcePasswordChange: true, // ✅ NEW
           });
         } else if (form.role === "TEACHER") {
           await apiClient.post("/admin/users/teacher", {
             name: form.name,
             email: form.email,
             password: form.password,
+            forcePasswordChange: true, // ✅ NEW
           });
         } else if (form.role === "PARENT") {
           await apiClient.post("/admin/users/parent", {
             name: form.name,
             email: form.email,
             password: form.password,
+            forcePasswordChange: true, // ✅ NEW
           });
         }
       }
@@ -163,8 +173,7 @@ export default function UsersPage() {
       );
     }
   }
-
-  async function handleArchive(userId) {
+    async function handleArchive(userId) {
     if (!window.confirm("Are you sure you want to archive this user?"))
       return;
 
@@ -186,7 +195,7 @@ export default function UsersPage() {
       );
 
       alert(
-        `Temporary Password:\n\n${res.data.temporaryPassword}\n\nGive this to the user.`
+        `Temporary Password:\n\n${res.data.temporaryPassword}\n\nUser will be required to change it on first login.`
       );
     } catch (err) {
       console.error("Reset failed", err);
@@ -258,6 +267,7 @@ export default function UsersPage() {
               {editingUser ? "Edit User" : "Create User"}
             </h2>
 
+            {/* FULL NAME (non-students) */}
             {form.role !== "STUDENT" && (
               <input
                 required
@@ -270,6 +280,7 @@ export default function UsersPage() {
               />
             )}
 
+            {/* EMAIL */}
             <input
               required
               type="email"
@@ -282,8 +293,8 @@ export default function UsersPage() {
               disabled={!!editingUser}
             />
 
-            {/* ✅ FIXED: Password for parent & teacher */}
-            {form.role !== "STUDENT" && (
+            {/* 🔥 PASSWORD — ONLY ON CREATE */}
+            {!editingUser && form.role !== "STUDENT" && (
               <input
                 required
                 type="password"
@@ -296,6 +307,7 @@ export default function UsersPage() {
               />
             )}
 
+            {/* ROLE */}
             <select
               className="w-full mb-3 p-2 border rounded"
               value={form.role}
@@ -309,7 +321,7 @@ export default function UsersPage() {
                 </option>
               ))}
             </select>
-
+                        {/* STUDENT FIELDS */}
             {form.role === "STUDENT" && (
               <>
                 <input
@@ -370,19 +382,23 @@ export default function UsersPage() {
                   }
                 />
 
-                <input
-                  required
-                  type="password"
-                  placeholder="Temporary Password"
-                  className="w-full mb-3 p-2 border rounded"
-                  value={form.password}
-                  onChange={(e) =>
-                    setForm({ ...form, password: e.target.value })
-                  }
-                />
+                {/* 🔥 PASSWORD — ONLY ON CREATE */}
+                {!editingUser && (
+                  <input
+                    required
+                    type="password"
+                    placeholder="Temporary Password"
+                    className="w-full mb-3 p-2 border rounded"
+                    value={form.password}
+                    onChange={(e) =>
+                      setForm({ ...form, password: e.target.value })
+                    }
+                  />
+                )}
               </>
             )}
 
+            {/* ACTION BUTTONS */}
             <div className="flex justify-end space-x-2">
               <button
                 type="button"
