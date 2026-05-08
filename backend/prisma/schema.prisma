@@ -70,6 +70,8 @@ model Student {
   class             Class             @relation(fields: [classId], references: [id])
   user              User?             @relation(fields: [userId], references: [id])
   transcripts       Transcript[]
+  parentContactLogs ParentContactLog[]
+  healthNotes       String? 
 }
 
 model Class {
@@ -218,6 +220,15 @@ model Discipline {
   term         Term?    @relation(fields: [termId], references: [id])
 }
 
+model ParentContactLog {
+  id        String   @id @default(cuid())
+  studentId Int
+  message   String
+  createdAt DateTime @default(now())
+
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+}
+
 model Invoice {
   id          Int       @id @default(autoincrement())
   studentId   Int
@@ -254,20 +265,20 @@ model Term {
 }
 
 model ReportCard {
-  id          Int                      @id @default(autoincrement())
-  studentId   Int
-  termId      Int
-  classId     Int
-  average     Float
-  attendanceAbsent Int                 @default(0)
-  generatedAt DateTime                 @default(now())
-  publishedAt DateTime?
-  total       Float
-  status      ReportCardStatus
-  class       Class                    @relation(fields: [classId], references: [id])
-  student     Student                  @relation(fields: [studentId], references: [id])
-  term        Term                     @relation(fields: [termId], references: [id])
-  subjects    ReportCardSubjectEntry[]
+  id               Int                      @id @default(autoincrement())
+  studentId        Int
+  termId           Int
+  classId          Int
+  average          Float
+  generatedAt      DateTime                 @default(now())
+  publishedAt      DateTime?
+  total            Float
+  status           ReportCardStatus
+  attendanceAbsent Int                      @default(0)
+  class            Class                    @relation(fields: [classId], references: [id])
+  student          Student                  @relation(fields: [studentId], references: [id])
+  term             Term                     @relation(fields: [termId], references: [id])
+  subjects         ReportCardSubjectEntry[]
 
   @@unique([studentId, termId])
 }

@@ -25,6 +25,10 @@ export default function AdminStudents() {
 
   const [studentDetails, setStudentDetails] = useState({});
 
+  // ✅ NEW STATE (FIX)
+  const [logInputs, setLogInputs] = useState({});
+  const [healthInputs, setHealthInputs] = useState({});
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -51,52 +55,107 @@ export default function AdminStudents() {
     }
   }
 
-    // ✅ FIXED CSV IMPORT HANDLER
-      const handleImportCSV = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
+  // ✅ NEW FUNCTION (FIX)
+  const handleAddLog = async (studentId) => {
+    const note = logInputs[studentId];
 
-        Papa.parse(file, {
-          header: true,
-          skipEmptyLines: true,
+    if (!note) {
+      alert("Enter a note");
+      return;
+    }
 
-          complete: async (results) => {
-            try {
-              console.log("RAW PARSED:", results.data);
+    try {
+      await apiClient.post(`/students/${studentId}/contact-log`, {
+        message: note,
+      });
 
-              const cleaned = results.data
-                .map((row) => {
-                  if (!row.firstName || !row.admissionNo) return null;
+      // clear input
+      setLogInputs((prev) => ({
+        ...prev,
+        [studentId]: "",
+      }));
 
-                  return {
-                    firstName: row.firstName.trim(),
-                    lastName: row.lastName?.trim() || "",
-                    admissionNo: row.admissionNo.toString().trim(),
-                    className: row.className?.trim(),
-                    parentName: row.parentName?.trim() || "",
-                    userId: 1,
-                  };
-                })
-                .filter(Boolean);
+      // refresh details
+      const res = await apiClient.get(`/students/${studentId}/details`);
 
-              console.log("CLEANED CSV:", cleaned);
+      setStudentDetails((prev) => ({
+        ...prev,
+        [studentId]: res.data,
+      }));
+    } catch (err) {
+      console.error("Failed to save log", err);
+      alert("Failed to save log");
+    }
+  };
 
-              const res = await apiClient.post("/students/bulk", cleaned);
+  const handleSaveHealth = async (studentId) => {
+  const healthNotes = healthInputs[studentId];
 
-              console.log("IMPORT RESULT:", res.data);
+  try {
+    await apiClient.put(`/students/${studentId}/health`, {
+      healthNotes,
+    });
 
-              alert(`Created: ${res.data.created}, Failed: ${res.data.failed}`);
+    // refresh details
+    const res = await apiClient.get(`/students/${studentId}/details`);
 
-              fetchData();
-            } catch (err) {
-              console.error("IMPORT FAILED:", err);
-              alert("Import failed");
-            }
-          },
-        });
-      };
+    setStudentDetails((prev) => ({
+      ...prev,
+      [studentId]: res.data,
+    }));
 
-  const filteredStudents = students.filter((s) => {
+    alert("Health notes saved");
+  } catch (err) {
+    console.error("Failed to save health notes", err);
+    alert("Failed to save");
+  }
+};
+
+  // ✅ FIXED CSV IMPORT HANDLER
+  const handleImportCSV = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+
+      complete: async (results) => {
+        try {
+          console.log("RAW PARSED:", results.data);
+
+          const cleaned = results.data
+            .map((row) => {
+              if (!row.firstName || !row.admissionNo) return null;
+
+              return {
+                firstName: row.firstName.trim(),
+                lastName: row.lastName?.trim() || "",
+                admissionNo: row.admissionNo.toString().trim(),
+                className: row.className?.trim(),
+                parentName: row.parentName?.trim() || "",
+                userId: 1,
+              };
+            })
+            .filter(Boolean);
+
+          console.log("CLEANED CSV:", cleaned);
+
+          const res = await apiClient.post("/students/bulk", cleaned);
+
+          console.log("IMPORT RESULT:", res.data);
+
+          alert(`Created: ${res.data.created}, Failed: ${res.data.failed}`);
+
+          fetchData();
+        } catch (err) {
+          console.error("IMPORT FAILED:", err);
+          alert("Import failed");
+        }
+      },
+    });
+  };
+    const filteredStudents = students.filter((s) => {
     const query = search.toLowerCase();
 
     return (
@@ -119,15 +178,15 @@ export default function AdminStudents() {
     return acc;
   }, {});
 
-const toggleClass = (className) => {
-  setOpenClasses((prev) => ({
-    ...prev,
-    [className]: !prev[className],
-  }));
-};
+  const toggleClass = (className) => {
+    setOpenClasses((prev) => ({
+      ...prev,
+      [className]: !prev[className],
+    }));
+  };
 
-// ✅ FIXED TO FETCH DATA (STEP 2)
-const toggleExpand = async (id) => {
+  // ✅ EXPAND + FETCH DETAILS
+  const toggleExpand = async (id) => {
     if (expandedStudentId === id) {
       setExpandedStudentId(null);
       return;
@@ -137,7 +196,7 @@ const toggleExpand = async (id) => {
 
     if (!studentDetails[id]) {
       try {
-        const res = await apiClient.get(`/admin/students/${id}/details`);
+        const res = await apiClient.get(`/students/${id}/details`);
 
         setStudentDetails((prev) => ({
           ...prev,
@@ -148,7 +207,9 @@ const toggleExpand = async (id) => {
       }
     }
   };
-    useEffect(() => {
+
+  // ✅ AUTO-OPEN CLASSES
+  useEffect(() => {
     const initialState = {};
     Object.keys(groupedStudents).forEach((cls) => {
       initialState[cls] = true;
@@ -177,7 +238,9 @@ const toggleExpand = async (id) => {
 
     try {
       await apiClient.delete(`/admin/students/${student.id}`);
-      setStudents((prev) => prev.filter((s) => s.id !== student.id));
+      setStudents((prev) =>
+        prev.filter((s) => s.id !== student.id)
+      );
     } catch (err) {
       console.error("Failed to delete student", err);
       alert("Failed to delete student");
@@ -221,16 +284,14 @@ const toggleExpand = async (id) => {
       alert(err?.response?.data?.message || "Failed to create student");
     }
   }
-
-  return (
+    return (
     <div className="space-y-6">
 
-      {/* 🔥 UPDATED HEADER WITH CSV IMPORT */}
+      {/* HEADER */}
       <div className="flex justify-between items-center">
         <h1 className="text-xl font-semibold">Students</h1>
 
         <div className="flex gap-2 items-center">
-          {/* ✅ CSV IMPORT */}
           <input
             type="file"
             accept=".csv"
@@ -253,6 +314,7 @@ const toggleExpand = async (id) => {
         </div>
       )}
 
+      {/* SEARCH */}
       <div className="mb-4 flex justify-between items-center">
         <input
           type="text"
@@ -274,6 +336,8 @@ const toggleExpand = async (id) => {
           Object.entries(groupedStudents).map(
             ([className, classStudents]) => (
               <div key={className} className="mb-6">
+
+                {/* CLASS HEADER */}
                 <div
                   onClick={() => toggleClass(className)}
                   className="flex justify-between items-center cursor-pointer bg-gray-100 px-4 py-3 rounded-md hover:bg-gray-200"
@@ -292,7 +356,8 @@ const toggleExpand = async (id) => {
                     </span>
                   </div>
                 </div>
-                                {openClasses[className] && (
+
+                {openClasses[className] && (
                   <div className="bg-white border rounded-lg overflow-hidden mt-2">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-100 text-left">
@@ -307,6 +372,7 @@ const toggleExpand = async (id) => {
                       <tbody>
                         {classStudents.map((s) => (
                           <React.Fragment key={s.id}>
+
                             {/* MAIN ROW */}
                             <tr className="border-t">
                               <td className="p-3">
@@ -324,7 +390,6 @@ const toggleExpand = async (id) => {
                               </td>
 
                               <td className="p-3 flex gap-2">
-                                {/* VIEW */}
                                 <button
                                   onClick={() => toggleExpand(s.id)}
                                   className="px-2 py-1 text-xs bg-gray-700 text-white rounded"
@@ -362,7 +427,7 @@ const toggleExpand = async (id) => {
                               </td>
                             </tr>
 
-                            {/* EXPANDED */}
+                            {/* EXPANDED ROW */}
                             {expandedStudentId === s.id && (
                               <tr>
                                 <td colSpan="4">
@@ -372,45 +437,83 @@ const toggleExpand = async (id) => {
                                     <div className="mb-3">
                                       <strong>Attendance</strong>
                                       <div className="text-sm mt-1">
-                                        Present: {studentDetails[s.id]?.attendance?.present ?? "--"} |{" "}
-                                        Absent: {studentDetails[s.id]?.attendance?.absent ?? "--"}
+                                        Present: {studentDetails[s.id]?.present ?? "--"} |
+                                        Absent: {studentDetails[s.id]?.absent ?? "--"}
                                       </div>
                                     </div>
 
-                                    {/* PARENT LOG */}
+                                    {/* 🔥 CONTACT LOG (FIXED) */}
                                     <div className="mb-3">
                                       <strong>Parent Contact Log</strong>
 
-                                      <div className="text-sm opacity-70 mt-1">
-                                        {studentDetails[s.id]?.parentLogs?.length
-                                          ? studentDetails[s.id].parentLogs.map((log, i) => (
-                                              <div key={i}>{log.note}</div>
+                                      <div className="text-sm opacity-70 mt-1 space-y-1">
+                                        {studentDetails[s.id]?.logs?.length
+                                          ? studentDetails[s.id].logs.map((log, i) => (
+                                              <div key={i}>
+                                                • {log.message} —{" "}
+                                                <span className="text-xs opacity-60">
+                                                  {log.createdAt && new Date(log.createdAt).toLocaleString()}
+                                                </span>
+                                              </div>
                                             ))
                                           : "No logs yet"}
                                       </div>
 
+                                      {/* ✅ FIXED INPUT */}
                                       <input
                                         type="text"
                                         placeholder="Add note..."
+                                        value={logInputs[s.id] || ""}
+                                        onChange={(e) =>
+                                          setLogInputs({
+                                            ...logInputs,
+                                            [s.id]: e.target.value,
+                                          })
+                                        }
                                         className="w-full mt-2 p-2 text-black rounded"
                                       />
+
+                                      {/* ✅ SAVE BUTTON */}
+                                      <button
+                                        onClick={() => handleAddLog(s.id)}
+                                        className="mt-2 px-3 py-1 bg-green-600 text-white text-xs rounded"
+                                      >
+                                        Save Note
+                                      </button>
                                     </div>
 
                                     {/* HEALTH */}
                                     <div>
                                       <strong>Health Notes</strong>
-                                      <textarea
-                                        value={studentDetails[s.id]?.healthNotes || ""}
-                                        readOnly
-                                        placeholder="Allergies, medication, etc..."
-                                        className="w-full mt-2 p-2 text-black rounded"
-                                      />
+                                        <textarea
+                                          value={
+                                            healthInputs[s.id] ??
+                                            studentDetails[s.id]?.healthNotes ??
+                                            ""
+                                          }
+                                          onChange={(e) =>
+                                            setHealthInputs({
+                                              ...healthInputs,
+                                              [s.id]: e.target.value,
+                                            })
+                                          }
+                                          placeholder="Allergies, medication, etc..."
+                                          className="w-full mt-2 p-2 text-black rounded"
+                                        />
+
+                                        <button
+                                          onClick={() => handleSaveHealth(s.id)}
+                                          className="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded"
+                                        >
+                                          Save Health Notes
+                                        </button>
                                     </div>
 
                                   </div>
                                 </td>
                               </tr>
                             )}
+
                           </React.Fragment>
                         ))}
                       </tbody>

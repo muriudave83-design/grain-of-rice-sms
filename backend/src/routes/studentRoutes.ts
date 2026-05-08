@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
 import { authorizeStudentAccess } from "../middlewares/ownershipMiddleware";
-import { getStudentTranscript } from "../controllers/student.controller";
+import { getStudentTranscript, updateHealth } from "../controllers/student.controller";
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -253,35 +253,108 @@ router.put(
   }
 );
 
-// 🔥 GET STUDENT DETAILS (ATTENDANCE + LOGS + HEALTH)
+// 🔥 GET STUDENT DETAILS (SAFE + REAL ATTENDANCE)
 router.get(
   "/:id/details",
   authenticate,
   requireRole(["ADMIN", "TEACHER"]),
   async (req, res) => {
-    const studentId = Number(req.params.id);
-
     try {
-      // ✅ TEMP: no attendance system yet
-      const present = 0;
-      const absent = 0;
+      const studentId = Number(req.params.id);
 
-      // ✅ TEMP: no logs/health tables yet
-      const parentLogs: any[] = [];
-      const healthNotes = "";
+      if (Number.isNaN(studentId)) {
+        return res.status(400).json({
+          message: "Invalid student id",
+        });
+      }
 
-      res.json({
-        attendance: {
-          present,
-          absent,
-        },
-        parentLogs,
-        healthNotes,
+      // ✅ 1. REAL ATTENDANCE
+      const attendance = await prisma.attendanceEntry.findMany({
+        where: { studentId },
+        select: { status: true },
       });
-    } catch (err) {
-      console.error("STUDENT DETAILS ERROR:", err);
+
+      const present = attendance.filter(
+        (a) => a.status === "PRESENT"
+      ).length;
+
+      const absent = attendance.filter(
+        (a) => a.status === "ABSENT"
+      ).length;
+
+      // ✅ 2. PARENT LOGS
+      const logs = await prisma.parentContactLog.findMany({
+        where: { studentId },
+        orderBy: { createdAt: "desc" },
+      });
+
+      // ✅ 3. HEALTH NOTES (🔥 NEW)
+      const student = await prisma.student.findUnique({
+        where: { id: studentId },
+        select: { healthNotes: true },
+      });
+
+      // ✅ 4. RESPONSE (MATCHES FRONTEND)
+      res.json({
+        present,
+        absent,
+        logs,
+        healthNotes: student?.healthNotes || "",
+      });
+    } catch (error) {
+      console.error("DETAILS ERROR:", error);
+
       res.status(500).json({
         message: "Failed to load student details",
+      });
+    }
+  }
+);
+
+// ✅ UPDATE HEALTH NOTES (NEW ROUTE — RIGHT AFTER DETAILS)
+router.put(
+  "/:id/health",
+  authenticate,
+  requireRole(["ADMIN", "TEACHER"]),
+  updateHealth
+);
+
+// 🔥 ADD PARENT CONTACT LOG
+router.post(
+  "/:id/contact-log",
+  authenticate,
+  requireRole(["ADMIN", "TEACHER"]),
+  async (req, res) => {
+    try {
+      const studentId = Number(req.params.id);
+      const { message } = req.body;
+
+      if (Number.isNaN(studentId)) {
+        return res.status(400).json({
+          message: "Invalid student id",
+        });
+      }
+
+      if (!message || message.trim() === "") {
+        return res.status(400).json({
+          message: "Message is required",
+        });
+      }
+
+      const log = await prisma.parentContactLog.create({
+        data: {
+          studentId,
+          message: message.trim(),
+          createdAt: new Date(), 
+        },
+      });
+
+      res.status(201).json(log);
+    } catch (error) {
+      console.error("CREATE LOG ERROR:", error);
+
+      res.status(500).json({
+        message: "Failed to create contact log",
       });
     }
   }
