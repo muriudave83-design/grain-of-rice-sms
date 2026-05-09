@@ -71,7 +71,7 @@ export default function GradebookDetail() {
         }
 
         const res = await apiClient.get(
-          `/teacher/attendance/report`,
+          `/attendance/report`,
           {
             params: {
               classId,
@@ -104,37 +104,6 @@ export default function GradebookDetail() {
       } catch (err) {
         console.error("❌ Failed to fetch attendance", err);
       }
-    };
-
-  const fetchData = async (termId) => {
-    try {
-      if (!termId && classId !== null) {
-        console.log("⛔ Prevented fetch without termId");
-        return;
-      }
-
-      const res = await apiClient.get(
-        `/teacher/gradebook/${id}`,
-        {
-          params: termId ? { termId } : {},
-        }
-      );
-
-      setData(res.data);
-
-      const realClassId = res.data?.class?.id;
-
-      console.log("🎯 Extracted classId from gradebook:", realClassId);
-
-      if (realClassId !== null && realClassId !== undefined) {
-        setClassId(realClassId);
-      }
-    } catch (err) {
-      console.error("Failed to load gradebook:", err);
-      setError("Failed to load gradebook");
-    } finally {
-      setLoading(false);
-    }
   };
     // 🧱 LOAD TERMS
   useEffect(() => {
@@ -162,6 +131,7 @@ export default function GradebookDetail() {
         }
       } catch (err) {
         console.error("❌ Failed to load terms", err);
+        setError("Failed to load terms");
         setLoading(false);
       }
     }
@@ -249,8 +219,13 @@ export default function GradebookDetail() {
     });
   };
 
-  const students = data?.class?.students || [];
-  const assignments = data?.assignments || [];
+    const students = data?.class?.students || [];
+    const assignments = [...(data?.assignments || [])].sort(
+    (a, b) =>
+      new Date(a.dateAssigned || a.createdAt) -
+      new Date(b.dateAssigned || b.createdAt)
+  );
+
     // ✅ DRAG HANDLER
   const handleDragEnd = async (result) => {
     if (!result.destination) return;
@@ -673,7 +648,8 @@ export default function GradebookDetail() {
         try {
           await apiClient.post("/teacher/score/bulk", { updates });
           alert(`Imported ${updates.length} scores ✅`);
-          fetchData(selectedTerm);
+          // re-run init logic safely
+          navigate(0);
         } catch (err) {
           console.error("Import failed", err);
           alert("Import failed ❌");
@@ -796,7 +772,6 @@ export default function GradebookDetail() {
       <h1 className="text-2xl font-bold mb-4">
         {data.class?.name} - {data.subject?.name}
       </h1>
-
       {/* 🧱 TERM SELECTOR */}
       <div className="mb-4">
         <select
@@ -851,7 +826,8 @@ export default function GradebookDetail() {
           + New Assignment
         </button>
       </div>
-            {/* TABLE */}
+
+      {/* TABLE */}
       <div>
         <table className="min-w-full border border-gray-300">
           <thead>
@@ -867,7 +843,8 @@ export default function GradebookDetail() {
                       Student
                     </th>
 
-                    {/* 🆕 ABSENT COLUMN */}
+                    <th className="border p-2">Percent</th>
+                    <th className="border p-2">Grade</th>
                     <th className="border p-2">Absent</th>
 
                     {assignments.map((a, index) => (
@@ -888,7 +865,6 @@ export default function GradebookDetail() {
                             }
                           >
                             <div className="flex flex-col items-center gap-1">
-
                               <div className="flex justify-between items-center w-full">
                                 <span
                                   {...provided.dragHandleProps}
@@ -947,24 +923,21 @@ export default function GradebookDetail() {
 
                     {provided.placeholder}
 
-                    <th className="border p-2">Total</th>
-                    <th className="border p-2">Avg</th>
-                    <th className="border p-2">Final</th>
-                    <th className="border p-2">Grade</th>
                     <th className="border p-2">Position</th>
                   </tr>
                 )}
               </Droppable>
             </DragDropContext>
           </thead>
-                    <tbody>
+
+          <tbody>
             {rankedStudents.map((student) => {
               const total = getStudentTotal(student);
               const avg = getStudentAverage(student);
               const final = getFinalGrade(student);
               const grade = getGrade(final);
               const position = getPosition(student.id);
-              const absent = getAbsentDays(student.id); // 🆕
+              const absent = getAbsentDays(student.id);
 
               return (
                 <tr key={student.id}>
@@ -972,7 +945,18 @@ export default function GradebookDetail() {
                     {student.firstName} {student.lastName}
                   </td>
 
-                  {/* 🆕 ABSENT CELL */}
+                  <td className="border p-2 font-bold">
+                    {Math.round(avg ?? 0)}%
+                  </td>
+
+                  <td
+                    className={`border p-2 font-bold ${getGradeColor(
+                      grade
+                    )}`}
+                  >
+                    {grade}
+                  </td>
+
                   <td className="border p-2 font-semibold text-center">
                     {absent}
                   </td>
@@ -984,8 +968,7 @@ export default function GradebookDetail() {
                       (s) =>
                         String(s.studentId) === String(student.id)
                     );
-
-                    return (
+                                        return (
                       <td
                         key={a.id}
                         className={`border px-4 py-2 ${
@@ -1027,24 +1010,6 @@ export default function GradebookDetail() {
                     );
                   })}
 
-                  <td className="border p-2 font-bold">
-                    {total.toFixed(1)}
-                  </td>
-                  <td className="border p-2 font-bold">
-                    {avg.toFixed(1)}
-                  </td>
-                  <td className="border p-2 font-bold">
-                    {final.toFixed(1)}
-                  </td>
-
-                  <td
-                    className={`border p-2 font-bold ${getGradeColor(
-                      grade
-                    )}`}
-                  >
-                    {grade}
-                  </td>
-
                   <td className="border p-2">{position}</td>
                 </tr>
               );
@@ -1052,11 +1017,11 @@ export default function GradebookDetail() {
           </tbody>
         </table>
       </div>
-            {/* 🔥 MODAL */}
+
+      {/* 🔥 MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded w-96 space-y-3">
-
             <h2 className="text-lg font-semibold">New Assignment</h2>
 
             <input

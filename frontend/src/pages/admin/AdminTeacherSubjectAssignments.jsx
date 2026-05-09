@@ -149,7 +149,7 @@ export default function AdminTeacherSubjectAssignments() {
               setForm({ ...form, classId: e.target.value })
             }
           >
-            <option value="">Select class</option>
+            <option value="">Select Grade</option>
             {classes.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -161,7 +161,7 @@ export default function AdminTeacherSubjectAssignments() {
         {/* Duplicate warning */}
         {duplicateAssignment && (
           <p className="text-red-600 text-sm">
-            This teacher is already assigned to that subject and class.
+            This teacher is already assigned to that subject and grade.
           </p>
         )}
 
@@ -186,7 +186,7 @@ export default function AdminTeacherSubjectAssignments() {
             <tr>
               <th className="p-3 text-left">Teacher</th>
               <th className="p-3 text-left">Subject</th>
-              <th className="p-3 text-left">Class</th>
+              <th className="p-3 text-left">Grade</th>
               <th className="p-3 w-24"></th>
             </tr>
           </thead>
