@@ -121,7 +121,11 @@ export const getAttendanceReport = async (
         const latestMap = new Map();
 
         for (const record of allRecords) {
-          const key = `${record.studentId}-${record.attendanceSessionId}`;
+          const sessionDate = new Date(record.session.date)
+            .toISOString()
+            .split("T")[0];
+
+          const key = `${record.studentId}-${sessionDate}`;
 
           if (!latestMap.has(key)) {
             latestMap.set(key, record);
