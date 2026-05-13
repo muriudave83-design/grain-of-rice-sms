@@ -13,7 +13,7 @@ export const getStudentsByClass = async (req: Request, res: Response) => {
         id: true,
         firstName: true,
         lastName: true,
-        admissionNumber: true,
+        admissionNo: true,
       }
     });
 
