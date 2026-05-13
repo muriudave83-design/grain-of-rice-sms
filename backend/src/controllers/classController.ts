@@ -11,9 +11,10 @@ export const getStudentsByClass = async (req: Request, res: Response) => {
       },
       select: {
         id: true,
-        name: true,
+        firstName: true,
+        lastName: true,
         admissionNumber: true,
-      },
+      }
     });
 
     res.json(students);

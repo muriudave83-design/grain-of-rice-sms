@@ -1,9 +1,9 @@
 import express from "express";
 import { getStudentsByClass } from "../controllers/classController";
-import { requireAuth } from "../middlewares/requireAuth";
+import { authenticate } from "../middlewares/authMiddleware";
 
 const router = express.Router();
 
-router.get("/:id/students", requireAuth, getStudentsByClass);
+router.get("/:id/students", authenticate, getStudentsByClass);
 
 export default router;
