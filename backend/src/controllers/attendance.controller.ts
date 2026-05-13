@@ -102,19 +102,35 @@ export const getAttendanceReport = async (
       (session) => session.id
     );
 
-    const absentRecords =
-      await prisma.attendanceEntry.findMany({
-        where: {
-          attendanceSessionId: {
-            in: sessionIds,
-          },
-          status: "ABSENT",
-        },
-        include: {
-          student: true,
-          session: true,
-        },
-      });
+        const allRecords =
+          await prisma.attendanceEntry.findMany({
+            where: {
+              attendanceSessionId: {
+                in: sessionIds,
+              },
+            },
+            include: {
+              student: true,
+              session: true,
+            },
+            orderBy: {
+              id: "desc",
+            },
+          });
+
+        const latestMap = new Map();
+
+        for (const record of allRecords) {
+          const key = `${record.studentId}-${record.attendanceSessionId}`;
+
+          if (!latestMap.has(key)) {
+            latestMap.set(key, record);
+          }
+        }
+
+        const absentRecords = [...latestMap.values()].filter(
+          (record) => record.status === "ABSENT"
+        );
 
     const report = absentRecords.map(
       (record) => ({
