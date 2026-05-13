@@ -18,7 +18,9 @@ console.log("🌍 API URL:", API_URL);
 // =====================================
 const apiClient = axios.create({
   baseURL: API_URL,
-  withCredentials: true, // future-proof (cookies if needed)
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
 // =====================================
@@ -26,9 +28,14 @@ const apiClient = axios.create({
 // =====================================
 apiClient.interceptors.request.use(
   (config) => {
-    let token = localStorage.getItem("token");
+    // 🚨 DO NOT attach token during login
+    if (config.url?.includes("/auth/login")) {
+      return config;
+    }
 
-    // 🧼 Clean invalid tokens
+    const token = localStorage.getItem("token");
+
+    // 🧼 Ignore invalid tokens
     if (
       !token ||
       token === "null" ||
@@ -38,11 +45,13 @@ apiClient.interceptors.request.use(
       return config;
     }
 
+    // ✅ Ensure headers exist
     if (!config.headers) {
       config.headers = {};
     }
 
-    config.headers["Authorization"] = `Bearer ${token}`;
+    // ✅ Attach token
+    config.headers.Authorization = `Bearer ${token}`;
 
     return config;
   },
@@ -53,7 +62,9 @@ apiClient.interceptors.request.use(
 // 🧠 HELPER: EXTRACT ERROR MESSAGE
 // =====================================
 const getErrorMessage = (error) => {
-  if (!error.response) return "Network error";
+  if (!error.response) {
+    return "Network error";
+  }
 
   return (
     error.response.data?.message ||
@@ -77,18 +88,12 @@ apiClient.interceptors.response.use(
       message,
     });
 
-    // 🔐 AUTH HANDLING (NO AUTO LOGOUT — GOOD DESIGN)
+    // 🔐 Optional auth warning
     if (error.response) {
       const status = error.response.status;
-      const token = localStorage.getItem("token");
 
-      if (
-        (status === 401 || status === 403) &&
-        token &&
-        token !== "null" &&
-        token !== "undefined"
-      ) {
-        console.warn("⚠️ Unauthorized request (ignored — no forced logout)");
+      if (status === 401 || status === 403) {
+        console.warn("⚠️ Unauthorized request");
       }
     }
 

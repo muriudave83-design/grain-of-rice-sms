@@ -102,13 +102,19 @@ model Guardian {
 }
 
 model ParentStudent {
-  id        Int     @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
+
   parentId  String
   studentId Int
-  parent    Parent  @relation(fields: [parentId], references: [id], onDelete: Cascade)
-  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  parent    Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 
   @@unique([parentId, studentId])
+  @@index([parentId])
+  @@index([studentId])
 }
 
 model Sponsorship {
@@ -455,6 +461,7 @@ enum Role {
   PARENT
   SPONSOR
   STUDENT
+  ATTENDANCE_OFFICER
 }
 
 enum AssessmentStatus {

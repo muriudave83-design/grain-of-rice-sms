@@ -1,8 +1,14 @@
+// ============================================================
+// src/routes/reportCardRoutes.ts
+// PART 1
+// ============================================================
+
 console.log("🔥 reportCardRoutes.ts LOADED");
 
 import { Router } from "express";
 import { prisma } from "../prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
+import { requireRole } from "../middlewares/rolesMiddleware";
 import { Role } from "@prisma/client";
 import { ReportCardStatus } from "@prisma/client";
 
@@ -28,59 +34,56 @@ function getGrade(avg: number) {
 
 /**
  * ============================================================
- * 🎓 STUDENT — OWN REPORT CARD (/me)
+ * 🎓 STUDENT / 👨‍👩‍👧 PARENT — OWN REPORT CARD (/me)
  * ============================================================
+ * FIX:
+ * ❌ removed inline role checks
+ * ✅ replaced with requireRole middleware
  */
 router.get(
   "/me",
   authenticate,
+  requireRole([Role.STUDENT, Role.PARENT, Role.ADMIN]),
   async (req: any, res) => {
     try {
-      if (!req.user) {
+      const user = req.user;
+
+      if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-    if (req.user.role === Role.STUDENT) {
-      // continue (existing logic below will run)
-    }
-
-    else if (req.user.role === Role.PARENT) {
-      const parentId = req.user.id;
-
-      const children = await prisma.student.findMany({
-        where: {
-          parentLinks: {
-            some: {
-              parentId: parentId,
+      // ================================
+      // PARENT FLOW
+      // ================================
+      if (user.role === Role.PARENT) {
+        const children = await prisma.student.findMany({
+          where: {
+            parentLinks: {
+              some: {
+                parentId: user.id,
+              },
             },
           },
-        },
-      });
+        });
 
-      if (!children.length) {
-        return res.json([]);
-      }
+        if (!children.length) {
+          return res.json([]);
+        }
 
-      const results = [];
-
-      for (const child of children) {
-        results.push({
+        const results = children.map((child) => ({
           studentId: child.id,
           name: `${child.firstName} ${child.lastName}`,
           subjects: [],
           overallAverage: 0,
           overallGrade: "N/A",
-        });
+        }));
+
+        return res.json(results);
       }
 
-      return res.json(results);
-    }
-
-    else {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
-
-      // ✅ Support both ?term=term1 and ?termId=1
+      // ================================
+      // STUDENT FLOW
+      // ================================
       let termId: number | undefined;
 
       if (req.query.term) {
@@ -98,7 +101,7 @@ router.get(
       console.log("📘 TERM FILTER:", termId);
 
       const student = await prisma.student.findFirst({
-        where: { userId: req.user.id },
+        where: { userId: user.id },
       });
 
       if (!student) {
@@ -119,12 +122,12 @@ router.get(
       const subjects = [];
 
       for (const cs of classSubjects) {
-      const assessments = await prisma.assessment.findMany({
-        where: {
-          subjectId: cs.subjectId,
-          classId,
-          ...(termId && { termId }), // ✅ APPLY TERM FILTER
-        },
+        const assessments = await prisma.assessment.findMany({
+          where: {
+            subjectId: cs.subjectId,
+            classId,
+            ...(termId && { termId }),
+          },
           select: {
             id: true,
             maxScore: true,
@@ -213,13 +216,14 @@ router.get(
     }
   }
 );
-
 // ============================================================
 // 👨‍👩‍👧 PARENT — VIEW SINGLE REPORT CARD
 // ============================================================
+
 router.get(
   "/student/:studentId/term/:termId",
   authenticate,
+  requireRole([Role.PARENT, Role.ADMIN]), // ✅ RBAC MOVED HERE
   async (req: any, res) => {
     try {
       const studentId = Number(req.params.studentId);
@@ -229,7 +233,9 @@ router.get(
         return res.status(401).json({ message: "Unauthorized" });
       }
 
-      // 🔐 Ensure parent owns this student
+      // ========================================================
+      // 🔐 PARENT OWNERSHIP CHECK (still required, but NOT role logic)
+      // ========================================================
       if (req.user.role === Role.PARENT) {
         const link = await prisma.parentStudent.findFirst({
           where: {
@@ -243,6 +249,9 @@ router.get(
         }
       }
 
+      // ========================================================
+      // 📊 FETCH REPORT CARD
+      // ========================================================
       const reportCard = await prisma.reportCard.findFirst({
         where: {
           studentId,
@@ -268,7 +277,6 @@ router.get(
       }
 
       return res.json(reportCard);
-
     } catch (err) {
       console.error("❌ Parent report card error:", err);
       res.status(500).json({
@@ -277,15 +285,15 @@ router.get(
     }
   }
 );
+ 
+// ============================================================
+// 🚀 GENERATE REPORT CARD (SECURED)
+// ============================================================
 
-/**
- * ============================================================
- * 🚀 GENERATE REPORT CARD
- * ============================================================
- */
 router.get(
   "/generate/:studentId",
   authenticate,
+  requireRole([Role.TEACHER, Role.ADMIN]), // ✅ STRICT ACCESS CONTROL
   async (req, res) => {
     try {
       const studentId = Number(req.params.studentId);
@@ -403,14 +411,14 @@ router.get(
   }
 );
 
-/**
- * ============================================================
- * 👨‍🏫 TEACHER + 🎓 STUDENT — REPORT CARDS
- * ============================================================
- */
+// ============================================================
+// 👨‍🏫 TEACHER + 🎓 STUDENT — REPORT CARDS BY CLASS
+// ============================================================
+
 router.get(
   "/by-class/:classId/term/:term",
   authenticate,
+  requireRole([Role.TEACHER, Role.ADMIN, Role.STUDENT]), // ✅ centralized RBAC
   async (req: any, res) => {
     console.log("🔥 REPORT CARD ROUTE HIT");
 
@@ -423,11 +431,15 @@ router.get(
 
       let classIdParam = req.params.classId;
       let classId = classIdParam ? Number(classIdParam) : undefined;
+
       const userId = req.user.id;
       const role = req.user.role;
 
       let students;
 
+      // ========================================================
+      // 🎓 STUDENT FLOW (restricted automatically by middleware)
+      // ========================================================
       if (role === Role.STUDENT) {
         const student = await prisma.student.findFirst({
           where: { userId },
@@ -438,20 +450,25 @@ router.get(
             message: "No student profile linked",
           });
         }
-        
+
         classId = student.classId;
         students = [student];
-        } else {
-          if (!classId || isNaN(classId)) {
-            return res.status(400).json({
-              message: "Valid classId is required",
-            });
-          }
+      }
 
-          students = await prisma.student.findMany({
-            where: { classId },
+      // ========================================================
+      // 👨‍🏫 TEACHER / ADMIN FLOW
+      // ========================================================
+      else {
+        if (!classId || isNaN(classId)) {
+          return res.status(400).json({
+            message: "Valid classId is required",
           });
         }
+
+        students = await prisma.student.findMany({
+          where: { classId },
+        });
+      }
 
       const classSubjects = await prisma.classSubject.findMany({
         where: { classId },
@@ -554,11 +571,14 @@ router.get(
         });
       }
 
+      // ========================================================
+      // 🎯 RESPONSE SHAPE CONTROL
+      // ========================================================
       if (role === Role.STUDENT) {
         return res.json(results[0] || null);
       }
 
-      res.json(results);
+      return res.json(results);
 
     } catch (err) {
       console.error("🔥 REAL ERROR:", err);
@@ -569,5 +589,3 @@ router.get(
     }
   }
 );
-
-export { router as reportCardReadRoutes };

@@ -127,6 +127,9 @@ function PublicRoute({ children }) {
 
     if (user.role === "ADMIN") return <Navigate to="/dashboard/admin" replace />;
     if (user.role === "TEACHER") return <Navigate to="/teacher" replace />;
+    if (user.role === "ATTENDANCE_OFFICER") {
+        return <Navigate to="/dashboard/admin/attendance" replace />;
+      }
     if (user.role === "PARENT") return <Navigate to="/parent" replace />;
     if (user.role === "STUDENT") return <Navigate to="/student" replace />;
 
@@ -191,7 +194,13 @@ export default function AppRoutes() {
       {/* ADMIN */}
       {/* ======================= */}
 
-      <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
+        <Route
+            element={
+              <ProtectedRoute
+                allowedRoles={["ADMIN", "ATTENDANCE_OFFICER"]}
+              />
+            }
+          >
         <Route element={<AdminLayout />}>
 
           <Route path="/admin" element={<Navigate to="/dashboard/admin" replace />} />

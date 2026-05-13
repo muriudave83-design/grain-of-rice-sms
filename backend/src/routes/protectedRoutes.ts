@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticate } from "../middlewares/authMiddleware";
-import { reportCardReadRoutes } from "./reportCardRoutes";
+import { reportCardReadRoutes } from "./reportCardReadRoutes";
 
 const router = Router();
 

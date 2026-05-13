@@ -34,7 +34,6 @@ router.get("/me", authenticate, (req, res) => {
 // ======================================================
 router.patch(
   "/change-password",
-  authenticate,
   changePassword
 );
 

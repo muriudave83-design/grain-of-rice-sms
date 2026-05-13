@@ -1,16 +1,14 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../prisma/client";
+import { Role } from "@prisma/client";
 
 /**
- * Ensures that a user can only access a student
- * based on their role and relationship.
- *
- * Admin      -> Full access
- * Teacher    -> Students they teach (via Enrollment → Subject → Teacher)
- * Parent     -> Their own children (Guardian table)
- * Student    -> Self only
- * Sponsor    -> Sponsored students
- * Accountant -> Billing-only access
+ * ============================================================
+ * OWNERSHIP MIDDLEWARE (ROW-LEVEL SECURITY ONLY)
+ * ============================================================
+ * IMPORTANT:
+ * ❌ NOT RBAC (do not use for endpoint access control)
+ * ✅ Only verifies relationship to a specific student
  */
 export const authorizeStudentAccess = async (
   req: Request,
@@ -19,7 +17,6 @@ export const authorizeStudentAccess = async (
 ) => {
   const user = (req as any).user;
 
-  // studentId can appear under different param names
   const rawStudentId =
     req.params.studentId ??
     req.params.id ??
@@ -35,37 +32,35 @@ export const authorizeStudentAccess = async (
     return res.status(400).json({ message: "Invalid student ID" });
   }
 
-  // ----------------------------------
-  // ADMIN — full access
-  // ----------------------------------
-  if (user.role === "ADMIN") {
+  // ============================================================
+  // ADMIN — always allowed (override all ownership rules)
+  // ============================================================
+  if (user.role === Role.ADMIN) {
     return next();
   }
 
-  // ----------------------------------
-  // ACCOUNTANT — allowed (billing module only)
-  // NOTE: Route-level guards must still be correct
-  // ----------------------------------
-  if (user.role === "ACCOUNTANT") {
+  // ============================================================
+  // ACCOUNTANT — allowed globally (billing context assumed)
+  // ============================================================
+  if (user.role === Role.ACCOUNTANT) {
     return next();
   }
 
-  // ----------------------------------
-  // STUDENT — self only
-  // ----------------------------------
-  if (user.role === "STUDENT") {
-    if (user.id === studentId) {
-      return next();
-    }
+  // ============================================================
+  // STUDENT — only self access
+  // ============================================================
+  if (user.role === Role.STUDENT) {
+    if (user.id === studentId) return next();
+
     return res.status(403).json({
       message: "Forbidden: Students can only access their own data",
     });
   }
 
-  // ----------------------------------
-  // TEACHER — must teach the student
-  // ----------------------------------
-  if (user.role === "TEACHER") {
+  // ============================================================
+  // TEACHER — must have enrollment relationship
+  // ============================================================
+  if (user.role === Role.TEACHER) {
     const teaches = await prisma.enrollment.findFirst({
       where: {
         studentId,
@@ -76,19 +71,17 @@ export const authorizeStudentAccess = async (
       select: { id: true },
     });
 
-    if (teaches) {
-      return next();
-    }
+    if (teaches) return next();
 
     return res.status(403).json({
       message: "Forbidden: You do not teach this student",
     });
   }
 
-  // ----------------------------------
-  // PARENT — must be guardian
-  // ----------------------------------
-  if (user.role === "PARENT") {
+  // ============================================================
+  // PARENT — must be linked guardian
+  // ============================================================
+  if (user.role === Role.PARENT) {
     const guardian = await prisma.guardian.findFirst({
       where: {
         studentId,
@@ -97,19 +90,17 @@ export const authorizeStudentAccess = async (
       select: { id: true },
     });
 
-    if (guardian) {
-      return next();
-    }
+    if (guardian) return next();
 
     return res.status(403).json({
       message: "Forbidden: This is not your child",
     });
   }
 
-  // ----------------------------------
-  // SPONSOR — must sponsor student
-  // ----------------------------------
-  if (user.role === "SPONSOR") {
+  // ============================================================
+  // SPONSOR — must have sponsorship link
+  // ============================================================
+  if (user.role === Role.SPONSOR) {
     const sponsorship = await prisma.sponsorship.findFirst({
       where: {
         studentId,
@@ -118,18 +109,16 @@ export const authorizeStudentAccess = async (
       select: { id: true },
     });
 
-    if (sponsorship) {
-      return next();
-    }
+    if (sponsorship) return next();
 
     return res.status(403).json({
       message: "Forbidden: You do not sponsor this student",
     });
   }
 
-  // ----------------------------------
-  // Fallback
-  // ----------------------------------
+  // ============================================================
+  // DEFAULT DENY
+  // ============================================================
   return res.status(403).json({
     message: "Forbidden: No access to this student",
   });

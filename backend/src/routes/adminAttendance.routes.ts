@@ -3,8 +3,20 @@ import { PrismaClient } from "@prisma/client"
 import { markAttendance } from "../controllers/attendance/markAttendance.controller"
 import { getAttendanceReport } from "../controllers/attendance.controller"
 
+// 🔐 AUTH & RBAC
+import { authenticate } from "../middlewares/authMiddleware"
+import { requireRole } from "../middlewares/rolesMiddleware"
+import { Role } from "@prisma/client"
+
 const router = express.Router()
 const prisma = new PrismaClient()
+
+/*
+🔒 GLOBAL PROTECTION (APPLIES TO ALL ROUTES BELOW)
+Only authenticated ADMIN users can access anything in this file
+*/
+router.use(authenticate)
+router.use(requireRole([Role.ADMIN, Role.ATTENDANCE_OFFICER]))
 
 /*
 Admin Attendance Summary
@@ -35,7 +47,6 @@ router.get("/summary", async (req, res) => {
       }
     })
 
-    // ✅ Ensure unique students
     const studentStatusMap = new Map<number, string>()
 
     todayEntries.forEach(entry => {
@@ -113,7 +124,7 @@ router.get("/by-class", async (req, res) => {
 
           if (sessionDate >= today && sessionDate < tomorrow) {
             status = entry.status
-            break // ✅ stop after first valid entry
+            break
           }
         }
 
@@ -177,7 +188,6 @@ router.get("/class/:classId", async (req, res) => {
       }
     })
 
-    console.log("STUDENT SAMPLE:", students[0])
     const result = students.map(student => {
       let status = "NOT_MARKED"
 
@@ -186,7 +196,7 @@ router.get("/class/:classId", async (req, res) => {
 
         if (sessionDate >= today && sessionDate < tomorrow) {
           status = entry.status
-          break // ✅ prevent overwrite / duplicates
+          break
         }
       }
 
@@ -213,8 +223,9 @@ Admin Mark Attendance
 POST /admin/attendance/mark
 */
 router.post("/mark", markAttendance)
+
 /*
-Admin Attendance Report (DATE RANGE + SUMMARY)
+Admin Attendance Report
 GET /admin/attendance/report
 */
 router.get("/report", getAttendanceReport)

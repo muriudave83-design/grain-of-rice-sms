@@ -106,7 +106,13 @@ router.patch(
         return res.status(404).json({ message: "User not found" });
       }
 
-      if ((req as any).user?.id === userId) {
+      if (!req.user) {
+        return res.status(401).json({
+          message: "Unauthorized",
+        });
+      }
+
+      if (req.user.id === userId) {
         return res.status(400).json({
           message: "You cannot reset your own password here",
         });
@@ -172,6 +178,61 @@ router.post(
     } catch (error: any) {
       console.error("Failed to create teacher:", error);
       return res.status(400).json({ message: error.message });
+    }
+  }
+);
+
+/**
+ * ✅ CREATE ATTENDANCE OFFICER
+ */
+router.post(
+  "/users/attendance-officer",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    try {
+      const { name, email, password } = req.body;
+
+      if (!name || !email || !password) {
+        return res.status(400).json({
+          message: "Missing fields",
+        });
+      }
+
+      const existing =
+        await prisma.user.findUnique({
+          where: { email },
+        });
+
+      if (existing) {
+        return res.status(400).json({
+          message: "User already exists",
+        });
+      }
+
+      const hashedPassword =
+        await bcrypt.hash(password, 10);
+
+      const user = await prisma.user.create({
+        data: {
+          name,
+          email,
+          password: hashedPassword,
+          role: "ATTENDANCE_OFFICER",
+          mustChangePassword: true,
+        },
+      });
+
+      return res.status(201).json(user);
+    } catch (error: any) {
+      console.error(
+        "Failed to create attendance officer:",
+        error
+      );
+
+      return res.status(400).json({
+        message: error.message,
+      });
     }
   }
 );

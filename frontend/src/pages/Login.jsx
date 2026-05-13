@@ -28,14 +28,10 @@ export default function Login() {
     try {
       console.log("🚀 Calling API: /auth/login");
 
-      const res = await api.post(
-        "/auth/login",
-        { email, password },
-        {
-          withCredentials: true,
-          headers: { "Content-Type": "application/json" },
-        }
-      );
+      const res = await api.post("/auth/login", {
+        email,
+        password,
+      });
 
       console.log("✅ LOGIN RESPONSE:", res.data);
 
@@ -89,6 +85,8 @@ export default function Login() {
         navigate("/admin", { replace: true });
       } else if (normalizedRole === "TEACHER") {
         navigate("/teacher/classes", { replace: true });
+      } else if (normalizedRole === "ATTENDANCE_OFFICER") {
+        navigate("/dashboard/admin/attendance", { replace: true });
       } else if (normalizedRole === "PARENT") {
         navigate("/parent", { replace: true });
       } else if (normalizedRole === "STUDENT") {

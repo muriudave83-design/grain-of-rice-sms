@@ -129,5 +129,57 @@ router.get(
     }
   }
 );
+/**
+ * ============================================================
+ * 🟢 GET STUDENTS BY CLASS
+ * GET /api/classes/:id/students
+ * ============================================================
+ */
+router.get(
+  "/:id/students",
+  authenticate,
+  requireRole([
+    Role.ADMIN,
+    Role.TEACHER,
+    Role.ATTENDANCE_OFFICER,
+  ]),
+  async (req, res) => {
+    try {
+      const classId = Number(req.params.id);
 
+      if (isNaN(classId)) {
+        return res.status(400).json({
+          message: "Invalid class ID",
+        });
+      }
+
+      const students = await prisma.student.findMany({
+        where: {
+          classId,
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          admissionNo: true,
+          classId: true,
+        },
+        orderBy: {
+          firstName: "asc",
+        },
+      });
+
+      return res.json(students);
+    } catch (error) {
+      console.error(
+        "❌ Failed to fetch students by class:",
+        error
+      );
+
+      return res.status(500).json({
+        message: "Failed to fetch students",
+      });
+    }
+  }
+);
 export default router;

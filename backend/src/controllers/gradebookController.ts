@@ -1,7 +1,10 @@
 // backend/src/controllers/gradebookController.ts
 import { Request, Response } from "express";
-import { PrismaClient, Role } from "@prisma/client";
-import { computeFinalForStudent, computeFinalForStudentsBulk } from "../utils/gradeHelpers";
+import { PrismaClient } from "@prisma/client";
+import {
+  computeFinalForStudent,
+  computeFinalForStudentsBulk,
+} from "../utils/gradeHelpers";
 
 const prisma = new PrismaClient();
 
@@ -26,8 +29,8 @@ export const getTeacherGradebook = async (req: Request, res: Response) => {
       });
     }
 
-    // ✅ Safe RBAC check (no hard fail)
-    if (subject.teacherId !== teacher.id && teacher.role !== Role.ADMIN) {
+    // ✅ Ownership check ONLY (RBAC handled in middleware)
+    if (subject.teacherId !== teacher.id) {
       return res.status(200).json({
         message: "You are not assigned to this subject",
         subject: { id: subject.id, name: subject.name },
@@ -125,7 +128,6 @@ export const getTeacherGradebook = async (req: Request, res: Response) => {
       subject: { id: subject.id, name: subject.name },
       students: resultRows,
     });
-
   } catch (err) {
     console.error("🔥 Gradebook fatal error:", err);
 
@@ -145,18 +147,17 @@ export const getParentGradebook = async (req: Request, res: Response) => {
     const parent = (req as any).user;
     const studentId = Number(req.params.studentId);
 
-    if (parent.role !== Role.ADMIN) {
-      const guard = await prisma.guardian.findFirst({
-        where: { studentId, userId: parent.id },
-      });
+    // ✅ Always enforce guardian relationship (no admin bypass here)
+    const guard = await prisma.guardian.findFirst({
+      where: { studentId, userId: parent.id },
+    });
 
-      if (!guard) {
-        return res.status(200).json({
-          message: "You are not authorized to view this student",
-          studentId,
-          subjects: [],
-        });
-      }
+    if (!guard) {
+      return res.status(200).json({
+        message: "You are not authorized to view this student",
+        studentId,
+        subjects: [],
+      });
     }
 
     const enrollments = await prisma.enrollment.findMany({
@@ -206,7 +207,6 @@ export const getParentGradebook = async (req: Request, res: Response) => {
       studentId,
       subjects: results,
     });
-
   } catch (err) {
     console.error("🔥 Parent gradebook error:", err);
 
@@ -264,7 +264,9 @@ export const getAdminOverview = async (req: Request, res: Response) => {
             name: student
               ? `${student.firstName} ${student.lastName}`
               : "Unknown",
-            finalScore: Number(((finals?.[id]?.finalScore || 0) * 100).toFixed(2)),
+            finalScore: Number(
+              ((finals?.[id]?.finalScore || 0) * 100).toFixed(2)
+            ),
             missingCount: finals?.[id]?.missingCount || 0,
           };
         });
@@ -276,7 +278,6 @@ export const getAdminOverview = async (req: Request, res: Response) => {
           studentCount: studentIds.length,
           students: studentsSummary,
         });
-
       } catch (err) {
         console.error("⚠️ subject processing failed:", err);
       }
@@ -286,7 +287,6 @@ export const getAdminOverview = async (req: Request, res: Response) => {
       message: "Admin overview loaded",
       overview,
     });
-
   } catch (err) {
     console.error("🔥 Admin overview error:", err);
 
