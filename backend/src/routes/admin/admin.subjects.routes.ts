@@ -8,7 +8,7 @@ const router = Router();
 
 /**
  * ============================================================
- * ADMIN — LIST SUBJECTS
+ * ADMIN — LIST SUBJECTS (UPDATED ✅ SEARCH + HIDE ARCHIVED)
  * GET /api/admin/subjects
  * ============================================================
  */
@@ -16,9 +16,30 @@ router.get(
   "/subjects",
   authenticate,
   requireRole([Role.ADMIN]),
-  async (_req, res) => {
+  async (req, res) => {
     try {
+      const { search } = req.query;
+
       const subjects = await prisma.subject.findMany({
+        where: {
+          isArchived: false,
+          ...(search && {
+            OR: [
+              {
+                name: {
+                  contains: String(search),
+                  mode: "insensitive",
+                },
+              },
+              {
+                code: {
+                  contains: String(search),
+                  mode: "insensitive",
+                },
+              },
+            ],
+          }),
+        },
         include: {
           teacher: true,
         },
@@ -35,7 +56,7 @@ router.get(
 
 /**
  * ============================================================
- * ADMIN — CREATE SUBJECT (FIXED ✅)
+ * ADMIN — CREATE SUBJECT
  * POST /api/admin/subjects
  * ============================================================
  */
@@ -51,7 +72,6 @@ router.post(
         return res.status(400).json({ error: "Subject name required" });
       }
 
-      // ✅ PREVENT DUPLICATE SUBJECT NAMES
       const existing = await prisma.subject.findFirst({
         where: {
           name: name,
@@ -75,7 +95,6 @@ router.post(
     } catch (error: any) {
       console.error("CREATE SUBJECT ERROR:", error);
 
-      // ✅ HANDLE UNIQUE CONSTRAINT (if still exists anywhere)
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
@@ -88,6 +107,61 @@ router.post(
       res.status(500).json({
         error: "Failed to create subject",
       });
+    }
+  }
+);
+
+/**
+ * ============================================================
+ * ADMIN — EDIT SUBJECT ✅ NEW
+ * PATCH /api/admin/subjects/:id
+ * ============================================================
+ */
+router.patch(
+  "/subjects/:id",
+  authenticate,
+  requireRole([Role.ADMIN]),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, code } = req.body;
+
+      const updated = await prisma.subject.update({
+        where: { id: Number(id) },
+        data: { name, code },
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("UPDATE SUBJECT ERROR:", error);
+      res.status(500).json({ error: "Failed to update subject" });
+    }
+  }
+);
+
+/**
+ * ============================================================
+ * ADMIN — ARCHIVE SUBJECT ✅ NEW
+ * PATCH /api/admin/subjects/:id/archive
+ * ============================================================
+ */
+router.patch(
+  "/subjects/:id/archive",
+  authenticate,
+  requireRole([Role.ADMIN]),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const archived = await prisma.subject.update({
+        where: { id: Number(id) },
+        data: { isArchived: true },
+      });
+
+      res.json({ message: "Subject archived", archived });
+    } catch (error) {
+      console.error("ARCHIVE SUBJECT ERROR:", error);
+      res.status(500).json({ error: "Failed to archive subject" });
     }
   }
 );

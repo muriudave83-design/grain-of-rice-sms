@@ -135,6 +135,10 @@ model Subject {
   name            String
   code            String?
   createdAt       DateTime                 @default(now())
+
+  isArchived      Boolean                  @default(false)
+  updatedAt       DateTime                 @default(now()) @updatedAt
+
   teacherId       Int?
   assessments     Assessment[]
   classSubjects   ClassSubject[]
