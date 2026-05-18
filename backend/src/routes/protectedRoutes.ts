@@ -4,8 +4,8 @@ import { reportCardReadRoutes } from "./reportCardReadRoutes";
 
 const router = Router();
 
-// ✅ Protect ALL report card routes
-router.use("/", authenticate, reportCardReadRoutes);
+// ✅ Namespace report routes properly
+router.use("/report-cards", authenticate, reportCardReadRoutes);
 
 // ✅ Protected dashboard test route
 router.get("/dashboard", authenticate, (req, res) => {

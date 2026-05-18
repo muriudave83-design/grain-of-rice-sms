@@ -176,7 +176,11 @@ router.get(
 router.get(
   "/report",
   authenticate,
-  requireRole([Role.ADMIN]),
+  requireRole([
+    Role.ADMIN,
+    Role.TEACHER,
+    Role.ATTENDANCE_OFFICER,
+  ]),
   asyncHandler(async (req, res) => {
     try {
       return await getAttendanceReport(req, res);

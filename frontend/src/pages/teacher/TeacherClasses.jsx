@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import apiClient from "../../services/apiClient";
 
 export default function TeacherClasses() {
@@ -18,6 +19,31 @@ export default function TeacherClasses() {
       console.error(err);
       setSubjects([]);
     }
+  };
+
+  const openGradebook = (teacherSubject) => {
+    if (!teacherSubject?.id) {
+      toast.error("No gradebook assigned yet");
+      return;
+    }
+
+    if (!teacherSubject?.id) {
+      toast.error("No gradebook assigned yet");
+      return;
+    }
+
+    navigate(`/teacher/gradebook/${teacherSubject.id}`);
+  };
+
+  const openFinalGrades = (teacherSubject) => {
+    if (!teacherSubject?.classId) {
+      toast.error("No class assigned yet");
+      return;
+    }
+
+    navigate(
+      `/teacher/final-grades/${teacherSubject.classId}?termId=1`
+    );
   };
 
   return (
@@ -83,9 +109,7 @@ export default function TeacherClasses() {
               <div style={{ marginTop: "10px" }}>
                 {/* PRIMARY */}
                 <button
-                  onClick={() =>
-                    navigate(`/teacher/gradebook/${ts.id}`)
-                  }
+                  onClick={() => openGradebook(ts)}
                   style={{
                     background: "#1976d2",
                     color: "white",
@@ -100,11 +124,7 @@ export default function TeacherClasses() {
 
                 {/* SECONDARY */}
                 <button
-                  onClick={() =>
-                    navigate(
-                      `/teacher/final-grades/${ts.classId}?termId=1`
-                    )
-                  }
+                  onClick={() => openFinalGrades(ts)}
                   style={{
                     marginLeft: "10px",
                     background: "#e5e7eb",

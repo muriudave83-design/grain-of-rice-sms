@@ -147,6 +147,11 @@ export default function GradebookDetail() {
       try {
         setLoading(true);
         console.log("🚀 START INIT");
+        if (!id) {
+          setError("No gradebook assigned yet");
+          setLoading(false);
+          return;
+        }
 
         // ✅ STEP 1: get gradebook (to extract classId)
         const baseRes = await apiClient.get(
