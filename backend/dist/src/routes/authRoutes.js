@@ -25,5 +25,5 @@ router.get("/me", authMiddleware_1.authenticate, (req, res) => {
 // AUTH — CHANGE PASSWORD
 // PATCH /api/auth/change-password
 // ======================================================
-router.patch("/change-password", authMiddleware_1.authenticate, authController_1.changePassword);
+router.patch("/change-password", authController_1.changePassword);
 exports.default = router;

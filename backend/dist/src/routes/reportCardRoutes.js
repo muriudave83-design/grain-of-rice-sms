@@ -1,14 +1,19 @@
 "use strict";
+// ============================================================
+// src/routes/reportCardRoutes.ts
+// PART 1
+// ============================================================
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.reportCardReadRoutes = void 0;
 console.log("🔥 reportCardRoutes.ts LOADED");
 const express_1 = require("express");
 const client_1 = require("../prisma/client");
 const authMiddleware_1 = require("../middlewares/authMiddleware");
+const rolesMiddleware_1 = require("../middlewares/rolesMiddleware");
 const client_2 = require("@prisma/client");
 const client_3 = require("@prisma/client");
+// ✅ CONTROLLER IMPORT
+const reportCard_controller_1 = require("../controllers/reportCard.controller");
 const router = (0, express_1.Router)();
-exports.reportCardReadRoutes = router;
 /**
  * ============================================================
  * HELPER — GRADE CALCULATOR
@@ -27,24 +32,27 @@ function getGrade(avg) {
 }
 /**
  * ============================================================
- * 🎓 STUDENT — OWN REPORT CARD (/me)
+ * 🎓 STUDENT / 👨‍👩‍👧 PARENT — OWN REPORT CARD (/me)
  * ============================================================
+ * FIX:
+ * ❌ removed inline role checks
+ * ✅ replaced with requireRole middleware
  */
-router.get("/me", authMiddleware_1.authenticate, async (req, res) => {
+router.get("/me", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.STUDENT, client_2.Role.PARENT, client_2.Role.ADMIN]), async (req, res) => {
     try {
-        if (!req.user) {
+        const user = req.user;
+        if (!user) {
             return res.status(401).json({ message: "Unauthorized" });
         }
-        if (req.user.role === client_2.Role.STUDENT) {
-            // continue (existing logic below will run)
-        }
-        else if (req.user.role === client_2.Role.PARENT) {
-            const parentId = req.user.id;
+        // ================================
+        // PARENT FLOW
+        // ================================
+        if (user.role === client_2.Role.PARENT) {
             const children = await client_1.prisma.student.findMany({
                 where: {
                     parentLinks: {
                         some: {
-                            parentId: parentId,
+                            parentId: user.id,
                         },
                     },
                 },
@@ -52,22 +60,18 @@ router.get("/me", authMiddleware_1.authenticate, async (req, res) => {
             if (!children.length) {
                 return res.json([]);
             }
-            const results = [];
-            for (const child of children) {
-                results.push({
-                    studentId: child.id,
-                    name: `${child.firstName} ${child.lastName}`,
-                    subjects: [],
-                    overallAverage: 0,
-                    overallGrade: "N/A",
-                });
-            }
+            const results = children.map((child) => ({
+                studentId: child.id,
+                name: `${child.firstName} ${child.lastName}`,
+                subjects: [],
+                overallAverage: 0,
+                overallGrade: "N/A",
+            }));
             return res.json(results);
         }
-        else {
-            return res.status(403).json({ message: "Unauthorized" });
-        }
-        // ✅ Support both ?term=term1 and ?termId=1
+        // ================================
+        // STUDENT FLOW
+        // ================================
         let termId;
         if (req.query.term) {
             const termMap = {
@@ -82,7 +86,7 @@ router.get("/me", authMiddleware_1.authenticate, async (req, res) => {
         }
         console.log("📘 TERM FILTER:", termId);
         const student = await client_1.prisma.student.findFirst({
-            where: { userId: req.user.id },
+            where: { userId: user.id },
         });
         if (!student) {
             return res.status(404).json({ message: "Student not found" });
@@ -101,7 +105,7 @@ router.get("/me", authMiddleware_1.authenticate, async (req, res) => {
                 where: {
                     subjectId: cs.subjectId,
                     classId,
-                    ...(termId && { termId }), // ✅ APPLY TERM FILTER
+                    ...(termId && { termId }),
                 },
                 select: {
                     id: true,
@@ -134,27 +138,35 @@ router.get("/me", authMiddleware_1.authenticate, async (req, res) => {
                     categoryBuckets[a.categoryId].push(value);
                 }
             }
+            // ====================================================
+            // ✅ FIXED WEIGHT NORMALIZATION
+            // ====================================================
             let weightedTotal = 0;
+            let activeWeightTotal = 0;
             for (const category of categories) {
                 const values = categoryBuckets[category.id] || [];
                 const weight = (category.weight ?? 0) / 100;
                 if (!weight)
                     continue;
-                let categoryAverage = 0;
-                if (values.length > 0) {
-                    categoryAverage =
-                        values.reduce((a, b) => a + b, 0) / values.length;
+                // ✅ Ignore empty categories completely
+                if (values.length === 0) {
+                    continue;
                 }
+                const categoryAverage = values.reduce((a, b) => a + b, 0) / values.length;
                 weightedTotal += categoryAverage * weight;
+                activeWeightTotal += weight;
             }
-            if (weightedTotal === 0)
+            // ✅ No active grades at all
+            if (activeWeightTotal === 0)
                 continue;
-            overallTotal += weightedTotal;
+            // ✅ Normalize active weights only
+            const normalizedAverage = weightedTotal / activeWeightTotal;
+            overallTotal += normalizedAverage;
             subjectCount++;
             subjects.push({
                 subject: cs.subject.name,
-                average: Number((weightedTotal * 100).toFixed(2)),
-                grade: getGrade(weightedTotal),
+                average: Number((normalizedAverage * 100).toFixed(2)),
+                grade: getGrade(normalizedAverage),
             });
         }
         const overallAverage = subjectCount > 0 ? overallTotal / subjectCount : 0;
@@ -176,14 +188,18 @@ router.get("/me", authMiddleware_1.authenticate, async (req, res) => {
 // ============================================================
 // 👨‍👩‍👧 PARENT — VIEW SINGLE REPORT CARD
 // ============================================================
-router.get("/student/:studentId/term/:termId", authMiddleware_1.authenticate, async (req, res) => {
+router.get("/student/:studentId/term/:termId", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.PARENT, client_2.Role.ADMIN]), async (req, res) => {
     try {
         const studentId = Number(req.params.studentId);
         const termId = Number(req.params.termId);
         if (!req.user) {
-            return res.status(401).json({ message: "Unauthorized" });
+            return res.status(401).json({
+                message: "Unauthorized",
+            });
         }
-        // 🔐 Ensure parent owns this student
+        // ========================================================
+        // 🔐 PARENT OWNERSHIP CHECK
+        // ========================================================
         if (req.user.role === client_2.Role.PARENT) {
             const link = await client_1.prisma.parentStudent.findFirst({
                 where: {
@@ -192,9 +208,14 @@ router.get("/student/:studentId/term/:termId", authMiddleware_1.authenticate, as
                 },
             });
             if (!link) {
-                return res.status(403).json({ message: "Not authorized" });
+                return res.status(403).json({
+                    message: "Not authorized",
+                });
             }
         }
+        // ========================================================
+        // 📊 FETCH REPORT CARD
+        // ========================================================
         const reportCard = await client_1.prisma.reportCard.findFirst({
             where: {
                 studentId,
@@ -226,23 +247,27 @@ router.get("/student/:studentId/term/:termId", authMiddleware_1.authenticate, as
         });
     }
 });
-/**
- * ============================================================
- * 🚀 GENERATE REPORT CARD
- * ============================================================
- */
-router.get("/generate/:studentId", authMiddleware_1.authenticate, async (req, res) => {
+// ============================================================
+// 🚀 GENERATE REPORT CARD (SECURED)
+// ============================================================
+router.get("/generate/:studentId", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.TEACHER, client_2.Role.ADMIN]), async (req, res) => {
     try {
         const studentId = Number(req.params.studentId);
         const student = await client_1.prisma.student.findUnique({
             where: { id: studentId },
         });
         if (!student) {
-            return res.status(404).json({ error: "Student not found" });
+            return res.status(404).json({
+                error: "Student not found",
+            });
         }
         const classSubjects = await client_1.prisma.classSubject.findMany({
-            where: { classId: student.classId },
-            include: { subject: true },
+            where: {
+                classId: student.classId,
+            },
+            include: {
+                subject: true,
+            },
         });
         const categories = await client_1.prisma.assignmentCategory.findMany();
         const results = [];
@@ -277,7 +302,9 @@ router.get("/generate/:studentId", authMiddleware_1.authenticate, async (req, re
             const categoryBuckets = {};
             for (const a of assessments) {
                 const score = scoreMap[a.id];
-                if (score != null && a.categoryId && a.maxScore > 0) {
+                if (score != null &&
+                    a.categoryId &&
+                    a.maxScore > 0) {
                     const value = score / a.maxScore;
                     if (!categoryBuckets[a.categoryId]) {
                         categoryBuckets[a.categoryId] = [];
@@ -285,30 +312,42 @@ router.get("/generate/:studentId", authMiddleware_1.authenticate, async (req, re
                     categoryBuckets[a.categoryId].push(value);
                 }
             }
+            // ====================================================
+            // ✅ FIXED WEIGHT NORMALIZATION
+            // ====================================================
             let weightedTotal = 0;
+            let activeWeightTotal = 0;
             for (const category of categories) {
                 const values = categoryBuckets[category.id] || [];
                 const weight = (category.weight ?? 0) / 100;
                 if (!weight)
                     continue;
-                let categoryAverage = 0;
-                if (values.length > 0) {
-                    categoryAverage =
-                        values.reduce((a, b) => a + b, 0) / values.length;
+                // ✅ Ignore missing categories
+                if (values.length === 0) {
+                    continue;
                 }
-                weightedTotal += categoryAverage * weight;
+                const categoryAverage = values.reduce((a, b) => a + b, 0) /
+                    values.length;
+                weightedTotal +=
+                    categoryAverage * weight;
+                activeWeightTotal += weight;
             }
-            if (weightedTotal === 0)
+            // ✅ No graded work
+            if (activeWeightTotal === 0)
                 continue;
-            overallTotal += weightedTotal;
+            // ✅ Normalize only active categories
+            const normalizedAverage = weightedTotal / activeWeightTotal;
+            overallTotal += normalizedAverage;
             subjectCount++;
             results.push({
                 subject: cs.subject.name,
-                average: Number((weightedTotal * 100).toFixed(2)),
-                grade: getGrade(weightedTotal),
+                average: Number((normalizedAverage * 100).toFixed(2)),
+                grade: getGrade(normalizedAverage),
             });
         }
-        const overallAverage = subjectCount > 0 ? overallTotal / subjectCount : 0;
+        const overallAverage = subjectCount > 0
+            ? overallTotal / subjectCount
+            : 0;
         res.json({
             student,
             results,
@@ -323,23 +362,32 @@ router.get("/generate/:studentId", authMiddleware_1.authenticate, async (req, re
         });
     }
 });
-/**
- * ============================================================
- * 👨‍🏫 TEACHER + 🎓 STUDENT — REPORT CARDS
- * ============================================================
- */
-router.get("/by-class/:classId/term/:term", authMiddleware_1.authenticate, async (req, res) => {
+// ============================================================
+// 👨‍🏫 TEACHER + 🎓 STUDENT — REPORT CARDS BY CLASS
+// ============================================================
+router.get("/by-class/:classId/term/:term", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([
+    client_2.Role.TEACHER,
+    client_2.Role.ADMIN,
+    client_2.Role.STUDENT,
+]), async (req, res) => {
     console.log("🔥 REPORT CARD ROUTE HIT");
     try {
         if (!req.user) {
-            return res.status(401).json({ message: "Unauthorized" });
+            return res.status(401).json({
+                message: "Unauthorized",
+            });
         }
         console.log("USER:", req.user);
         let classIdParam = req.params.classId;
-        let classId = classIdParam ? Number(classIdParam) : undefined;
+        let classId = classIdParam
+            ? Number(classIdParam)
+            : undefined;
         const userId = req.user.id;
         const role = req.user.role;
         let students;
+        // ========================================================
+        // 🎓 STUDENT FLOW
+        // ========================================================
         if (role === client_2.Role.STUDENT) {
             const student = await client_1.prisma.student.findFirst({
                 where: { userId },
@@ -352,6 +400,9 @@ router.get("/by-class/:classId/term/:term", authMiddleware_1.authenticate, async
             classId = student.classId;
             students = [student];
         }
+        // ========================================================
+        // 👨‍🏫 TEACHER / ADMIN FLOW
+        // ========================================================
         else {
             if (!classId || isNaN(classId)) {
                 return res.status(400).json({
@@ -364,7 +415,9 @@ router.get("/by-class/:classId/term/:term", authMiddleware_1.authenticate, async
         }
         const classSubjects = await client_1.prisma.classSubject.findMany({
             where: { classId },
-            include: { subject: true },
+            include: {
+                subject: true,
+            },
         });
         const categories = await client_1.prisma.assignmentCategory.findMany();
         const results = [];
@@ -401,7 +454,9 @@ router.get("/by-class/:classId/term/:term", authMiddleware_1.authenticate, async
                 const categoryBuckets = {};
                 for (const a of assessments) {
                     const score = scoreMap[a.id];
-                    if (score != null && a.categoryId && a.maxScore > 0) {
+                    if (score != null &&
+                        a.categoryId &&
+                        a.maxScore > 0) {
                         const value = score / a.maxScore;
                         if (!categoryBuckets[a.categoryId]) {
                             categoryBuckets[a.categoryId] = [];
@@ -409,30 +464,42 @@ router.get("/by-class/:classId/term/:term", authMiddleware_1.authenticate, async
                         categoryBuckets[a.categoryId].push(value);
                     }
                 }
+                // ====================================================
+                // ✅ FIXED WEIGHT NORMALIZATION
+                // ====================================================
                 let weightedTotal = 0;
+                let activeWeightTotal = 0;
                 for (const category of categories) {
                     const values = categoryBuckets[category.id] || [];
                     const weight = (category.weight ?? 0) / 100;
                     if (!weight)
                         continue;
-                    let categoryAverage = 0;
-                    if (values.length > 0) {
-                        categoryAverage =
-                            values.reduce((a, b) => a + b, 0) / values.length;
+                    // ✅ Ignore empty categories completely
+                    if (values.length === 0) {
+                        continue;
                     }
-                    weightedTotal += categoryAverage * weight;
+                    const categoryAverage = values.reduce((a, b) => a + b, 0) /
+                        values.length;
+                    weightedTotal +=
+                        categoryAverage * weight;
+                    activeWeightTotal += weight;
                 }
-                if (weightedTotal === 0)
+                // ✅ No graded categories
+                if (activeWeightTotal === 0)
                     continue;
-                overallTotal += weightedTotal;
+                // ✅ Normalize active weights only
+                const normalizedAverage = weightedTotal / activeWeightTotal;
+                overallTotal += normalizedAverage;
                 subjectCount++;
                 subjects.push({
                     subject: cs.subject.name,
-                    average: Number((weightedTotal * 100).toFixed(2)),
-                    grade: getGrade(weightedTotal),
+                    average: Number((normalizedAverage * 100).toFixed(2)),
+                    grade: getGrade(normalizedAverage),
                 });
             }
-            const overallAverage = subjectCount > 0 ? overallTotal / subjectCount : 0;
+            const overallAverage = subjectCount > 0
+                ? overallTotal / subjectCount
+                : 0;
             results.push({
                 studentId: student.id,
                 name: `${student.firstName} ${student.lastName}`,
@@ -441,16 +508,26 @@ router.get("/by-class/:classId/term/:term", authMiddleware_1.authenticate, async
                 overallGrade: getGrade(overallAverage),
             });
         }
+        // ========================================================
+        // 🎯 RESPONSE SHAPE CONTROL
+        // ========================================================
         if (role === client_2.Role.STUDENT) {
             return res.json(results[0] || null);
         }
-        res.json(results);
+        return res.json(results);
     }
     catch (err) {
         console.error("🔥 REAL ERROR:", err);
         res.status(500).json({
             message: "Failed to load report cards",
-            error: err instanceof Error ? err.message : err,
+            error: err instanceof Error
+                ? err.message
+                : err,
         });
     }
 });
+// ============================================================
+// 👨‍👩‍👧 PARENT REPORT CARD CONTROLLER ROUTE
+// ============================================================
+router.get("/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.PARENT]), reportCard_controller_1.getParentReportCards);
+exports.default = router;

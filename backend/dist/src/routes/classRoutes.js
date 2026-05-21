@@ -4,10 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
-const reports_controller_1 = require("../controllers/reports.controller");
+const classController_1 = require("../controllers/classController");
+const authMiddleware_1 = require("../middlewares/authMiddleware");
 const router = express_1.default.Router();
-// existing
-router.get("/student/:studentId", reports_controller_1.getStudentReport);
-// 🔥 ADD THIS
-router.post("/report-comment", reports_controller_1.saveReportComment);
+router.get("/:id/students", authMiddleware_1.authenticate, classController_1.getStudentsByClass);
 exports.default = router;

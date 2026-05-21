@@ -17,11 +17,8 @@ const studentRoutes_1 = __importDefault(require("./routes/studentRoutes"));
 const assessmentRoutes_1 = require("./routes/assessmentRoutes");
 const gradebookRoutes_1 = __importDefault(require("./routes/gradebookRoutes"));
 const dashboardRoutes_1 = __importDefault(require("./routes/dashboardRoutes"));
-// ✅ Assignment Categories
 const assignmentCategory_routes_1 = __importDefault(require("./routes/assignmentCategory.routes"));
-// ✅ Terms route
 const termRoutes_1 = __importDefault(require("./routes/termRoutes"));
-// ✅ Admin routes
 const admin_auditLogs_routes_1 = __importDefault(require("./routes/admin.auditLogs.routes"));
 const admin_users_routes_1 = __importDefault(require("./routes/admin.users.routes"));
 const admin_classes_routes_1 = __importDefault(require("./routes/admin/admin.classes.routes"));
@@ -30,35 +27,36 @@ const admin_students_routes_1 = __importDefault(require("./routes/admin/admin.st
 const admin_class_students_routes_1 = __importDefault(require("./routes/admin/admin.class.students.routes"));
 const admin_classSubjects_routes_1 = __importDefault(require("./routes/admin/admin.classSubjects.routes"));
 const adminAttendance_routes_1 = __importDefault(require("./routes/adminAttendance.routes"));
-// ✅ Teacher ↔ Subject assignments
 const admin_teacherSubjects_routes_1 = __importDefault(require("./routes/admin/admin.teacherSubjects.routes"));
-// ✅ Teacher assignments endpoint
 const teacherAssignments_routes_1 = __importDefault(require("./routes/teacherAssignments.routes"));
-// ✅ REPORT CARDS (FIXED IMPORTS)
 const reportCardReadRoutes_1 = require("./routes/reportCardReadRoutes");
 const reports_routes_1 = __importDefault(require("./routes/reports.routes"));
-// ✅ Parent ↔ Student linking
 const parentStudentRoutes_1 = require("./routes/parentStudentRoutes");
-// ✅ Parent routes
 const admin_parents_routes_1 = __importDefault(require("./routes/admin.parents.routes"));
-// ✅ Report Card PDF
 const reportCardPdf_routes_1 = __importDefault(require("./routes/reportCardPdf.routes"));
-// ✅ Attendance
 const attendanceRoutes_1 = __importDefault(require("./routes/attendanceRoutes"));
-// ✅ Teacher-visible classes
 const classes_1 = __importDefault(require("./routes/classes"));
 const teacher_routes_1 = __importDefault(require("./routes/teacher.routes"));
+const fees_routes_1 = __importDefault(require("./routes/fees.routes"));
+const sponsorship_routes_1 = __importDefault(require("./routes/sponsorship.routes"));
+const discipline_routes_1 = __importDefault(require("./routes/discipline.routes"));
 const app = (0, express_1.default)();
 // ----------------------------------
-// CORS
+// ✅ CORS (FIXED FOR RENDER)
 // ----------------------------------
-app.use((0, cors_1.default)({
+const corsOptions = {
     origin: [
         "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:3000",
         "https://sms-frontend-gjfo.onrender.com",
     ],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     credentials: true,
-}));
+};
+app.use((0, cors_1.default)(corsOptions));
+// ✅ CRITICAL: handle preflight requests
+app.options("*", (0, cors_1.default)(corsOptions));
 // ----------------------------------
 // MIDDLEWARE
 // ----------------------------------
@@ -101,20 +99,22 @@ app.use("/api/students", studentRoutes_1.default);
 app.use("/api", protectedRoutes_1.default);
 app.use("/api/assessments", assessmentRoutes_1.assessmentRoutes);
 app.use("/api/classes", classes_1.default);
-app.use("/api/teacher", teacher_routes_1.default); // ✅ MUST be before any generic /api routes
+app.use("/api/teacher", teacher_routes_1.default);
 app.use("/api/gradebook", gradebookRoutes_1.default);
 app.use("/api/dashboard", dashboardRoutes_1.default);
 app.use("/api/assignment-categories", assignmentCategory_routes_1.default);
 app.use("/api/admin/attendance", adminAttendance_routes_1.default);
 app.use("/api/terms", termRoutes_1.default);
 app.use("/api/attendance", attendanceRoutes_1.default);
-// ✅ Teacher assignments (safe)
+app.use("/api/fees", fees_routes_1.default);
+app.use("/api/sponsorship", sponsorship_routes_1.default);
 app.use("/api/teacher-assignments", teacherAssignments_routes_1.default);
+app.use("/api/discipline", discipline_routes_1.default);
 // ----------------------------------
-// REPORT CARDS (STRICT SCOPING)
+// REPORT CARDS
 // ----------------------------------
 app.use("/api/report-cards", reportCardReadRoutes_1.reportCardReadRoutes);
-app.use("/api/report-cards/pdf", reportCardPdf_routes_1.default); // ✅ FIXED (NO MORE /api LEAK)
+app.use("/api/report-cards/pdf", reportCardPdf_routes_1.default);
 app.use("/api/reports", reports_routes_1.default);
 // ----------------------------------
 // PARENT ↔ STUDENT
@@ -141,7 +141,7 @@ app.get("/", (_req, res) => {
 // ----------------------------------
 // SERVER
 // ----------------------------------
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const PORT = Number(process.env.PORT) || 5055;
+app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
 });

@@ -14,43 +14,92 @@ router.use(authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["T
 //
 // 📚 TEACHER CORE ROUTES
 //
-// ✅ GET teacher classes
 router.get("/classes", teacher_controller_2.getTeacherClasses);
-// ✅ GET teacher subjects
 router.get("/subjects", teacher_controller_2.getTeacherSubjects);
-// ✅ GET gradebook detail
 router.get("/gradebook/:id", teacher_controller_2.getGradebook);
-// ✅ GET class students
 router.get("/class/:classId/students", teacher_controller_2.getClassStudents);
 //
 // 🧾 REPORTS
 //
 router.post("/report/comment", teacher_controller_2.saveReportComment);
-// 🧱 NEW — GET report data
 router.get("/report/:classId", teacher_controller_2.getReportData);
+//
+// 🧱 FINAL GRADES (FIXED)
+//
+router.get("/final-grades/:classId", async (req, res) => {
+    try {
+        const { classId } = req.params;
+        const { termId } = req.query;
+        if (!termId) {
+            return res.status(400).json({ message: "termId required" });
+        }
+        // ✅ REUSE EXISTING REPORT LOGIC
+        const mockReq = {
+            params: { classId },
+            query: { termId },
+            user: req.user,
+        };
+        let jsonData = [];
+        const mockRes = {
+            json: (data) => {
+                jsonData = data;
+            },
+            status: () => mockRes,
+        };
+        await (0, teacher_controller_2.getReportData)(mockReq, mockRes);
+        const results = jsonData.map((student) => {
+            const subjects = student.subjects || [];
+            if (subjects.length === 0) {
+                return {
+                    studentId: student.studentId,
+                    name: student.name,
+                    average: 0,
+                    letter: "-",
+                };
+            }
+            const avg = subjects.reduce((sum, s) => sum + (s.finalGrade || 0), 0) / subjects.length;
+            const rounded = Number(avg.toFixed(1));
+            const getLetter = (grade) => {
+                if (grade >= 80)
+                    return "A";
+                if (grade >= 70)
+                    return "B";
+                if (grade >= 60)
+                    return "C";
+                if (grade >= 50)
+                    return "D";
+                return "E";
+            };
+            return {
+                studentId: student.studentId,
+                name: student.name,
+                average: rounded,
+                letter: getLetter(rounded),
+            };
+        });
+        res.json(results);
+    }
+    catch (err) {
+        console.error("FINAL GRADES ERROR:", err);
+        res.status(500).json({ message: "Server error" });
+    }
+});
 //
 // 🧱 SCORES
 //
-// ✅ POST score (create/update single)
 router.post("/score", teacher_controller_2.upsertScore);
-// 🧱 NEW — BULK SCORE UPDATE 🚀
 router.post("/score/bulk", teacher_controller_2.bulkUpdateScores);
 //
-// 🧱 PHASE 5 — ASSIGNMENTS
+// 🧱 ASSIGNMENTS
 //
-// ✅ CREATE assignment (by class)
 router.post("/class/:classId/assignment", teacher_controller_2.createAssignment);
-// ✅ CREATE assignment (general)
 router.post("/assignment", teacher_controller_2.createAssignment);
-// ✅ DELETE assignment
 router.delete("/assignment/:id", teacher_controller_2.deleteAssignment);
-// ✅ REORDER assignments
 router.put("/assignment/reorder", teacher_controller_2.reorderAssignments);
-// ✅ UPDATE assignment
 router.put("/assignment/:id", teacher_controller_2.updateAssignment);
 router.post("/transcript/generate", teacher_controller_1.generateTranscripts);
 //
-// 🔒 LOCK / UNLOCK ASSIGNMENT
+// 🔒 LOCK / UNLOCK
 //
 router.put("/assignment/:id/lock", async (req, res) => {
     try {
@@ -68,7 +117,7 @@ router.put("/assignment/:id/lock", async (req, res) => {
     }
 });
 //
-// 🧱 STEP 5 — TERMS ROUTE (NEW)
+// 🧱 TERMS
 //
 router.get("/terms/:classId", async (req, res) => {
     try {
@@ -76,14 +125,35 @@ router.get("/terms/:classId", async (req, res) => {
         if (!classId) {
             return res.status(400).json({ error: "Invalid classId" });
         }
-        const terms = await prisma_1.default.term.findMany({
-            where: {
-                classId: classId,
-            },
-            orderBy: {
-                createdAt: "asc",
-            },
+        // ✅ STEP 1 — VERIFY CLASS EXISTS
+        const existingClass = await prisma_1.default.class.findUnique({
+            where: { id: classId },
         });
+        if (!existingClass) {
+            return res.status(404).json({
+                error: "Class not found",
+            });
+        }
+        // ✅ STEP 2 — FETCH TERMS
+        const terms = await prisma_1.default.term.findMany({
+            where: { classId },
+            orderBy: { createdAt: "asc" },
+        });
+        // ✅ STEP 3 — AUTO-CREATE IF EMPTY
+        if (terms.length === 0) {
+            console.warn("⚠️ No terms found — auto-creating one");
+            const now = new Date();
+            const newTerm = await prisma_1.default.term.create({
+                data: {
+                    name: "Term 1",
+                    classId,
+                    startDate: now,
+                    endDate: new Date(now.getFullYear(), now.getMonth() + 3, now.getDate()),
+                    academicYear: `${now.getFullYear()}/${now.getFullYear() + 1}`,
+                },
+            });
+            return res.json([newTerm]);
+        }
         res.json(terms);
     }
     catch (err) {

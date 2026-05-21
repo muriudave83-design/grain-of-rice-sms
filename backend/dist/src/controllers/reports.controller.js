@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getStudentReport = void 0;
+exports.getStudentReport = exports.saveReportComment = void 0;
 const client_1 = require("../prisma/client");
-// ✅ Grade helper (UPDATED: uses F)
+// ✅ Grade helper
 const getGrade = (avg) => {
     if (avg >= 80)
         return "A";
@@ -14,6 +14,37 @@ const getGrade = (avg) => {
         return "D";
     return "F";
 };
+// 🔥 NEW: SAVE COMMENT
+const saveReportComment = async (req, res) => {
+    try {
+        const { studentId, teacherSubjectId, comment } = req.body;
+        if (!studentId || !teacherSubjectId) {
+            return res.status(400).json({ message: "Missing fields" });
+        }
+        await client_1.prisma.reportComment.upsert({
+            where: {
+                studentId_teacherSubjectId: {
+                    studentId: Number(studentId),
+                    teacherSubjectId: Number(teacherSubjectId),
+                },
+            },
+            update: {
+                comment,
+            },
+            create: {
+                studentId: Number(studentId),
+                teacherSubjectId: Number(teacherSubjectId),
+                comment,
+            },
+        });
+        res.json({ success: true });
+    }
+    catch (err) {
+        console.error("Save comment error:", err);
+        res.status(500).json({ message: "Something went wrong" });
+    }
+};
+exports.saveReportComment = saveReportComment;
 const getStudentReport = async (req, res) => {
     const { studentId } = req.params;
     try {
@@ -26,7 +57,6 @@ const getStudentReport = async (req, res) => {
         if (!student) {
             return res.status(404).json({ message: "Student not found" });
         }
-        // ✅ STEP 1 — GET ALL STUDENTS IN CLASS
         const studentsInClass = await client_1.prisma.student.findMany({
             where: { classId: student.classId },
         });
@@ -43,7 +73,6 @@ const getStudentReport = async (req, res) => {
                 },
             },
         });
-        // ✅ STEP 2 — HELPER FUNCTION
         const calculateStudentAverage = (studentId, assignments) => {
             let total = 0;
             let totalWeight = 0;
@@ -57,9 +86,8 @@ const getStudentReport = async (req, res) => {
             });
             return totalWeight > 0 ? total / totalWeight : 0;
         };
-        // ✅ STEP 3 — SUBJECT RANKING
-        const report = subjects.map((ts) => {
-            // 1. Compute averages for ALL students
+        // 🔥 INCLUDE COMMENTS
+        const report = await Promise.all(subjects.map(async (ts) => {
             const studentAverages = studentsInClass.map((s) => {
                 const avg = calculateStudentAverage(s.id, ts.assignments);
                 return {
@@ -67,22 +95,29 @@ const getStudentReport = async (req, res) => {
                     avg,
                 };
             });
-            // 2. Sort descending
             studentAverages.sort((a, b) => b.avg - a.avg);
-            // 3. Find current student's position
             const position = studentAverages.findIndex((s) => s.studentId === Number(studentId)) + 1;
-            // 4. Current student's avg
             const current = studentAverages.find((s) => s.studentId === Number(studentId));
             const avg = current?.avg || 0;
+            // ✅ FETCH COMMENT
+            const existingComment = await client_1.prisma.reportComment.findUnique({
+                where: {
+                    studentId_teacherSubjectId: {
+                        studentId: Number(studentId),
+                        teacherSubjectId: ts.id,
+                    },
+                },
+            });
             return {
+                teacherSubjectId: ts.id,
                 subject: ts.subject.name,
                 average: Number(avg.toFixed(1)),
                 grade: getGrade(avg),
                 position,
                 totalStudents: studentAverages.length,
+                comment: existingComment?.comment || "",
             };
-        });
-        // ✅ STEP 4 — OVERALL RANKING
+        }));
         const overallAverages = studentsInClass.map((s) => {
             let total = 0;
             report.forEach((subj) => {
@@ -96,12 +131,10 @@ const getStudentReport = async (req, res) => {
                 avg: overall,
             };
         });
-        // 2. Sort
         overallAverages.sort((a, b) => b.avg - a.avg);
-        // 3. Find position
         const overallPosition = overallAverages.findIndex((s) => s.studentId === Number(studentId)) + 1;
-        // ✅ FINAL RESPONSE
         res.json({
+            studentId: student.id,
             student: `${student.firstName} ${student.lastName}`
                 .replace(/\s+/g, " ")
                 .trim(),

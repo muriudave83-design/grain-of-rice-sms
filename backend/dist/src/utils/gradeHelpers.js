@@ -22,7 +22,11 @@ const computeFinalForStudent = async (studentId, subjectId) => {
             },
         });
         const score = scoreRow?.score ?? null;
-        const percent = score !== null ? score / a.maxScore : null;
+        // ✅ FIXED (safe max handling)
+        const max = Number(a.maxScore) || 100;
+        const percent = score !== null
+            ? Number(score) / max
+            : null;
         const contribution = percent !== null ? percent * a.weight : 0;
         details.push({
             assessmentId: a.id,
@@ -70,7 +74,11 @@ const computeFinalForStudentsBulk = async (studentIds, subjectId) => {
         for (const a of assessments) {
             const key = `${studentId}_${a.id}`;
             const score = scoreMap.get(key) ?? null;
-            const percent = score !== null ? score / a.maxScore : null;
+            // ✅ FIXED (same logic here)
+            const max = Number(a.maxScore) || 100;
+            const percent = score !== null
+                ? Number(score) / max
+                : null;
             const contribution = percent !== null ? percent * a.weight : 0;
             if (score === null)
                 missingCount++;

@@ -22,8 +22,8 @@ const getTeacherGradebook = async (req, res) => {
                 students: [],
             });
         }
-        // ✅ Safe RBAC check (no hard fail)
-        if (subject.teacherId !== teacher.id && teacher.role !== client_1.Role.ADMIN) {
+        // ✅ Ownership check ONLY (RBAC handled in middleware)
+        if (subject.teacherId !== teacher.id) {
             return res.status(200).json({
                 message: "You are not assigned to this subject",
                 subject: { id: subject.id, name: subject.name },
@@ -125,17 +125,16 @@ const getParentGradebook = async (req, res) => {
     try {
         const parent = req.user;
         const studentId = Number(req.params.studentId);
-        if (parent.role !== client_1.Role.ADMIN) {
-            const guard = await prisma.guardian.findFirst({
-                where: { studentId, userId: parent.id },
+        // ✅ Always enforce guardian relationship (no admin bypass here)
+        const guard = await prisma.guardian.findFirst({
+            where: { studentId, userId: parent.id },
+        });
+        if (!guard) {
+            return res.status(200).json({
+                message: "You are not authorized to view this student",
+                studentId,
+                subjects: [],
             });
-            if (!guard) {
-                return res.status(200).json({
-                    message: "You are not authorized to view this student",
-                    studentId,
-                    subjects: [],
-                });
-            }
         }
         const enrollments = await prisma.enrollment.findMany({
             where: { studentId },

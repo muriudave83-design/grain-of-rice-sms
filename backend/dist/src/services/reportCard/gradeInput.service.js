@@ -80,7 +80,9 @@ function computeSubjectFinalScore(assessments) {
     let missingScores = false;
     for (const a of assessments) {
         const weight = normalized ? a.weight / weightSum : a.weight;
-        if (a.score === null) {
+        if (a.score === null ||
+            a.score === undefined ||
+            Number.isNaN(a.score)) {
             missingScores = true;
             continue;
         }

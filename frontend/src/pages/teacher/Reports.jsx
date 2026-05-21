@@ -52,14 +52,17 @@ export default function Reports() {
         console.error(err);
       }
     };
+
     fetchClasses();
   }, []);
-    useEffect(() => {
+
+  useEffect(() => {
     const fetchTerms = async () => {
       if (!classId) return;
 
       try {
         const res = await apiClient.get(`/teacher/terms/${classId}`);
+
         setTerms([
           { id: 1, name: "Term 1" },
           { id: 2, name: "Term 2" },
@@ -106,6 +109,7 @@ export default function Reports() {
       setFilteredReports(reports);
     } else {
       const lower = search.toLowerCase();
+
       setFilteredReports(
         reports.filter((r) =>
           r.name.toLowerCase().includes(lower)
@@ -126,14 +130,17 @@ export default function Reports() {
 
       <div className="flex items-center gap-4 mb-6 print-hidden">
         <img src="/logo.png" className="w-14 h-14" />
+
         <div>
           <h1 className="text-3xl font-bold">
             Grain of Rice Academy
           </h1>
+
           <p>Official Report Cards</p>
         </div>
       </div>
-            <div className="mb-4">
+
+      <div className="mb-4">
         <strong>Grade:</strong> {selectedClassName} <br />
         <strong>Term:</strong> {selectedTermName}
       </div>
@@ -145,6 +152,7 @@ export default function Reports() {
           className="border px-3 py-2"
         >
           <option value="">Select Class</option>
+
           {classes.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name || `Class ${c.id}`}
@@ -188,6 +196,7 @@ export default function Reports() {
       </div>
 
       {loading && <p>Generating reports...</p>}
+
       {error && <p className="text-red-600">{error}</p>}
 
       {!loading && filteredReports.length === 0 ? (
@@ -211,6 +220,7 @@ export default function Reports() {
                   <h2 className="text-xl font-bold">
                     Grain of Rice Academy
                   </h2>
+
                   <p className="text-sm">
                     Official Report Card
                   </p>
@@ -219,9 +229,17 @@ export default function Reports() {
 
               {/* STUDENT INFO */}
               <div className="mb-4">
-                <p><strong>Student:</strong> {student.name}</p>
-                <p><strong>Grade:</strong> {selectedClassName}</p>
-                <p><strong>Term:</strong> {selectedTermName}</p>
+                <p>
+                  <strong>Student:</strong> {student.name}
+                </p>
+
+                <p>
+                  <strong>Grade:</strong> {selectedClassName}
+                </p>
+
+                <p>
+                  <strong>Term:</strong> {selectedTermName}
+                </p>
               </div>
 
               <hr className="my-3" />
@@ -236,10 +254,15 @@ export default function Reports() {
 
                 {student.subjects.map((sub) => {
                   const key =
-                    student.studentId + "-" + sub.teacherSubjectId;
+                    student.studentId +
+                    "-" +
+                    sub.teacherSubjectId;
 
                   return (
-                    <div key={key} className="grid grid-cols-3 py-1">
+                    <div
+                      key={key}
+                      className="grid grid-cols-3 py-1"
+                    >
                       <span>{sub.subjectName}</span>
                       <span>{sub.finalGrade}%</span>
                       <span>{sub.letter}</span>
@@ -250,21 +273,59 @@ export default function Reports() {
 
               <hr className="my-3" />
 
+              {/* ATTENDANCE */}
+              <div className="mt-4 border-t pt-3">
+                <h3 className="font-bold mb-2">
+                  Attendance
+                </h3>
+
+                <p>
+                  <strong>Present:</strong>{" "}
+                  {student.attendance?.present ?? 0}
+                </p>
+
+                <p>
+                  <strong>Absent:</strong>{" "}
+                  {student.attendance?.absent ?? 0}
+                </p>
+
+                <p>
+                  <strong>Late:</strong>{" "}
+                  {student.attendance?.late ?? 0}
+                </p>
+
+                <p>
+                  <strong>Attendance Rate:</strong>{" "}
+                  {student.attendance?.percentage ?? 0}%
+                </p>
+              </div>
+
+              <hr className="my-3" />
+
               {/* COMMENTS */}
               <div>
-                <p className="font-semibold mb-1">Comment:</p>
+                <p className="font-semibold mb-1">
+                  Comment:
+                </p>
 
                 {student.subjects.map((sub) => {
                   const key =
-                    student.studentId + "-" + sub.teacherSubjectId;
+                    student.studentId +
+                    "-" +
+                    sub.teacherSubjectId;
 
                   return (
                     <textarea
                       key={key}
                       className="border w-full mt-1 p-1"
-                      value={comments[key] || sub.comment || ""}
+                      value={
+                        comments[key] ||
+                        sub.comment ||
+                        ""
+                      }
                       onChange={(e) => {
                         const val = e.target.value;
+
                         setComments((prev) => ({
                           ...prev,
                           [key]: val,

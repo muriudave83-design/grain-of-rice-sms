@@ -157,7 +157,7 @@ router.get("/:id", authMiddleware_1.authenticate, ownershipMiddleware_1.authoriz
                 enrollments: { include: { subject: true } },
                 grades: true,
                 invoices: true,
-                disciplines: true,
+                discipline: true,
             },
         });
         if (!student) {
@@ -197,5 +197,202 @@ router.put("/:id/restore", authMiddleware_1.authenticate, (0, rolesMiddleware_1.
         console.error(err);
         res.status(500).json({ error: "Restore failed" });
     }
+});
+// 🔥 GET STUDENT DETAILS (SAFE + REAL ATTENDANCE)
+router.get("/:id/details", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN", "TEACHER"]), async (req, res) => {
+    try {
+        const studentId = Number(req.params.id);
+        if (Number.isNaN(studentId)) {
+            return res.status(400).json({
+                message: "Invalid student id",
+            });
+        }
+        // ✅ 1. REAL ATTENDANCE
+        const attendance = await prisma.attendanceEntry.findMany({
+            where: { studentId },
+            select: { status: true },
+        });
+        const present = attendance.filter((a) => a.status === "PRESENT").length;
+        const absent = attendance.filter((a) => a.status === "ABSENT").length;
+        // ✅ 2. PARENT LOGS
+        const logs = await prisma.parentContactLog.findMany({
+            where: { studentId },
+            orderBy: { createdAt: "desc" },
+        });
+        // ✅ 3. DISCIPLINE HISTORY
+        const discipline = await prisma.discipline.findMany({
+            where: { studentId },
+            include: {
+                term: true,
+            },
+            orderBy: {
+                date: "desc",
+            },
+        });
+        // ✅ 3. HEALTH NOTES (🔥 NEW)
+        const student = await prisma.student.findUnique({
+            where: { id: studentId },
+            select: { healthNotes: true },
+        });
+        // ✅ 4. RESPONSE (MATCHES FRONTEND)
+        res.json({
+            present,
+            absent,
+            logs,
+            discipline,
+            healthNotes: student?.healthNotes || "",
+        });
+    }
+    catch (error) {
+        console.error("DETAILS ERROR:", error);
+        res.status(500).json({
+            message: "Failed to load student details",
+        });
+    }
+});
+// ✅ UPDATE HEALTH NOTES (NEW ROUTE — RIGHT AFTER DETAILS)
+router.put("/:id/health", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN", "TEACHER"]), student_controller_1.updateHealth);
+// 🔥 ADD PARENT CONTACT LOG
+router.post("/:id/contact-log", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN", "TEACHER"]), async (req, res) => {
+    try {
+        const studentId = Number(req.params.id);
+        const { message } = req.body;
+        if (Number.isNaN(studentId)) {
+            return res.status(400).json({
+                message: "Invalid student id",
+            });
+        }
+        if (!message || message.trim() === "") {
+            return res.status(400).json({
+                message: "Message is required",
+            });
+        }
+        const log = await prisma.parentContactLog.create({
+            data: {
+                studentId,
+                message: message.trim(),
+                createdAt: new Date(),
+            },
+        });
+        res.status(201).json(log);
+    }
+    catch (error) {
+        console.error("CREATE LOG ERROR:", error);
+        res.status(500).json({
+            message: "Failed to create contact log",
+        });
+    }
+});
+// 🔥 BULK CREATE STUDENTS FROM CSV
+router.post("/bulk", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)(["ADMIN"]), async (req, res) => {
+    const rows = req.body;
+    if (!Array.isArray(rows)) {
+        return res.status(400).json({
+            message: "Invalid data format",
+        });
+    }
+    let created = 0;
+    let failed = 0;
+    const errors = [];
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        try {
+            let { firstName, lastName, admissionNo, className, parentName, } = row;
+            // ✅ NORMALIZE INPUT
+            firstName = firstName?.trim();
+            lastName = lastName?.trim();
+            admissionNo = admissionNo?.trim();
+            className = className?.trim();
+            parentName = parentName?.trim();
+            // ✅ VALIDATION (aligned with system rules)
+            if (!firstName || !admissionNo || !className) {
+                failed++;
+                errors.push({
+                    row: i + 1,
+                    message: "Missing required fields (firstName, admissionNo, className)",
+                });
+                continue;
+            }
+            // 🔥 NORMALIZE CLASS NAME (THE FIX)
+            const normalizedClassName = className
+                ?.trim()
+                .toUpperCase()
+                .replace(/\s+/g, " ")
+                .replace(/GRADE(\d+)/, "GRADE $1");
+            // 🔍 FIND CLASS USING NORMALIZED VALUE
+            let cls = await prisma.class.findFirst({
+                where: {
+                    name: normalizedClassName,
+                },
+            });
+            // ➕ AUTO-CREATE CLEAN CLASS NAME ONLY
+            if (!cls) {
+                cls = await prisma.class.create({
+                    data: {
+                        name: normalizedClassName,
+                    },
+                });
+                console.log(`✅ Created new class: ${normalizedClassName}`);
+            }
+            // ✅ CHECK DUPLICATE ADMISSION NUMBER
+            const existing = await prisma.student.findFirst({
+                where: { admissionNo },
+            });
+            if (existing) {
+                failed++;
+                errors.push({
+                    row: i + 1,
+                    message: `Admission number already exists: ${admissionNo}`,
+                });
+                continue;
+            }
+            // ✅ OPTIONAL: FIND PARENT
+            let parentId = null;
+            if (parentName) {
+                const parent = await prisma.parent.findFirst({
+                    where: {
+                        name: {
+                            equals: parentName,
+                            mode: "insensitive",
+                        },
+                    },
+                });
+                if (parent) {
+                    parentId = parent.id;
+                }
+            }
+            // ✅ CREATE STUDENT WITH CORRECT RELATION
+            const student = await prisma.student.create({
+                data: {
+                    firstName,
+                    lastName: lastName || "",
+                    admissionNo,
+                    classId: cls.id, // 🔥 THIS IS THE FIX
+                },
+            });
+            // ✅ LINK PARENT
+            if (parentId) {
+                await prisma.parentStudent.create({
+                    data: {
+                        studentId: student.id,
+                        parentId,
+                    },
+                });
+            }
+            created++;
+        }
+        catch (err) {
+            failed++;
+            errors.push({
+                row: i + 1,
+                message: err.message || "Unknown error",
+            });
+        }
+    }
+    return res.json({
+        created,
+        failed,
+        errors,
+    });
 });
 exports.default = router;

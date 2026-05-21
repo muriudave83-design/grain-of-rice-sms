@@ -6,15 +6,29 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const client_1 = require("@prisma/client");
 const markAttendance_controller_1 = require("../controllers/attendance/markAttendance.controller");
+const attendance_controller_1 = require("../controllers/attendance.controller");
+// 🔐 AUTH & RBAC
+const authMiddleware_1 = require("../middlewares/authMiddleware");
+const rolesMiddleware_1 = require("../middlewares/rolesMiddleware");
+const client_2 = require("@prisma/client");
 const router = express_1.default.Router();
 const prisma = new client_1.PrismaClient();
+/*
+🔒 GLOBAL PROTECTION (APPLIES TO ALL ROUTES BELOW)
+Only authenticated ADMIN users can access anything in this file
+*/
+router.use(authMiddleware_1.authenticate);
+router.use((0, rolesMiddleware_1.requireRole)([client_2.Role.ADMIN, client_2.Role.ATTENDANCE_OFFICER]));
 /*
 Admin Attendance Summary
 GET /admin/attendance/summary
 */
 router.get("/summary", async (req, res) => {
     try {
-        const today = new Date();
+        const selectedDate = req.query.date;
+        const today = selectedDate
+            ? new Date(selectedDate)
+            : new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
@@ -33,7 +47,6 @@ router.get("/summary", async (req, res) => {
                 status: true
             }
         });
-        // ✅ Ensure unique students
         const studentStatusMap = new Map();
         todayEntries.forEach(entry => {
             if (!studentStatusMap.has(entry.studentId)) {
@@ -71,7 +84,10 @@ GET /admin/attendance/by-class
 */
 router.get("/by-class", async (req, res) => {
     try {
-        const today = new Date();
+        const selectedDate = req.query.date;
+        const today = selectedDate
+            ? new Date(selectedDate)
+            : new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
@@ -98,7 +114,7 @@ router.get("/by-class", async (req, res) => {
                     const sessionDate = new Date(entry.session.date);
                     if (sessionDate >= today && sessionDate < tomorrow) {
                         status = entry.status;
-                        break; // ✅ stop after first valid entry
+                        break;
                     }
                 }
                 if (status === "PRESENT")
@@ -136,7 +152,10 @@ GET /admin/attendance/class/:classId
 router.get("/class/:classId", async (req, res) => {
     try {
         const classId = parseInt(req.params.classId);
-        const today = new Date();
+        const selectedDate = req.query.date;
+        const today = selectedDate
+            ? new Date(selectedDate)
+            : new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
@@ -159,12 +178,12 @@ router.get("/class/:classId", async (req, res) => {
                 const sessionDate = new Date(entry.session.date);
                 if (sessionDate >= today && sessionDate < tomorrow) {
                     status = entry.status;
-                    break; // ✅ prevent overwrite / duplicates
+                    break;
                 }
             }
             return {
                 studentId: student.id,
-                name: student.user?.name || "Unknown",
+                name: `${student.firstName} ${student.lastName}`,
                 status
             };
         });
@@ -182,4 +201,9 @@ Admin Mark Attendance
 POST /admin/attendance/mark
 */
 router.post("/mark", markAttendance_controller_1.markAttendance);
+/*
+Admin Attendance Report
+GET /admin/attendance/report
+*/
+router.get("/report", attendance_controller_1.getAttendanceReport);
 exports.default = router;

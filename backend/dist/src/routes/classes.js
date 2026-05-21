@@ -102,4 +102,46 @@ router.get("/:classId/subjects", authMiddleware_1.authenticate, (0, rolesMiddlew
         res.status(500).json({ message: "Failed to load subjects" });
     }
 });
+/**
+ * ============================================================
+ * 🟢 GET STUDENTS BY CLASS
+ * GET /api/classes/:id/students
+ * ============================================================
+ */
+router.get("/:id/students", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([
+    client_2.Role.ADMIN,
+    client_2.Role.TEACHER,
+    client_2.Role.ATTENDANCE_OFFICER,
+]), async (req, res) => {
+    try {
+        const classId = Number(req.params.id);
+        if (isNaN(classId)) {
+            return res.status(400).json({
+                message: "Invalid class ID",
+            });
+        }
+        const students = await client_1.prisma.student.findMany({
+            where: {
+                classId,
+            },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                admissionNo: true,
+                classId: true,
+            },
+            orderBy: {
+                firstName: "asc",
+            },
+        });
+        return res.json(students);
+    }
+    catch (error) {
+        console.error("❌ Failed to fetch students by class:", error);
+        return res.status(500).json({
+            message: "Failed to fetch students",
+        });
+    }
+});
 exports.default = router;

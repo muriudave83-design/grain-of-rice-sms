@@ -3,14 +3,14 @@ import { prisma } from "../../prisma/client";
 import { ReportCardStatus } from "@prisma/client";
 
 /**
- * Phase-8 v1.1 â€” Report Card PDF Generator
+ * Phase-8 v1.1 — Report Card PDF Generator
  * Schema-aligned to PHASE 7 (LOCKED)
  * School: Grain of Rice Academy
  */
 export async function generateReportCardPdf(
   reportCardId: number
 ): Promise<Buffer> {
-  // 1ï¸âƒ£ Fetch report card with VALID relations
+  // 1️⃣ Fetch report card with VALID relations
   const reportCard = await prisma.reportCard.findUnique({
     where: { id: reportCardId },
     include: {
@@ -36,7 +36,39 @@ export async function generateReportCardPdf(
     throw new Error("Report card is not published");
   }
 
-  // 2ï¸âƒ£ Create PDF document
+  // 2️⃣ ATTENDANCE (REAL DB LOGIC FIX)
+  const attendanceRecords = await prisma.attendanceEntry.findMany({
+    where: {
+      studentId: reportCard.student.id,
+    },
+  });
+
+  console.log("REPORT STUDENT ID:", reportCard.student.id);
+  console.log("ATTENDANCE MATCHES:", attendanceRecords.length);
+
+  const allAttendance = await prisma.attendanceEntry.findMany({
+    take: 5,
+  });
+
+  console.log(
+    "SAMPLE ATTENDANCE STUDENT IDS:",
+    allAttendance.map(a => a.studentId)
+  );
+
+  const present = attendanceRecords.filter(a => a.status === "PRESENT").length;
+  const absent = attendanceRecords.filter(a => a.status === "ABSENT").length;
+  const late = attendanceRecords.filter(a => a.status === "LATE").length;
+
+  const total = attendanceRecords.length || 1;
+
+  const attendance = {
+    present,
+    absent,
+    late,
+    percentage: Math.round((present / total) * 100),
+  };
+
+  // 3️⃣ Create PDF document
   const doc = new PDFDocument({
     size: "A4",
     margin: 50,
@@ -45,78 +77,87 @@ export async function generateReportCardPdf(
   const chunks: Buffer[] = [];
   doc.on("data", (chunk) => chunks.push(chunk));
 
-  // 3ï¸âƒ£ HEADER
+  // =========================
+  // 4️⃣ HEADER (IMPROVED)
+  // =========================
   doc
-    .fontSize(16)
+    .fontSize(18)
     .font("Helvetica-Bold")
-    .text("Grain of Rice Academy", { align: "center" });
+    .text("GRAIN OF RICE ACADEMY", { align: "center" });
 
-  doc.moveDown(0.5);
+  doc.moveDown(0.3);
 
   doc
-    .fontSize(14)
+    .fontSize(12)
     .font("Helvetica-Bold")
-    .text("REPORT CARD", { align: "center" });
+    .text("OFFICIAL REPORT CARD", { align: "center" });
 
-  doc.moveDown(0.5);
+  doc.moveDown(0.3);
 
   doc
     .fontSize(10)
     .font("Helvetica")
     .text(
-      `Academic Year: ${reportCard.term.academicYear}  |  Term: ${reportCard.term.name} of 3`,
+      `Academic Year: ${reportCard.term.academicYear}    |    Term: ${reportCard.term.name}`,
       { align: "center" }
     );
 
   doc.moveDown(1);
 
-  // 4ï¸âƒ£ STUDENT METADATA (2 columns)
+  // =========================
+  // 5️⃣ STUDENT INFO (GRID)
+  // =========================
   const startY = doc.y;
-  const studentName = `${reportCard.student.firstName} ${reportCard.student.lastName}`;
 
-  doc.fontSize(10).font("Helvetica-Bold").text("Student Name:", 50, startY);
-  doc.font("Helvetica").text(studentName, 140, startY);
+  doc.fontSize(10).font("Helvetica-Bold");
 
-  doc.font("Helvetica-Bold").text("Admission No:", 50, startY + 15);
-  doc
-    .font("Helvetica")
-    .text(reportCard.student.admissionNo, 140, startY + 15);
+  doc.text("Student Name:", 50, startY);
+  doc.text("Admission No:", 50, startY + 15);
+  doc.text("Class:", 50, startY + 30);
 
-  doc.font("Helvetica-Bold").text("Class:", 50, startY + 30);
-  doc.font("Helvetica").text(reportCard.class.name, 140, startY + 30);
+  doc.text("Term:", 320, startY);
+  doc.text("Academic Year:", 320, startY + 15);
+  doc.text("Date:", 320, startY + 30);
 
-  doc.font("Helvetica-Bold").text("Date Generated:", 320, startY);
-  doc
-    .font("Helvetica")
-    .text(new Date().toLocaleDateString(), 430, startY);
+  doc.font("Helvetica");
 
-  doc.font("Helvetica-Bold").text("Term:", 320, startY + 15);
-  doc.font("Helvetica").text(reportCard.term.name, 430, startY + 15);
+  doc.text(
+    `${reportCard.student.firstName} ${reportCard.student.lastName}`,
+    140,
+    startY
+  );
+  doc.text(reportCard.student.admissionNo, 140, startY + 15);
+  doc.text(reportCard.class.name, 140, startY + 30);
 
-  doc.font("Helvetica-Bold").text("Academic Year:", 320, startY + 30);
-  doc
-    .font("Helvetica")
-    .text(reportCard.term.academicYear, 430, startY + 30);
+  doc.text(reportCard.term.name, 430, startY);
+  doc.text(reportCard.term.academicYear, 430, startY + 15);
+  doc.text(new Date().toLocaleDateString(), 430, startY + 30);
 
   doc.moveDown(3);
 
-  // 5ï¸âƒ£ PERFORMANCE TABLE (Phase-7 correct)
+  // =========================
+  // 6️⃣ PERFORMANCE TABLE
+  // =========================
   const tableTop = doc.y;
-  const columnX = {
+
+  const col = {
     subject: 50,
-    total: 260,
-    average: 340,
+    total: 300,
+    average: 420,
   };
 
   doc.font("Helvetica-Bold");
-  doc.text("Subject", columnX.subject, tableTop);
-  doc.text("Total", columnX.total, tableTop);
-  doc.text("Average", columnX.average, tableTop);
+  doc.text("SUBJECT", col.subject, tableTop);
+  doc.text("TOTAL", col.total, tableTop);
+  doc.text("AVERAGE", col.average, tableTop);
 
-  doc.moveDown(0.5);
+  doc.moveTo(50, tableTop + 15)
+    .lineTo(550, tableTop + 15)
+    .stroke();
+
   doc.font("Helvetica");
 
-  let rowY = tableTop + 20;
+  let rowY = tableTop + 25;
 
   for (const entry of reportCard.subjects) {
     if (rowY > 750) {
@@ -124,16 +165,18 @@ export async function generateReportCardPdf(
       rowY = 50;
     }
 
-    doc.text(entry.subject.name, columnX.subject, rowY);
-    doc.text(entry.total.toFixed(1), columnX.total, rowY);
-    doc.text(entry.average.toFixed(1), columnX.average, rowY);
+    doc.text(entry.subject.name, col.subject, rowY);
+    doc.text(entry.total.toFixed(1), col.total, rowY);
+    doc.text(entry.average.toFixed(1), col.average, rowY);
 
-    rowY += 18;
+    rowY += 20;
   }
 
   doc.moveDown(2);
 
-  // 6ï¸âƒ£ SUMMARY (schema fields only)
+  // =========================
+  // 7️⃣ SUMMARY
+  // =========================
   doc.font("Helvetica-Bold").text("Summary");
   doc.moveDown(0.5);
   doc.font("Helvetica");
@@ -141,17 +184,35 @@ export async function generateReportCardPdf(
   doc.text(`Term Total Marks: ${reportCard.total.toFixed(1)}`);
   doc.text(`Term Average: ${reportCard.average.toFixed(1)}`);
 
-  doc.moveDown(2);
+  // =========================
+  // 8️⃣ ATTENDANCE (FORCED NEW PAGE FIX)
+  // =========================
 
-  // 7ï¸âƒ£ FOOTER
+  doc.addPage();
+
+  doc.font("Helvetica-Bold")
+     .fontSize(11)
+     .text("ATTENDANCE", 50, 100);
+
+  doc.font("Helvetica")
+     .fontSize(10)
+     .text(`Present: ${attendance.present}`, 50, 130)
+     .text(`Absent: ${attendance.absent}`, 50, 145)
+     .text(`Late: ${attendance.late}`, 50, 160)
+     .text(`Attendance Rate: ${attendance.percentage}%`, 50, 175);
+
+  // =========================
+  // 9️⃣ FOOTER (PROFESSIONAL)
+  // =========================
   doc
     .fontSize(8)
+    .font("Helvetica")
     .text(
-      "This report is system-generated and valid without signature.",
+      "This is an official academic document generated by Grain of Rice Academy MIS. No signature required.",
       { align: "center" }
     );
 
-  // 8ï¸âƒ£ Finalize
+  // 🔟 FINALIZE
   doc.end();
 
   return new Promise((resolve) => {

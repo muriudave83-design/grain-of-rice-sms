@@ -93,6 +93,12 @@ const loginUser = async (req, res) => {
                 message: "Invalid credentials",
             });
         }
+        if (user.mustChangePassword) {
+            return res.json({
+                requirePasswordChange: true,
+                userId: user.id,
+            });
+        }
         // 🛡️ BLOCK DEACTIVATED ACCOUNTS
         if (!user.isActive) {
             return res.status(403).json({
@@ -141,21 +147,32 @@ exports.loginUser = loginUser;
 // ======================================================
 const changePassword = async (req, res) => {
     try {
-        if (!req.user) {
-            return res.status(401).json({
-                message: "Unauthorized",
-            });
-        }
-        const userId = req.user.id;
-        const userRole = req.user.role;
-        const { currentPassword, newPassword } = req.body;
+        const { currentPassword, newPassword, userId } = req.body;
         if (!currentPassword || !newPassword) {
             return res.status(400).json({
                 message: "Current password and new password are required.",
             });
         }
+        // ✅ USE userId FROM BODY (TEMP FLOW FIX)
+        let targetUserId = userId;
+        // ✅ FALLBACK TO AUTH USER (NORMAL FLOW)
+        if (!targetUserId && req.user) {
+            targetUserId = req.user.id;
+        }
+        if (!targetUserId) {
+            return res.status(401).json({
+                message: "Unauthorized",
+            });
+        }
+        // ✅ FIX: ensure ID is a number
+        const numericUserId = Number(targetUserId);
+        if (isNaN(numericUserId)) {
+            return res.status(400).json({
+                message: "Invalid user ID",
+            });
+        }
         const user = await prisma.user.findUnique({
-            where: { id: userId },
+            where: { id: numericUserId },
         });
         if (!user) {
             return res.status(404).json({
@@ -170,7 +187,7 @@ const changePassword = async (req, res) => {
         }
         const hashedNewPassword = await (0, password_1.hashPassword)(newPassword);
         await prisma.user.update({
-            where: { id: userId },
+            where: { id: numericUserId }, // ✅ FIXED HERE TOO
             data: {
                 password: hashedNewPassword,
                 mustChangePassword: false,
@@ -180,9 +197,9 @@ const changePassword = async (req, res) => {
         await (0, auditLog_service_1.createAuditLog)({
             action: client_1.AuditAction.PASSWORD_CHANGED,
             entityType: "User",
-            entityId: String(userId),
-            actorUserId: String(userId),
-            actorRole: userRole,
+            entityId: String(numericUserId),
+            actorUserId: String(numericUserId),
+            actorRole: user.role,
         });
         return res.json({
             message: "Password updated successfully.",
