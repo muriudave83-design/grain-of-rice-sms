@@ -105,6 +105,8 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
 
       // ✅ NEW: compute weighted average (no inflation)
       let weightedTotal = 0;
+      let activeWeightTotal = 0;
+
       const missingCategories: number[] = [];
 
       for (const category of categories) {
@@ -114,20 +116,23 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
 
         if (!weight) continue;
 
-        let categoryAverage = 0;
-
-        if (values.length > 0) {
-          categoryAverage =
-            values.reduce((a, b) => a + b, 0) / values.length;
-        } else {
-          // 👇 Track missing category
+        // Ignore completely ungraded categories
+        if (values.length === 0) {
           missingCategories.push(categoryId);
+          continue;
         }
 
+        const categoryAverage =
+          values.reduce((a, b) => a + b, 0) / values.length;
+
         weightedTotal += categoryAverage * weight;
+        activeWeightTotal += weight;
       }
 
-      const average = Number(weightedTotal.toFixed(2));
+      const average =
+        activeWeightTotal > 0
+          ? Number((weightedTotal / activeWeightTotal).toFixed(2))
+          : null;
 
       // better missing count (only published)
       const missingCount =

@@ -132,11 +132,9 @@ export const getAttendanceReport = async (
           }
         }
 
-        const absentRecords = [...latestMap.values()].filter(
-          (record) => record.status === "ABSENT"
-        );
+        const latestRecords = [...latestMap.values()];
 
-    const report = absentRecords.map(
+        const report = latestRecords.map(
       (record) => ({
         studentId: record.student.id,
         studentName: `${record.student.firstName} ${record.student.lastName}`,
@@ -147,31 +145,25 @@ export const getAttendanceReport = async (
       })
     );
 
-    const summary: Record<
-      string,
-      {
-        studentName: string;
-        admissionNumber: string;
-        totalAbsent: number;
-      }
-    > = {};
+      const summary = {
+    totalStudents: report.length,
 
-    report.forEach((record) => {
-      if (!summary[record.studentName]) {
-        summary[record.studentName] = {
-          studentName: record.studentName,
-          admissionNumber:
-            record.admissionNumber,
-          totalAbsent: 0,
-        };
-      }
+    present: report.filter(
+      (r) => r.status === "PRESENT"
+    ).length,
 
-      summary[record.studentName].totalAbsent += 1;
-    });
+    absent: report.filter(
+      (r) => r.status === "ABSENT"
+    ).length,
+
+    late: report.filter(
+      (r) => r.status === "LATE"
+    ).length,
+  };
 
     return res.json({
       records: report,
-      summary: Object.values(summary),
+      summary,
     });
   } catch (error: unknown) {
     console.error(

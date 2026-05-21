@@ -64,14 +64,26 @@ export const teacherDashboard = async (req: Request, res: Response) => {
     }
 
     // ✅ Average grade across teacher's subjects (Phase 2 compliant)
-    const avg = await prisma.grade.aggregate({
-      where: {
-        subjectId: { in: subjectIds },
-      },
-      _avg: {
-        average: true,
-      },
-    });
+      const termId = req.query.termId
+        ? Number(req.query.termId)
+        : null;
+
+      // ✅ Average grade across teacher's subjects (TERM AWARE)
+      const avg = await prisma.grade.aggregate({
+        where: {
+          subjectId: { in: subjectIds },
+
+          ...(termId
+            ? {
+                termId,
+              }
+            : {}),
+        },
+
+        _avg: {
+          average: true,
+        },
+      });
 
     res.json({
       subjects: subjectsCount,
@@ -91,7 +103,7 @@ export const teacherDashboard = async (req: Request, res: Response) => {
 /**
  * Admin dashboard
  */
-export const adminDashboard = async (_req: Request, res: Response) => {
+export const adminDashboard = async (req: Request, res: Response) => {
   try {
     const [students, teachers, subjects] = await Promise.all([
       prisma.student.count(),

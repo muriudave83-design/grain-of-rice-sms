@@ -24,6 +24,8 @@ export default function GradebookDetail() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [termLocked, setTermLocked] = useState(false);
+  const [lockMessage, setLockMessage] = useState("");
 
   // ❌ OLD (will be removed from UI but kept temporarily safe)
   const [newAssignment, setNewAssignment] = useState("");
@@ -113,7 +115,28 @@ export default function GradebookDetail() {
 
         console.log("📦 TERMS RESPONSE:", res.data);
 
-        setTerms(res.data);
+      // ✅ Always show all 3 terms
+
+      const normalizedTerms = [
+        {
+          ...(res.data.find((t) => t.name === "Term 1") || {}),
+          id: 1,
+          name: "Term 1",
+        },
+        {
+          ...(res.data.find((t) => t.name === "Term 2") || {}),
+          id: 2,
+          name: "Term 2",
+        },
+        {
+          ...(res.data.find((t) => t.name === "Term 3") || {}),
+          id: 3,
+          name: "Term 3",
+        },
+      ];
+
+      setTerms(normalizedTerms);
+
       if (res.data.length > 0) {
         const firstTerm = res.data[0];
         const firstTermId = firstTerm.id;
@@ -164,6 +187,8 @@ export default function GradebookDetail() {
           throw new Error("classId not found in gradebook");
         }
 
+        setClassId(classId);
+
         console.log("✅ classId:", classId);
 
         // ✅ STEP 2: get terms
@@ -171,15 +196,49 @@ export default function GradebookDetail() {
           `/teacher/terms/${classId}`
         );
 
-        const terms = termRes.data;
+        const backendTerms = termRes.data || [];
 
-        if (!terms || terms.length === 0) {
-          throw new Error("No terms returned");
-        }
+        const normalizedTerms = [
+          {
+            ...(backendTerms.find((t) => t.name === "Term 1") || {}),
+            id: 1,
+            name: "Term 1",
+          },
+          {
+            ...(backendTerms.find((t) => t.name === "Term 2") || {}),
+            id: 2,
+            name: "Term 2",
+          },
+          {
+            ...(backendTerms.find((t) => t.name === "Term 3") || {}),
+            id: 3,
+            name: "Term 3",
+          },
+        ];
 
-        const firstTerm = terms[0];
+        setTerms(normalizedTerms);
 
+        const firstTerm = normalizedTerms[0];
         const termId = firstTerm.id;
+
+       // 🔒 VALIDATE TERM LOCK
+      const validationRes = await apiClient.get(
+        `/terms/validate`,
+        {
+          params: {
+            classId,
+            term: firstTerm.name,
+          },
+        }
+      );
+
+      if (validationRes.data.status === "locked") {
+        setTermLocked(true);
+        setLockMessage(validationRes.data.message);
+      } else {
+        setTermLocked(false);
+        setLockMessage("");
+      }
 
         console.log("✅ termId:", termId);
 
@@ -213,6 +272,69 @@ export default function GradebookDetail() {
     if (id) init();
   }, [id]);
 
+  // 🔄 RELOAD GRADEBOOK WHEN TERM CHANGES
+useEffect(() => {
+  if (!selectedTerm || !id) return;
+
+  const reloadTermData = async () => {
+    try {
+      setLoading(true);
+
+      const selected = terms.find(
+        (t) => Number(t.id) === Number(selectedTerm)
+      );
+
+      // 🔒 validate lock
+      const validationRes = await apiClient.get(
+        `/terms/validate`,
+        {
+          params: {
+            classId,
+            term: selected?.name,
+          },
+        }
+      );
+
+      if (validationRes.data.status === "locked") {
+        setTermLocked(true);
+        setLockMessage(validationRes.data.message);
+      } else {
+        setTermLocked(false);
+        setLockMessage("");
+      }
+
+      // 📦 reload gradebook
+      const res = await apiClient.get(
+        `/teacher/gradebook/${id}`,
+        {
+          params: {
+            termId: selectedTerm,
+          },
+        }
+      );
+
+      setData(res.data);
+
+      // 🆕 keep selected term object updated
+      setSelectedTermData(selected);
+
+      // 📊 reload attendance
+      await fetchAttendance(classId, selected);
+
+    } catch (err) {
+      console.error("❌ Term switch failed", err);
+
+      alert(
+        "No active records found for this term."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  reloadTermData();
+}, [selectedTerm, id, classId, terms]);  
+
   const handleRightClick = (e, assignment) => {
     e.preventDefault();
     e.stopPropagation();
@@ -231,34 +353,36 @@ export default function GradebookDetail() {
       new Date(b.dateAssigned || b.createdAt)
   );
 
-    // ✅ DRAG HANDLER
-  const handleDragEnd = async (result) => {
-    if (!result.destination) return;
+   // ✅ DRAG HANDLER
+      const handleDragEnd = async (result) => {
+        if (termLocked) return;
 
-    const items = Array.from(assignments);
-    const [moved] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, moved);
+        if (!result.destination) return;
 
-    try {
-      await apiClient.put("/teacher/assignment/reorder", {
-        assignments: items.map((a, index) => ({
-          id: a.id,
-          position: index,
-        })),
-      });
+        const items = Array.from(assignments);
+        const [moved] = items.splice(result.source.index, 1);
+        items.splice(result.destination.index, 0, moved);
 
-      setData((prev) => {
-        if (!prev) return prev;
+        try {
+          await apiClient.put("/teacher/assignment/reorder", {
+            assignments: items.map((a, index) => ({
+              id: a.id,
+              position: index,
+            })),
+          });
 
-        return {
-          ...prev,
-          assignments: items,
-        };
-      });
-    } catch (err) {
-      console.error("Reorder failed", err);
-    }
-  };
+          setData((prev) => {
+            if (!prev) return prev;
+
+            return {
+              ...prev,
+              assignments: items,
+            };
+          });
+        } catch (err) {
+          console.error("Reorder failed", err);
+        }
+      };
 
   // 🆕 GET ABSENT DAYS (HELPER)
   const getAbsentDays = (studentId) => {
@@ -360,7 +484,7 @@ export default function GradebookDetail() {
       }
     }
 
-    if (appliedWeight === 0) return 0;
+    if (appliedWeight === 0) return null;
 
     return total / appliedWeight;
   };
@@ -371,39 +495,44 @@ export default function GradebookDetail() {
     return calculateFinalGrade(categoryAverages, weights);
   };
 
-  // 🔥 FIXED ADD ASSIGNMENT (MODAL VERSION)
-  const handleAddAssignment = async () => {
-    if (!form.title) return;
+    // 🔥 FIXED ADD ASSIGNMENT (MODAL VERSION)
+    const handleAddAssignment = async () => {
+      if (termLocked) {
+        alert("This term has been locked.");
+        return;
+      }
 
-    try {
-      const res = await apiClient.post("/teacher/assignment", {
-        title: form.title,
-        teacherSubjectId: id,
-        type: form.type,
-        maxPoints: Number(form.maxPoints),
-        dateAssigned: form.dateAssigned,
-        dueDate: form.dueDate,
-        termId: selectedTerm,
-      });
+      if (!form.title) return;
 
-      setData((prev) => ({
-        ...prev,
-        assignments: [...prev.assignments, { ...res.data, scores: [] }],
-      }));
+      try {
+        const res = await apiClient.post("/teacher/assignment", {
+          title: form.title,
+          teacherSubjectId: id,
+          type: form.type,
+          maxPoints: Number(form.maxPoints),
+          dateAssigned: form.dateAssigned,
+          dueDate: form.dueDate,
+          termId: selectedTerm,
+        });
 
-      setShowModal(false);
+        setData((prev) => ({
+          ...prev,
+          assignments: [...prev.assignments, { ...res.data, scores: [] }],
+        }));
 
-      setForm({
-        title: "",
-        type: "ASSIGNMENT",
-        maxPoints: 100,
-        dateAssigned: "",
-        dueDate: "",
-      });
-    } catch (err) {
-      console.error("Failed to create assignment", err);
-    }
-  };
+        setShowModal(false);
+
+        setForm({
+          title: "",
+          type: "ASSIGNMENT",
+          maxPoints: 100,
+          dateAssigned: "",
+          dueDate: "",
+        });
+      } catch (err) {
+        console.error("Failed to create assignment", err);
+      }
+    };
 
   const getStudentTotal = (student) => {
     if (!assignments) return 0;
@@ -425,7 +554,9 @@ export default function GradebookDetail() {
   };
 
   const getStudentAverage = (student) => {
-    if (!assignments) return 0;
+    if (!assignments || assignments.length === 0) {
+      return null;
+    }
 
     let total = 0;
     let totalWeight = 0;
@@ -435,22 +566,38 @@ export default function GradebookDetail() {
         (s) => String(s.studentId) === String(student.id)
       );
 
-      if (!scoreObj) return;
+      // Ignore blank/ungraded assignments
+      if (
+        !scoreObj ||
+        scoreObj.score === null ||
+        scoreObj.score === undefined ||
+        scoreObj.score === ""
+      ) {
+        return;
+      }
 
       const weight = a.weight || 1;
 
-      total += scoreObj.score * weight;
+      total += Number(scoreObj.score) * weight;
       totalWeight += weight;
     });
 
-    return totalWeight > 0 ? total / totalWeight : 0;
+    // No graded assignments
+    if (totalWeight === 0) {
+      return null;
+    }
+
+    return total / totalWeight;
   };
 
   const getGrade = (avg) => {
+    if (avg == null) return "—";
+
     if (avg >= 80) return "A";
     if (avg >= 70) return "B";
     if (avg >= 60) return "C";
     if (avg >= 50) return "D";
+
     return "F";
   };
 
@@ -468,28 +615,38 @@ export default function GradebookDetail() {
 
   const getPosition = (studentId) => positionMap[studentId] || "-";
 
-  // 🔒 LOCK TOGGLE
-  const handleToggleLock = async (assignment) => {
-    try {
-      const res = await apiClient.put(
-        `/teacher/assignment/${assignment.id}/lock`,
-        { isLocked: !assignment.isLocked }
-      );
+// 🔒 LOCK TOGGLE
+    const handleToggleLock = async (assignment) => {
+      if (termLocked) {
+        alert("This term has been locked.");
+        return;
+      }
 
-      setData((prev) => {
-        const updated = { ...prev };
-        const a = updated.assignments.find((x) => x.id === assignment.id);
-        if (a) a.isLocked = res.data.isLocked;
-        return updated;
-      });
+      try {
+        const res = await apiClient.put(
+          `/teacher/assignment/${assignment.id}/lock`,
+          { isLocked: !assignment.isLocked }
+        );
 
-      setContextMenu(null);
-    } catch (err) {
-      console.error("Lock toggle failed", err);
-    }
-  };
+        setData((prev) => {
+          const updated = { ...prev };
+          const a = updated.assignments.find((x) => x.id === assignment.id);
+          if (a) a.isLocked = res.data.isLocked;
+          return updated;
+        });
+
+        setContextMenu(null);
+      } catch (err) {
+        console.error("Lock toggle failed", err);
+      }
+    };
 
   const handleDeleteAssignment = async (assignmentId) => {
+    if (termLocked) {
+      alert("This term has been locked.");
+      return;
+    }
+
     try {
       await apiClient.delete(`/teacher/assignment/${assignmentId}`);
 
@@ -506,26 +663,31 @@ export default function GradebookDetail() {
     }
   };
 
-  const handleRenameAssignment = async (assignmentId, title) => {
-    if (!title) return;
+    const handleRenameAssignment = async (assignmentId, title) => {
+      if (termLocked) {
+        alert("This term has been locked.");
+        return;
+      }
 
-    try {
-      await apiClient.put(`/teacher/assignment/${assignmentId}`, {
-        title,
-      });
+      if (!title) return;
 
-      setData((prev) => {
-        const updated = { ...prev };
-        const assignment = updated.assignments.find(
-          (a) => a.id === assignmentId
-        );
-        if (assignment) assignment.title = title;
-        return updated;
-      });
-    } catch (err) {
-      console.error("Rename failed", err);
-    }
-  };
+      try {
+        await apiClient.put(`/teacher/assignment/${assignmentId}`, {
+          title,
+        });
+
+        setData((prev) => {
+          const updated = { ...prev };
+          const assignment = updated.assignments.find(
+            (a) => a.id === assignmentId
+          );
+          if (assignment) assignment.title = title;
+          return updated;
+        });
+      } catch (err) {
+        console.error("Rename failed", err);
+      }
+    };
 
   const handleWeightChange = async (id, weight) => {
     const weightNumber = Number(weight);
@@ -578,7 +740,7 @@ export default function GradebookDetail() {
       return [
         `${student.firstName} ${student.lastName}`,
         ...scores,
-        final ? final.toFixed(1) : "",
+        final != null ? final.toFixed(1) : "",
         absent,
       ];
     });
@@ -684,66 +846,78 @@ export default function GradebookDetail() {
   };
 
   // 🧠 SCORE SAVE
-  const handleScoreChange = async (
-    studentId,
-    assignmentId,
-    value,
-    isLocked
-  ) => {
-    if (isLocked) return;
-    if (value === "") return;
+    const handleScoreChange = async (
+      studentId,
+      assignmentId,
+      value,
+      isLocked
+    ) => {
 
-    const score = Number(value);
-    const assignment = assignments.find((a) => a.id === assignmentId);
+      // 🔒 TERM LOCK
+      if (termLocked) {
+        alert("This term has been locked.");
+        return;
+      }
 
-    if (!assignment) return;
-    if (isNaN(score) || score < 0) return;
+      // 🔒 ASSIGNMENT LOCK
+      if (isLocked) return;
 
-    if (score > (assignment.maxPoints || 100)) {
-      alert("Score cannot exceed max points");
-      return;
-    }
+      if (value === "") return;
 
-    try {
-      setSaving(true);
+      const score = Number(value);
+      const assignment = assignments.find((a) => a.id === assignmentId);
 
-      await apiClient.post("/teacher/score", {
-        studentId,
-        assignmentId,
-        score,
-      });
+      if (!assignment) return;
+      if (isNaN(score) || score < 0) return;
 
-      setData((prev) => {
-        if (!prev) return prev;
+      if (score > (assignment.maxPoints || 100)) {
+        alert("Score cannot exceed max points");
+        return;
+      }
 
-        return {
-          ...prev,
-          assignments: prev.assignments.map((a) => {
-            if (a.id !== assignmentId) return a;
+      try {
+        setSaving(true);
 
-            const existing = a.scores?.find(
-              (s) => String(s.studentId) === String(studentId)
-            );
+        await apiClient.post("/teacher/score", {
+          studentId,
+          assignmentId,
+          score,
+        });
 
-            let updatedScores;
+        setData((prev) => {
+          if (!prev) return prev;
 
-            if (existing) {
-              updatedScores = a.scores.map((s) =>
-                String(s.studentId) === String(studentId)
-                  ? { ...s, score }
-                  : s
+          return {
+            ...prev,
+            assignments: prev.assignments.map((a) => {
+              if (a.id !== assignmentId) return a;
+
+              const existing = a.scores?.find(
+                (s) => String(s.studentId) === String(studentId)
               );
-            } else {
-              updatedScores = [...(a.scores || []), { studentId, score }];
-            }
 
-            return {
-              ...a,
-              scores: updatedScores,
-            };
-          }),
-        };
-      });
+              let updatedScores;
+
+              if (existing) {
+                updatedScores = a.scores.map((s) =>
+                  String(s.studentId) === String(studentId)
+                    ? { ...s, score }
+                    : s
+                );
+              } else {
+                updatedScores = [
+                  ...(a.scores || []),
+                  { studentId, score },
+                ];
+              }
+
+              return {
+                ...a,
+                scores: updatedScores,
+              };
+            }),
+          };
+        });
 
       setLocalScores((prev) => {
         const copy = { ...prev };
@@ -798,6 +972,14 @@ export default function GradebookDetail() {
 
       {saving && <p className="text-sm text-gray-500 mb-2">Saving...</p>}
 
+      {termLocked && (
+        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+          <strong>Locked:</strong>{" "}
+          {lockMessage ||
+            "This term has been finalized and locked. Editing has been disabled."}
+        </div>
+      )}
+
       {/* 🧱 CSV CONTROLS */}
       <div className="flex gap-2 mb-4">
         <button
@@ -825,8 +1007,14 @@ export default function GradebookDetail() {
       {/* 🔥 NEW BUTTON */}
       <div className="mb-4">
         <button
-          onClick={() => setShowModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
+          disabled={termLocked}
+          onClick={() => {
+            if (termLocked) return;
+            setShowModal(true);
+          }}
+          className={`bg-blue-600 text-white px-4 py-2 rounded ${
+            termLocked ? "opacity-50 cursor-not-allowed" : ""
+          }`}
         >
           + New Assignment
         </button>
@@ -892,13 +1080,18 @@ export default function GradebookDetail() {
                               <input
                                 id={`title-${a.id}`}
                                 defaultValue={a.title}
+                                disabled={termLocked}
                                 onBlur={(e) =>
                                   handleRenameAssignment(
                                     a.id,
                                     e.target.value
                                   )
                                 }
-                                className="border p-1 w-24 text-sm text-center"
+                                className={`border p-1 w-24 text-sm text-center ${
+                                  termLocked
+                                    ? "bg-gray-100 cursor-not-allowed"
+                                    : ""
+                                }`}
                               />
 
                               <span className="text-xs text-gray-500">
@@ -912,13 +1105,18 @@ export default function GradebookDetail() {
                               <input
                                 type="number"
                                 value={a.weight || 1}
+                                disabled={termLocked}
                                 onChange={(e) =>
                                   handleWeightChange(
                                     a.id,
                                     e.target.value
                                   )
                                 }
-                                className="w-16 border text-center text-sm"
+                                className={`w-16 border text-center text-sm ${
+                                  termLocked
+                                    ? "bg-gray-100 cursor-not-allowed"
+                                    : ""
+                                }`}
                               />
                             </div>
                           </th>
@@ -938,8 +1136,8 @@ export default function GradebookDetail() {
           <tbody>
             {rankedStudents.map((student) => {
               const total = getStudentTotal(student);
-              const avg = getStudentAverage(student);
               const final = getFinalGrade(student);
+              const avg = final;
               const grade = getGrade(final);
               const position = getPosition(student.id);
               const absent = getAbsentDays(student.id);
@@ -951,7 +1149,7 @@ export default function GradebookDetail() {
                   </td>
 
                   <td className="border p-2 font-bold">
-                    {Math.round(avg ?? 0)}%
+                    {avg == null ? "—" : `${Math.round(avg)}%`}
                   </td>
 
                   <td
@@ -982,7 +1180,7 @@ export default function GradebookDetail() {
                       >
                         <input
                           type="number"
-                          disabled={a.isLocked}
+                          disabled={a.isLocked || termLocked}
                           value={
                             localScores[key] ??
                             (scoreObj ? scoreObj.score : "")

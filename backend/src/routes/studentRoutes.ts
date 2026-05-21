@@ -288,6 +288,17 @@ router.get(
         orderBy: { createdAt: "desc" },
       });
 
+      // ✅ 3. DISCIPLINE HISTORY
+      const discipline = await prisma.discipline.findMany({
+        where: { studentId },
+        include: {
+          term: true,
+        },
+        orderBy: {
+          date: "desc",
+        },
+      });
+
       // ✅ 3. HEALTH NOTES (🔥 NEW)
       const student = await prisma.student.findUnique({
         where: { id: studentId },
@@ -299,6 +310,7 @@ router.get(
         present,
         absent,
         logs,
+        discipline,
         healthNotes: student?.healthNotes || "",
       });
     } catch (error) {

@@ -194,17 +194,15 @@ export default function AdminStudents() {
 
     setExpandedStudentId(id);
 
-    if (!studentDetails[id]) {
-      try {
-        const res = await apiClient.get(`/students/${id}/details`);
+    try {
+      const res = await apiClient.get(`/students/${id}/details`);
 
-        setStudentDetails((prev) => ({
-          ...prev,
-          [id]: res.data,
-        }));
-      } catch (err) {
-        console.error("Failed to load student details", err);
-      }
+      setStudentDetails((prev) => ({
+        ...prev,
+        [id]: res.data,
+      }));
+    } catch (err) {
+      console.error("Failed to load student details", err);
     }
   };
 
@@ -480,6 +478,41 @@ export default function AdminStudents() {
                                       >
                                         Save Note
                                       </button>
+                                    </div>
+
+                                    {/* DISCIPLINE HISTORY */}
+                                    <div className="mb-3">
+                                      <strong>Discipline History</strong>
+
+                                      <div className="text-sm opacity-70 mt-1 space-y-1">
+                                        {studentDetails[s.id]?.discipline?.length ? (
+                                          studentDetails[s.id].discipline.map((item, i) => (
+                                            <div
+                                              key={i}
+                                              className="border border-gray-700 rounded p-2"
+                                            >
+                                              <div>
+                                                <strong>{item.type}</strong>
+                                              </div>
+
+                                              <div className="text-xs mt-1">
+                                                {item.notes || "No notes"}
+                                              </div>
+
+                                              <div className="text-xs opacity-60 mt-1">
+                                                {item.date
+                                                  ? new Date(item.date).toLocaleDateString()
+                                                  : ""}
+                                                {item.term?.name
+                                                  ? ` • ${item.term.name}`
+                                                  : ""}
+                                              </div>
+                                            </div>
+                                          ))
+                                        ) : (
+                                          "No discipline records"
+                                        )}
+                                      </div>
                                     </div>
 
                                     {/* HEALTH */}

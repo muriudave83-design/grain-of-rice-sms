@@ -191,7 +191,7 @@ export default function TeacherAssessments() {
 
                       {/* ✅ NEW DYNAMIC REPORT CARDS LINK */}
                       <Link
-                        to={`/teacher/report-cards/${a.classId}/term1`}
+                        to={`/teacher/report-cards/${a.classId}/${a.term?.id}`}
                         className="px-2 py-1 text-xs rounded bg-purple-100 text-purple-700 hover:bg-purple-200"
                       >
                         Report Cards

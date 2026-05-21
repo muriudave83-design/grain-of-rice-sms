@@ -14,21 +14,24 @@ export async function markAttendance(req: Request, res: Response) {
       });
     }
 
-    // ✅ START OF DAY
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // ✅ USE PROVIDED DATE OR FALL BACK TO TODAY
+    const selectedDate = req.body.date
+      ? new Date(req.body.date)
+      : new Date();
 
-    // ✅ END OF DAY
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    // ✅ END OF SELECTED DAY
+    const nextDay = new Date(selectedDate);
+    nextDay.setDate(nextDay.getDate() + 1);
 
     // ✅ FIND TODAY SESSION PROPERLY
     let session = await prisma.attendanceSession.findFirst({
       where: {
         classId: classIdNum,
         date: {
-          gte: today,
-          lt: tomorrow,
+          gte: selectedDate,
+          lt: nextDay,
         },
       },
     });
@@ -39,7 +42,7 @@ export async function markAttendance(req: Request, res: Response) {
         data: {
           classId: classIdNum,
           teacherId: 1,
-          date: new Date(),
+          date: selectedDate,
           status: AttendanceSessionStatus.DRAFT,
         },
       });

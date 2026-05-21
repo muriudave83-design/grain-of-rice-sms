@@ -15,12 +15,21 @@ const checkSystemLock = async (res: Response) => {
   return false;
 };
 
-export const getDiscipline = async (_req: Request, res: Response) => {
+export const getDiscipline = async (req: Request, res: Response) => {
+  const termId = Number(req.query.termId);
+
   const data = await prisma.discipline.findMany({
+    where: termId
+      ? {
+          termId,
+        }
+      : undefined,
+
     include: {
       student: true,
       term: true,
     },
+
     orderBy: { date: "desc" },
   });
 

@@ -24,6 +24,11 @@ export default function AdminLayout() {
       return "Attendance Reports";
     }
 
+    // ✅ TERMS
+    if (location.pathname.includes("/terms")) {
+      return "Terms";
+    }
+
     if (location.pathname.includes("/reports")) {
       return "Reports";
     }
@@ -157,6 +162,18 @@ export default function AdminLayout() {
               }`}
             >
               Attendance Reports
+            </span>
+
+            {/* TERMS */}
+            <span
+              onClick={() => navigate("/dashboard/admin/terms")}
+              className={`cursor-pointer hover:underline ${
+                isActive("/dashboard/admin/terms")
+                  ? "font-bold underline"
+                  : ""
+              }`}
+            >
+              Terms
             </span>
 
             {/* REPORTS */}

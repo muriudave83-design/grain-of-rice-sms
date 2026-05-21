@@ -9,10 +9,14 @@ export default function AdminAttendanceClass() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [selectedDate, setSelectedDate] = useState(
+  new Date().toISOString().split("T")[0]
+    );
+
   const fetchStudents = async () => {
     try {
       const res = await apiClient.get(
-        `/admin/attendance/class/${classId}`
+        `/admin/attendance/class/${classId}?date=${selectedDate}`
       );
 
       setStudents(res.data);
@@ -27,7 +31,7 @@ export default function AdminAttendanceClass() {
 
   useEffect(() => {
     fetchStudents();
-  }, [classId]);
+  }, [classId, selectedDate]);
 
   // ✅ Normalize status (VERY IMPORTANT)
   const normalizedStudents = students.map((s) => ({
@@ -67,6 +71,7 @@ export default function AdminAttendanceClass() {
         studentId,
         classId,
         status,
+        date: selectedDate,
       });
 
       fetchStudents();
@@ -78,15 +83,16 @@ export default function AdminAttendanceClass() {
   // ✅ Mark all present
   const markAllPresent = async () => {
     try {
-      await Promise.all(
-        normalizedStudents.map((student) =>
-          apiClient.post("/admin/attendance/mark", {
-            studentId: student.studentId,
-            classId,
-            status: "PRESENT",
-          })
-        )
-      );
+        await Promise.all(
+          normalizedStudents.map((student) =>
+            apiClient.post("/admin/attendance/mark", {
+              studentId: student.studentId,
+              classId,
+              status: "PRESENT",
+              date: selectedDate,
+            })
+          )
+        );
 
       fetchStudents();
     } catch (err) {
@@ -111,6 +117,19 @@ export default function AdminAttendanceClass() {
       <h1 className="text-xl font-semibold mb-1">
         Class Attendance (Class ID: {classId})
       </h1>
+
+      <div className="mb-4">
+        <label className="block text-sm font-medium mb-1">
+          Select Attendance Date
+        </label>
+
+        <input
+          type="date"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="border rounded px-3 py-2"
+        />
+      </div>
 
       {/* 📅 TODAY */}
       <p className="text-sm text-gray-500 mb-4">

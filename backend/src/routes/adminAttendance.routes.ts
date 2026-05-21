@@ -24,11 +24,16 @@ GET /admin/attendance/summary
 */
 router.get("/summary", async (req, res) => {
   try {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+const selectedDate = req.query.date as string | undefined
 
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
+const today = selectedDate
+  ? new Date(selectedDate)
+  : new Date()
+
+today.setHours(0, 0, 0, 0)
+
+const tomorrow = new Date(today)
+tomorrow.setDate(tomorrow.getDate() + 1)
 
     const totalStudents = await prisma.student.count()
 
@@ -90,11 +95,16 @@ GET /admin/attendance/by-class
 */
 router.get("/by-class", async (req, res) => {
   try {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+      const selectedDate = req.query.date as string | undefined
 
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
+      const today = selectedDate
+        ? new Date(selectedDate)
+        : new Date()
+
+      today.setHours(0, 0, 0, 0)
+
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
 
     const classes = await prisma.class.findMany({
       include: {
@@ -168,7 +178,12 @@ router.get("/class/:classId", async (req, res) => {
   try {
     const classId = parseInt(req.params.classId)
 
-    const today = new Date()
+    const selectedDate = req.query.date as string | undefined
+
+    const today = selectedDate
+      ? new Date(selectedDate)
+      : new Date()
+
     today.setHours(0, 0, 0, 0)
 
     const tomorrow = new Date(today)

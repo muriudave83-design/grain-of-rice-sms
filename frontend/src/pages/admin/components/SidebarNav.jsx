@@ -115,6 +115,10 @@ export default function SidebarNav() {
               🏫 Class Subject Assignment
             </NavLink>
 
+            <NavLink to={path("terms")} className={linkClass}>
+              📆 Terms
+            </NavLink>
+
             <NavLink to={path("reports")} className={linkClass}>
               📊 Reports
             </NavLink>
@@ -154,7 +158,6 @@ export default function SidebarNav() {
 
       {/* FOOTER */}
       <div className="mt-6 text-xs text-gray-400 pb-10">
-        v0.1 — Demo
       </div>
 
     </nav>

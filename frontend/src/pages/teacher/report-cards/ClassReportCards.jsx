@@ -4,11 +4,14 @@ import api from "@/services/apiClient";
 
 // ✅ Grade function
 function getGrade(avg) {
-  if (avg >= 80) return "A";
-  if (avg >= 70) return "B";
-  if (avg >= 60) return "C";
-  if (avg >= 50) return "D";
-  return "E";
+if (avg == null) return "—";
+
+if (avg >= 80) return "A";
+if (avg >= 70) return "B";
+if (avg >= 60) return "C";
+if (avg >= 50) return "D";
+
+return "F";
 }
 
 export default function ClassReportCards() {
@@ -54,16 +57,24 @@ export default function ClassReportCards() {
             grade: getGrade(s.average),
           }));
 
-          // ✅ FIX: Proper total calculation
-          const total = subjectEntries.reduce(
-            (sum, s) => sum + (s.average || 0),
+          // ✅ only count subjects that actually have grades
+          const gradedSubjects = subjectEntries.filter(
+            (s) =>
+              s.average !== null &&
+              s.average !== undefined
+          );
+
+          // ✅ real total
+          const total = gradedSubjects.reduce(
+            (sum, s) => sum + Number(s.average),
             0
           );
 
+          // ✅ null if no grades exist
           const average =
-            subjectEntries.length > 0
-              ? total / subjectEntries.length
-              : 0;
+            gradedSubjects.length > 0
+              ? total / gradedSubjects.length
+              : null;
 
           return {
             id: student.studentId,
@@ -221,7 +232,11 @@ export default function ClassReportCards() {
                     <td key={subject} className="py-2 px-2">
                       {subj ? (
                         <div>
-                          <div>{subj.average?.toFixed(1)}%</div>
+                          <div>
+                            {subj.average == null
+                              ? "—"
+                              : `${Math.round(subj.average)}%`}
+                          </div>
                           <div className="text-xs text-gray-500">
                             {subj.grade}
                           </div>
@@ -234,11 +249,15 @@ export default function ClassReportCards() {
                 })}
 
                 <td className="py-2 px-2 font-semibold">
-                  {student.total.toFixed(1)}
+                  {student.average == null
+                    ? "—"
+                    : student.total.toFixed(1)}
                 </td>
 
                 <td className="py-2 px-2">
-                  {student.average.toFixed(1)}
+                  {student.average == null
+                    ? "—"
+                    : `${Math.round(student.average)}%`}
                 </td>
 
                 <td className="py-2 px-2 font-bold">

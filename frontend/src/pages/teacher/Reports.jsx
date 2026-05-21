@@ -60,7 +60,11 @@ export default function Reports() {
 
       try {
         const res = await apiClient.get(`/teacher/terms/${classId}`);
-        setTerms(res.data);
+        setTerms([
+          { id: 1, name: "Term 1" },
+          { id: 2, name: "Term 2" },
+          { id: 3, name: "Term 3" },
+        ]);
 
         if (res.data.length > 0) {
           setTermId(res.data[0].id);
@@ -124,7 +128,7 @@ export default function Reports() {
         <img src="/logo.png" className="w-14 h-14" />
         <div>
           <h1 className="text-3xl font-bold">
-            Grain of Rice SMS
+            Grain of Rice Academy
           </h1>
           <p>Official Report Cards</p>
         </div>
@@ -205,7 +209,7 @@ export default function Reports() {
 
                 <div>
                   <h2 className="text-xl font-bold">
-                    Grain of Rice SMS
+                    Grain of Rice Academy
                   </h2>
                   <p className="text-sm">
                     Official Report Card

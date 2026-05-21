@@ -108,10 +108,14 @@ export function computeSubjectFinalScore(
   for (const a of assessments) {
     const weight = normalized ? a.weight / weightSum : a.weight;
 
-    if (a.score === null) {
-      missingScores = true;
-      continue;
-    }
+    if (
+      a.score === null ||
+      a.score === undefined ||
+      Number.isNaN(a.score)
+    ) {
+    missingScores = true;
+    continue;
+  }
 
     const percentage = (a.score / a.maxScore) * 100;
     finalScore += percentage * weight;
