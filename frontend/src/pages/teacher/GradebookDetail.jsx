@@ -989,10 +989,11 @@ useEffect(() => {
         />
 
         <button
-          onClick={handleGenerateTranscript}
-          className="bg-purple-600 text-white px-4 py-2"
+          disabled
+          title="Coming soon"
+          className="bg-gray-400 text-white px-4 py-2 cursor-not-allowed opacity-70"
         >
-          Generate Transcripts
+          Generate Transcripts (will be unlocked in a future update)
         </button>
       </div>
 
