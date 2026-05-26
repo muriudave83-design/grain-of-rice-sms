@@ -253,7 +253,7 @@ router.put(
   }
 );
 
-// 🔥 GET STUDENT DETAILS (SAFE + REAL ATTENDANCE)
+// 🔥 GET STUDENT DETAILS (TERM AWARE)
 router.get(
   "/:id/details",
   authenticate,
@@ -262,16 +262,33 @@ router.get(
     try {
       const studentId = Number(req.params.id);
 
+      const termId = req.query.termId
+        ? Number(req.query.termId)
+        : null;
+
       if (Number.isNaN(studentId)) {
         return res.status(400).json({
           message: "Invalid student id",
         });
       }
 
-      // ✅ 1. REAL ATTENDANCE
+      // ✅ ATTENDANCE (TERM AWARE)
       const attendance = await prisma.attendanceEntry.findMany({
-        where: { studentId },
-        select: { status: true },
+        where: {
+          studentId,
+
+          ...(termId
+            ? {
+                session: {
+                  termId,
+                },
+              }
+            : {}),
+        },
+
+        select: {
+          status: true,
+        },
       });
 
       const present = attendance.filter(
@@ -282,30 +299,48 @@ router.get(
         (a) => a.status === "ABSENT"
       ).length;
 
-      // ✅ 2. PARENT LOGS
+      // ✅ PARENT LOGS
       const logs = await prisma.parentContactLog.findMany({
         where: { studentId },
-        orderBy: { createdAt: "desc" },
+
+        orderBy: {
+          createdAt: "desc",
+        },
       });
 
-      // ✅ 3. DISCIPLINE HISTORY
+      // ✅ DISCIPLINE (TERM AWARE)
       const discipline = await prisma.discipline.findMany({
-        where: { studentId },
+        where: {
+          studentId,
+
+          ...(termId
+            ? {
+                termId,
+              }
+            : {}),
+        },
+
         include: {
           term: true,
         },
+
         orderBy: {
           date: "desc",
         },
       });
 
-      // ✅ 3. HEALTH NOTES (🔥 NEW)
+      // ✅ HEALTH NOTES
       const student = await prisma.student.findUnique({
-        where: { id: studentId },
-        select: { healthNotes: true },
+        where: {
+          id: studentId,
+        },
+
+        select: {
+          healthNotes: true,
+        },
       });
 
-      // ✅ 4. RESPONSE (MATCHES FRONTEND)
+      // ✅ RESPONSE
       res.json({
         present,
         absent,

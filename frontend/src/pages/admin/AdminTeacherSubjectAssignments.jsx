@@ -20,6 +20,7 @@ export default function AdminTeacherSubjectAssignments() {
 
   async function fetchData() {
     setLoading(true);
+
     try {
       const [teachersRes, subjectsRes, classesRes, assignmentsRes] =
         await Promise.all([
@@ -116,9 +117,17 @@ export default function AdminTeacherSubjectAssignments() {
             }
           >
             <option value="">Select teacher</option>
+
             {teachers.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name}
+                {t.name} —{" "}
+                {t.startDate
+                  ? new Date(t.startDate).toLocaleDateString()
+                  : "No start"}{" "}
+                to{" "}
+                {t.endDate
+                  ? new Date(t.endDate).toLocaleDateString()
+                  : "No end"}
               </option>
             ))}
           </select>
@@ -133,6 +142,7 @@ export default function AdminTeacherSubjectAssignments() {
             }
           >
             <option value="">Select subject</option>
+
             {subjects.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -150,6 +160,7 @@ export default function AdminTeacherSubjectAssignments() {
             }
           >
             <option value="">Select Grade</option>
+
             {classes.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -210,9 +221,11 @@ export default function AdminTeacherSubjectAssignments() {
                   <td className="p-3">
                     {a?.teacher?.name || "—"}
                   </td>
+
                   <td className="p-3">
                     {a?.subject?.name || "—"}
                   </td>
+
                   <td className="p-3">
                     {a?.class?.name || "—"}
                   </td>

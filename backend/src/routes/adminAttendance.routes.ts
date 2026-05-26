@@ -24,16 +24,17 @@ GET /admin/attendance/summary
 */
 router.get("/summary", async (req, res) => {
   try {
-const selectedDate = req.query.date as string | undefined
+    const selectedDate = req.query.date as string | undefined
+    const termId = Number(req.query.termId)
 
-const today = selectedDate
-  ? new Date(selectedDate)
-  : new Date()
+    const today = selectedDate
+      ? new Date(selectedDate)
+      : new Date()
 
-today.setHours(0, 0, 0, 0)
+    today.setHours(0, 0, 0, 0)
 
-const tomorrow = new Date(today)
-tomorrow.setDate(tomorrow.getDate() + 1)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
 
     const totalStudents = await prisma.student.count()
 
@@ -43,7 +44,8 @@ tomorrow.setDate(tomorrow.getDate() + 1)
           date: {
             gte: today,
             lt: tomorrow
-          }
+          },
+          termId
         }
       },
       select: {
@@ -95,22 +97,28 @@ GET /admin/attendance/by-class
 */
 router.get("/by-class", async (req, res) => {
   try {
-      const selectedDate = req.query.date as string | undefined
+    const selectedDate = req.query.date as string | undefined
+    const termId = Number(req.query.termId)
 
-      const today = selectedDate
-        ? new Date(selectedDate)
-        : new Date()
+    const today = selectedDate
+      ? new Date(selectedDate)
+      : new Date()
 
-      today.setHours(0, 0, 0, 0)
+    today.setHours(0, 0, 0, 0)
 
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
+    const tomorrow = new Date(today)
+    tomorrow.setDate(tomorrow.getDate() + 1)
 
     const classes = await prisma.class.findMany({
       include: {
         students: {
           include: {
             attendanceEntries: {
+              where: {
+                session: {
+                  termId
+                }
+              },
               include: {
                 session: true
               }
@@ -177,8 +185,8 @@ GET /admin/attendance/class/:classId
 router.get("/class/:classId", async (req, res) => {
   try {
     const classId = parseInt(req.params.classId)
-
     const selectedDate = req.query.date as string | undefined
+    const termId = Number(req.query.termId)
 
     const today = selectedDate
       ? new Date(selectedDate)
@@ -196,6 +204,11 @@ router.get("/class/:classId", async (req, res) => {
       include: {
         user: true,
         attendanceEntries: {
+          where: {
+            session: {
+              termId
+            }
+          },
           include: {
             session: true
           }

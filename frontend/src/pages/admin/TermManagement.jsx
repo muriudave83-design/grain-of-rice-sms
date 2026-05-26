@@ -18,6 +18,9 @@ export default function TermManagement() {
     classId: "",
   });
 
+  const [editingTerm, setEditingTerm] =
+    useState(null);
+
   async function fetchTerms() {
     try {
       const token = localStorage.getItem("token");
@@ -98,7 +101,10 @@ export default function TermManagement() {
         },
         body: JSON.stringify({
           ...form,
-          classId: Number(form.classId),
+
+          ...(form.classId && {
+            classId: Number(form.classId),
+          }),
         }),
       });
 
@@ -131,19 +137,37 @@ export default function TermManagement() {
     try {
       const token = localStorage.getItem("token");
 
-      await fetch(`/api/terms/${id}`, {
+      const res = await fetch(`/api/terms/${id}`, {
         method: "PUT",
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(updates),
+        body: JSON.stringify({
+          ...updates,
+
+          ...(updates.classId && {
+            classId: Number(updates.classId),
+          }),
+        }),
       });
+
+      const data = await res.json();
+
+      console.log("UPDATE RESPONSE:", data);
+
+      if (!res.ok) {
+        alert(data.message || "Failed to update term");
+        return;
+      }
+
+      alert("Term updated successfully");
 
       fetchTerms();
     } catch (err) {
       console.error(err);
+      alert("Update crashed");
     }
   }
 
@@ -201,7 +225,6 @@ export default function TermManagement() {
       </h1>
 
       <div className="grid grid-cols-5 gap-4 mb-4">
-
         <select
           className="border p-2"
           value={form.name}
@@ -306,7 +329,26 @@ export default function TermManagement() {
               </div>
 
               <div className="text-sm text-gray-500">
-                Class: {t.class?.name || t.classId}
+                Start:{" "}
+                {t.startDate
+                  ? new Date(
+                      t.startDate
+                    ).toLocaleDateString()
+                  : "N/A"}
+              </div>
+
+              <div className="text-sm text-gray-500">
+                End:{" "}
+                {t.endDate
+                  ? new Date(
+                      t.endDate
+                    ).toLocaleDateString()
+                  : "N/A"}
+              </div>
+
+              <div className="text-sm text-gray-500">
+                Class:{" "}
+                {t.class?.name || t.classId}
               </div>
 
               <div className="text-sm">
@@ -323,21 +365,23 @@ export default function TermManagement() {
             </div>
 
             <div className="flex gap-2">
-
               {/* EDIT */}
               <button
-                onClick={() => {
-                  const newName = prompt(
-                    "Edit term name",
-                    t.name
-                  );
-
-                  if (!newName) return;
-
-                  updateTerm(t.id, {
-                    name: newName,
-                  });
-                }}
+                onClick={() =>
+                  setEditingTerm({
+                    ...t,
+                    startDate: t.startDate
+                      ? t.startDate.split(
+                          "T"
+                        )[0]
+                      : "",
+                    endDate: t.endDate
+                      ? t.endDate.split(
+                          "T"
+                        )[0]
+                      : "",
+                  })
+                }
                 className="bg-blue-600 text-white px-3 py-1 rounded"
               >
                 Edit
@@ -345,28 +389,171 @@ export default function TermManagement() {
 
               {/* LOCK / ARCHIVE */}
               <button
-                onClick={() => toggleLock(t.id)}
+                onClick={() =>
+                  toggleLock(t.id)
+                }
                 className={`px-3 py-1 rounded text-white ${
                   t.isLocked
                     ? "bg-green-600"
                     : "bg-yellow-600"
                 }`}
               >
-                {t.isLocked ? "Unlock" : "Archive"}
+                {t.isLocked
+                  ? "Unlock"
+                  : "Archive"}
               </button>
 
               {/* DELETE */}
               <button
-                onClick={() => deleteTerm(t.id)}
+                onClick={() =>
+                  deleteTerm(t.id)
+                }
                 className="bg-red-600 text-white px-3 py-1 rounded"
               >
                 Delete
               </button>
-
             </div>
           </div>
         ))}
       </div>
+
+      {editingTerm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded w-[400px] space-y-4">
+            <h2 className="text-xl font-bold">
+              Edit Term
+            </h2>
+
+            <select
+              className="border p-2 w-full"
+              value={editingTerm.name}
+              onChange={(e) =>
+                setEditingTerm({
+                  ...editingTerm,
+                  name: e.target.value,
+                })
+              }
+            >
+              {SYSTEM_TERMS.map((term) => (
+                <option
+                  key={term}
+                  value={term}
+                >
+                  {term}
+                </option>
+              ))}
+            </select>
+
+            <input
+              className="border p-2 w-full"
+              value={
+                editingTerm.academicYear
+              }
+              onChange={(e) =>
+                setEditingTerm({
+                  ...editingTerm,
+                  academicYear:
+                    e.target.value,
+                })
+              }
+            />
+
+            <input
+              type="date"
+              className="border p-2 w-full"
+              value={
+                editingTerm.startDate ||
+                ""
+              }
+              onChange={(e) =>
+                setEditingTerm({
+                  ...editingTerm,
+                  startDate:
+                    e.target.value,
+                })
+              }
+            />
+
+            <input
+              type="date"
+              className="border p-2 w-full"
+              value={
+                editingTerm.endDate || ""
+              }
+              onChange={(e) =>
+                setEditingTerm({
+                  ...editingTerm,
+                  endDate:
+                    e.target.value,
+                })
+              }
+            />
+
+            <select
+              className="border p-2 w-full"
+              value={
+                editingTerm.classId || ""
+              }
+              onChange={(e) =>
+                setEditingTerm({
+                  ...editingTerm,
+                  classId:
+                    e.target.value,
+                })
+              }
+            >
+              <option value="">
+                Select Class
+              </option>
+
+              {classes.map((cls) => (
+                <option
+                  key={cls.id}
+                  value={cls.id}
+                >
+                  {cls.name}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() =>
+                  setEditingTerm(null)
+                }
+                className="border px-4 py-2 rounded"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={async () => {
+                  await updateTerm(
+                    editingTerm.id,
+                    {
+                      name:
+                        editingTerm.name,
+                      academicYear:
+                        editingTerm.academicYear,
+                      startDate:
+                        editingTerm.startDate,
+                      endDate:
+                        editingTerm.endDate,
+                      classId:
+                        editingTerm.classId,
+                    }
+                  );
+
+                  setEditingTerm(null);
+                }}
+                className="bg-blue-600 text-white px-4 py-2 rounded"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

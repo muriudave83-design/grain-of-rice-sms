@@ -8,7 +8,9 @@ export async function getTerms(
 ) {
   try {
     const terms = await prisma.term.findMany({
-      orderBy: { startDate: "desc" },
+      orderBy: {
+        createdAt: "desc",
+      },
     });
 
     return res.json(terms);
@@ -37,24 +39,27 @@ export async function createTerm(
       classId,
     } = req.body;
 
-    if (
-      !name ||
-      !startDate ||
-      !endDate ||
-      !academicYear
-    ) {
+    if (!name || !academicYear) {
       return res.status(400).json({
-        message: "All fields are required",
+        message:
+          "Name and academic year are required",
       });
     }
 
     const term = await prisma.term.create({
       data: {
         name,
-        academicYear,
 
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+        academicYear:
+          String(academicYear),
+
+        ...(startDate && {
+          startDate: new Date(startDate),
+        }),
+
+        ...(endDate && {
+          endDate: new Date(endDate),
+        }),
 
         ...(classId && {
           classId: Number(classId),
@@ -65,7 +70,10 @@ export async function createTerm(
     return res.status(201).json(term);
 
   } catch (error: any) {
-    console.error(error);
+    console.error(
+      "CREATE TERM ERROR:",
+      error
+    );
 
     return res.status(500).json({
       message: "Failed to create term",
@@ -183,8 +191,38 @@ export async function deleteTerm(
   try {
     const id = Number(req.params.id);
 
+    const existingAttendance =
+      await prisma.attendanceSession.findFirst({
+        where: {
+          termId: id,
+        },
+      });
+
+    if (existingAttendance) {
+      return res.status(400).json({
+        message:
+          "Cannot delete term with attendance records.",
+      });
+    }
+
+    const existingReports =
+      await prisma.reportCard.findFirst({
+        where: {
+          termId: id,
+        },
+      });
+
+    if (existingReports) {
+      return res.status(400).json({
+        message:
+          "Cannot delete term with report cards.",
+      });
+    }
+
     await prisma.term.delete({
-      where: { id },
+      where: {
+        id,
+      },
     });
 
     return res.json({

@@ -20,7 +20,10 @@ export const getStudentTranscript = async (
     res.json(transcripts);
   } catch (err) {
     console.error("FETCH TRANSCRIPT ERROR:", err);
-    res.status(500).json({ message: "Failed to fetch transcript" });
+
+    res.status(500).json({
+      message: "Failed to fetch transcript",
+    });
   }
 };
 
@@ -51,6 +54,7 @@ export const addContactLog = async (
     res.status(201).json(log);
   } catch (err) {
     console.error("ADD CONTACT LOG ERROR:", err);
+
     res.status(500).json({
       message: "Failed to add contact log",
     });
@@ -63,6 +67,7 @@ export const getStudentDetails = async (
   res: Response
 ) => {
   const studentId = Number(req.params.id);
+  const termId = Number(req.query.termId);
 
   try {
     // attendance count
@@ -70,6 +75,10 @@ export const getStudentDetails = async (
       where: {
         studentId,
         status: "ABSENT",
+
+        session: {
+          termId,
+        },
       },
     });
 
@@ -77,13 +86,20 @@ export const getStudentDetails = async (
       where: {
         studentId,
         status: "PRESENT",
+
+        session: {
+          termId,
+        },
       },
     });
 
     // logs
     const logs = await prisma.parentContactLog.findMany({
       where: { studentId },
-      orderBy: { createdAt: "desc" }, // 🔥 IMPORTANT
+
+      orderBy: {
+        createdAt: "desc",
+      }, // 🔥 IMPORTANT
     });
 
     res.json({
@@ -93,27 +109,37 @@ export const getStudentDetails = async (
     });
   } catch (err) {
     console.error("GET STUDENT DETAILS ERROR:", err);
+
     res.status(500).json({
       message: "Failed to fetch student details",
     });
   }
 };
 
-export const updateHealth = async (req: Request, res: Response) => {
+export const updateHealth = async (
+  req: Request,
+  res: Response
+) => {
   const studentId = Number(req.params.id);
   const { healthNotes } = req.body;
 
   try {
     await prisma.student.update({
       where: { id: studentId },
+
       data: {
         healthNotes,
       },
     });
 
-    res.json({ message: "Health notes updated" });
+    res.json({
+      message: "Health notes updated",
+    });
   } catch (err) {
     console.error("UPDATE HEALTH ERROR:", err);
-    res.status(500).json({ message: "Failed to update health notes" });
+
+    res.status(500).json({
+      message: "Failed to update health notes",
+    });
   }
 };

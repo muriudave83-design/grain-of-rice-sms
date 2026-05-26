@@ -17,9 +17,14 @@ export const healthCheck = async (_req: Request, res: Response) => {
 export const teacherDashboard = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
+
     if (!user) {
       return res.status(401).json({ message: "Not authenticated" });
     }
+
+    const termId = req.query.termId
+      ? Number(req.query.termId)
+      : null;
 
     // Subjects owned by teacher
     const subjects = await prisma.subject.findMany({
@@ -33,14 +38,31 @@ export const teacherDashboard = async (req: Request, res: Response) => {
     // Students across teacher's subjects
     const studentsCount = subjectIds.length
       ? await prisma.enrollment.count({
-          where: { subjectId: { in: subjectIds } },
+          where: {
+            subjectId: { in: subjectIds },
+
+            ...(termId
+              ? {
+                  termId,
+                }
+              : {}),
+          },
         })
       : 0;
 
     // Assessments for these subjects
     const assessments = subjectIds.length
       ? await prisma.assessment.findMany({
-          where: { subjectId: { in: subjectIds } },
+          where: {
+            subjectId: { in: subjectIds },
+
+            ...(termId
+              ? {
+                  termId,
+                }
+              : {}),
+          },
+
           select: { id: true },
         })
       : [];
@@ -51,25 +73,6 @@ export const teacherDashboard = async (req: Request, res: Response) => {
       const assessmentIds = assessments.map((a) => a.id);
 
       const enrollmentsCount = await prisma.enrollment.count({
-        where: { subjectId: { in: subjectIds } },
-      });
-
-      const existingScoresCount = await prisma.assessmentScore.count({
-        where: { assessmentId: { in: assessmentIds } },
-      });
-
-      // Expected scores = enrollments × assessments
-      const expectedScores = enrollmentsCount * assessmentIds.length;
-      missingCount = Math.max(0, expectedScores - existingScoresCount);
-    }
-
-    // ✅ Average grade across teacher's subjects (Phase 2 compliant)
-      const termId = req.query.termId
-        ? Number(req.query.termId)
-        : null;
-
-      // ✅ Average grade across teacher's subjects (TERM AWARE)
-      const avg = await prisma.grade.aggregate({
         where: {
           subjectId: { in: subjectIds },
 
@@ -79,11 +82,46 @@ export const teacherDashboard = async (req: Request, res: Response) => {
               }
             : {}),
         },
+      });
 
-        _avg: {
-          average: true,
+      const existingScoresCount = await prisma.assessmentScore.count({
+        where: {
+          assessmentId: { in: assessmentIds },
+
+          ...(termId
+            ? {
+                termId,
+              }
+            : {}),
         },
       });
+
+      // Expected scores = enrollments × assessments
+      const expectedScores =
+        enrollmentsCount * assessmentIds.length;
+
+      missingCount = Math.max(
+        0,
+        expectedScores - existingScoresCount
+      );
+    }
+
+    // ✅ Average grade across teacher's subjects (TERM AWARE)
+    const avg = await prisma.grade.aggregate({
+      where: {
+        subjectId: { in: subjectIds },
+
+        ...(termId
+          ? {
+              termId,
+            }
+          : {}),
+      },
+
+      _avg: {
+        average: true,
+      },
+    });
 
     res.json({
       subjects: subjectsCount,
@@ -93,6 +131,7 @@ export const teacherDashboard = async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("teacherDashboard error:", err);
+
     res.status(500).json({
       message: "Server error",
       error: (err as Error).message,
@@ -105,15 +144,31 @@ export const teacherDashboard = async (req: Request, res: Response) => {
  */
 export const adminDashboard = async (req: Request, res: Response) => {
   try {
-    const [students, teachers, subjects] = await Promise.all([
-      prisma.student.count(),
-      prisma.user.count({ where: { role: Role.TEACHER } }),
-      prisma.subject.count(),
-    ]);
+    const termId = req.query.termId
+      ? Number(req.query.termId)
+      : null;
 
-    res.json({ students, teachers, subjects });
+    const [students, teachers, subjects] =
+      await Promise.all([
+        prisma.student.count(),
+
+        prisma.user.count({
+          where: {
+            role: Role.TEACHER,
+          },
+        }),
+
+      prisma.subject.count()
+      ]);
+
+    res.json({
+      students,
+      teachers,
+      subjects,
+    });
   } catch (err) {
     console.error("adminDashboard error:", err);
+
     res.status(500).json({
       message: "Server error",
       error: (err as Error).message,
@@ -128,10 +183,12 @@ export const listAllStudents = async (_req: Request, res: Response) => {
   try {
     const students = await prisma.student.findMany({
       take: 200,
+
       select: {
         id: true,
         firstName: true,
         lastName: true,
+
         class: {
           select: {
             name: true,
@@ -143,6 +200,7 @@ export const listAllStudents = async (_req: Request, res: Response) => {
     res.json(students);
   } catch (err) {
     console.error("listAllStudents error:", err);
+
     res.status(500).json({
       message: "Server error",
       error: (err as Error).message,
@@ -157,6 +215,7 @@ export const listAllSubjects = async (_req: Request, res: Response) => {
   try {
     const subjects = await prisma.subject.findMany({
       take: 200,
+
       select: {
         id: true,
         name: true,
@@ -168,6 +227,7 @@ export const listAllSubjects = async (_req: Request, res: Response) => {
     res.json(subjects);
   } catch (err) {
     console.error("listAllSubjects error:", err);
+
     res.status(500).json({
       message: "Server error",
       error: (err as Error).message,

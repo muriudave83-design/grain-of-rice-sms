@@ -63,11 +63,7 @@ export default function Reports() {
       try {
         const res = await apiClient.get(`/teacher/terms/${classId}`);
 
-        setTerms([
-          { id: 1, name: "Term 1" },
-          { id: 2, name: "Term 2" },
-          { id: 3, name: "Term 3" },
-        ]);
+        setTerms(res.data || []);
 
         if (res.data.length > 0) {
           setTermId(res.data[0].id);
@@ -167,7 +163,15 @@ export default function Reports() {
         >
           {terms.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.name}
+              {t.name} (
+              {t.startDate
+                ? new Date(t.startDate).toLocaleDateString()
+                : "No start"}
+              {" → "}
+              {t.endDate
+                ? new Date(t.endDate).toLocaleDateString()
+                : "No end"}
+              )
             </option>
           ))}
         </select>

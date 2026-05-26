@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
+import { formatTermLabel } from "../../utils/formatTermLabel";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -37,17 +38,7 @@ export default function AdminDashboard() {
       const termsData = termsRes.data || [];
 
       // 🔥 FILTER ONLY THESE TERMS
-    const filteredTerms = termsData.filter(
-      (t) =>
-        (t.name === "Term 2" &&
-          String(t.academicYear).includes("2026")) ||
-
-        (t.name === "Term 3" &&
-          String(t.academicYear).includes("2026")) ||
-
-        (t.name === "Term 1" &&
-          String(t.academicYear).includes("2027"))
-    );
+      const filteredTerms = termsData;
 
       // 🔥 STORE FILTERED TERMS ONLY
       setTerms(filteredTerms);
@@ -159,11 +150,11 @@ export default function AdminDashboard() {
           }}
           className="border p-2"
         >
-          {terms.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name} - {t.academicYear}
-            </option>
-          ))}
+        {terms.map((t) => (
+          <option key={t.id} value={t.id}>
+            {formatTermLabel(t)}
+          </option>
+        ))}
         </select>
 
         {/* 🔒 LOCK BUTTON */}

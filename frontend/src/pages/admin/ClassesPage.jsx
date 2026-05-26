@@ -21,6 +21,7 @@ export default function ClassesPage() {
 
   async function fetchData() {
     setLoading(true);
+
     try {
       const [classesRes, teachersRes] = await Promise.all([
         api.get("/admin/classes"),
@@ -38,16 +39,23 @@ export default function ClassesPage() {
 
   function openCreate() {
     setEditingClass(null);
-    setForm({ name: "", classTeacherId: "" });
+
+    setForm({
+      name: "",
+      classTeacherId: "",
+    });
+
     setShowForm(true);
   }
 
   function openEdit(cls) {
     setEditingClass(cls);
+
     setForm({
       name: cls.name,
       classTeacherId: cls.classTeacherId || "",
     });
+
     setShowForm(true);
   }
 
@@ -89,6 +97,7 @@ export default function ClassesPage() {
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-xl font-semibold">Classes</h1>
+
           <button
             onClick={openCreate}
             className="px-4 py-2 bg-blue-600 text-white rounded text-sm"
@@ -132,6 +141,7 @@ export default function ClassesPage() {
                 filtered.map((cls) => (
                   <tr key={cls.id} className="border-t">
                     <td className="p-3">{cls.name}</td>
+
                     <td className="p-3">
                       {cls.classTeacher?.name || (
                         <span className="text-gray-400 text-xs">
@@ -139,6 +149,7 @@ export default function ClassesPage() {
                         </span>
                       )}
                     </td>
+
                     <td className="p-3 space-x-2">
                       <button
                         onClick={() => openEdit(cls)}
@@ -146,6 +157,7 @@ export default function ClassesPage() {
                       >
                         Edit
                       </button>
+
                       <button
                         onClick={() => deleteClass(cls)}
                         className="text-red-600 text-xs"
@@ -185,13 +197,24 @@ export default function ClassesPage() {
                 className="w-full mb-4 p-2 border rounded"
                 value={form.classTeacherId}
                 onChange={(e) =>
-                  setForm({ ...form, classTeacherId: e.target.value })
+                  setForm({
+                    ...form,
+                    classTeacherId: e.target.value,
+                  })
                 }
               >
                 <option value="">No class teacher</option>
+
                 {teachers.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name}
+                    {t.name} —{" "}
+                    {t.startDate
+                      ? new Date(t.startDate).toLocaleDateString()
+                      : "No start"}{" "}
+                    to{" "}
+                    {t.endDate
+                      ? new Date(t.endDate).toLocaleDateString()
+                      : "No end"}
                   </option>
                 ))}
               </select>
@@ -204,6 +227,7 @@ export default function ClassesPage() {
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
                   className="px-3 py-1 text-sm bg-blue-600 text-white rounded"

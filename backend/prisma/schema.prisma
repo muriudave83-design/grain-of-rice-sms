@@ -45,15 +45,16 @@ model Parent {
 }
 
 model Student {
-  id                Int               @id @default(autoincrement())
+  id                Int                @id @default(autoincrement())
   firstName         String
   lastName          String
-  createdAt         DateTime          @default(now())
-  admissionNo       String            @unique
+  createdAt         DateTime           @default(now())
+  admissionNo       String             @unique
   dob               DateTime?
-  userId            Int?              @unique
+  userId            Int?               @unique
   classId           Int
-  isArchived        Boolean           @default(false)
+  isArchived        Boolean            @default(false)
+  healthNotes       String?
   assessmentScores  AssessmentScore[]
   attendanceEntries AttendanceEntry[]
   discipline        Discipline[]
@@ -62,16 +63,15 @@ model Student {
   grades            Grade[]
   guardians         Guardian[]
   invoices          Invoice[]
+  parentContactLogs ParentContactLog[]
   parentLinks       ParentStudent[]
   reportCards       ReportCard[]
   reportComments    ReportComment[]
   scores            Score[]
   sponsorships      Sponsorship[]
-  class             Class             @relation(fields: [classId], references: [id])
-  user              User?             @relation(fields: [userId], references: [id])
+  class             Class              @relation(fields: [classId], references: [id])
+  user              User?              @relation(fields: [userId], references: [id])
   transcripts       Transcript[]
-  parentContactLogs ParentContactLog[]
-  healthNotes       String? 
 }
 
 model Class {
@@ -103,14 +103,11 @@ model Guardian {
 
 model ParentStudent {
   id        Int      @id @default(autoincrement())
-
   parentId  String
   studentId Int
-
+  createdAt DateTime @default(now())
   parent    Parent   @relation(fields: [parentId], references: [id], onDelete: Cascade)
   student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
 
   @@unique([parentId, studentId])
   @@index([parentId])
@@ -135,11 +132,9 @@ model Subject {
   name            String
   code            String?
   createdAt       DateTime                 @default(now())
-
+  teacherId       Int?
   isArchived      Boolean                  @default(false)
   updatedAt       DateTime                 @default(now()) @updatedAt
-
-  teacherId       Int?
   assessments     Assessment[]
   classSubjects   ClassSubject[]
   enrollments     Enrollment[]
@@ -235,7 +230,6 @@ model ParentContactLog {
   studentId Int
   message   String
   createdAt DateTime @default(now())
-
   student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 }
 
@@ -253,25 +247,27 @@ model Invoice {
 }
 
 model Term {
-  id           Int          @id @default(autoincrement())
-  name         String
-  startDate    DateTime
-  endDate      DateTime
-  academicYear String
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-  classId      Int
-  isLocked     Boolean      @default(false)
-  assessments  Assessment[]
-  assignments  Assignment[]
-  discipline   Discipline[]
-  grades       Grade[]
-  reportCards  ReportCard[]
-  class        Class        @relation(fields: [classId], references: [id])
-  transcripts  Transcript[]
+  id                 Int                 @id @default(autoincrement())
+  name               String
+  startDate          DateTime
+  endDate            DateTime
+  academicYear       String
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  classId            Int
+  isLocked           Boolean             @default(false)
+  assessments        Assessment[]
+  assignments        Assignment[]
+  attendanceSessions AttendanceSession[]
+  discipline         Discipline[]
+  grades             Grade[]
+  reportCards        ReportCard[]
+  reportComments     ReportComment[]
+  class              Class               @relation(fields: [classId], references: [id])
+  transcripts        Transcript[]
 
-  @@unique([name, classId])
+  @@unique([name, classId, academicYear])
 }
 
 model ReportCard {
@@ -313,11 +309,13 @@ model AttendanceSession {
   status    AttendanceSessionStatus @default(DRAFT)
   createdAt DateTime                @default(now())
   updatedAt DateTime                @updatedAt
+  termId    Int?
   entries   AttendanceEntry[]
   class     Class                   @relation(fields: [classId], references: [id])
   teacher   User                    @relation(fields: [teacherId], references: [id])
+  term      Term?                   @relation(fields: [termId], references: [id])
 
-  @@unique([classId, date])
+  @@unique([classId, date, termId])
 }
 
 model AttendanceEntry {
@@ -406,10 +404,12 @@ model ReportComment {
   createdAt        DateTime       @default(now())
   teacherSubjectId Int
   updatedAt        DateTime       @updatedAt
+  termId           Int?
   student          Student        @relation(fields: [studentId], references: [id])
   teacherSubject   TeacherSubject @relation(fields: [teacherSubjectId], references: [id])
+  term             Term?          @relation(fields: [termId], references: [id])
 
-  @@unique([studentId, teacherSubjectId])
+  @@unique([studentId, teacherSubjectId, termId])
 }
 
 model Transcript {

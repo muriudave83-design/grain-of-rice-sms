@@ -113,6 +113,7 @@ function FeesTab({ studentId }) {
     </div>
   );
 }
+
 /* =========================
    DISCIPLINE TAB
 ========================= */
@@ -165,9 +166,17 @@ function DisciplineTab({ studentId }) {
         className="border p-2 mb-3"
       >
         <option value="">All Terms</option>
+
         {terms.map((t) => (
           <option key={t.id} value={t.id}>
-            {t.name}
+            {t.name} —{" "}
+            {t.startDate
+              ? new Date(t.startDate).toLocaleDateString()
+              : "No start"}{" "}
+            to{" "}
+            {t.endDate
+              ? new Date(t.endDate).toLocaleDateString()
+              : "No end"}
           </option>
         ))}
       </select>
@@ -188,6 +197,7 @@ function DisciplineTab({ studentId }) {
     </div>
   );
 }
+
 /* =========================
    SPONSORSHIP TAB
 ========================= */
