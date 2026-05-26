@@ -93,6 +93,20 @@ export default function GradebookDetail() {
 
           if (!key) return;
 
+          // ✅ ONLY COUNT ABSENCES
+          const status =
+            r.status ||
+            r.attendanceStatus ||
+            r.present;
+
+          const isAbsent =
+            status === "ABSENT" ||
+            status === "Absent" ||
+            status === false;
+
+          // Ignore PRESENT/LATE/etc
+          if (!isAbsent) return;
+
           if (!map[key]) {
             map[key] = 0;
           }
@@ -117,41 +131,26 @@ export default function GradebookDetail() {
 
       // ✅ Always show all 3 terms
 
-      const normalizedTerms = [
-        {
-          ...(res.data.find((t) => t.name === "Term 1") || {}),
-          id: 1,
-          name: "Term 1",
-        },
-        {
-          ...(res.data.find((t) => t.name === "Term 2") || {}),
-          id: 2,
-          name: "Term 2",
-        },
-        {
-          ...(res.data.find((t) => t.name === "Term 3") || {}),
-          id: 3,
-          name: "Term 3",
-        },
-      ];
+      const normalizedTerms = res.data || [];   
 
       setTerms(normalizedTerms);
 
-      if (res.data.length > 0) {
-        const firstTerm = res.data[0];
-        const firstTermId = firstTerm.id;
+      const forcedTerm = normalizedTerms.find(
+        (t) => t.name === "Term 2"
+      );
 
-        console.log("✅ Auto-selecting term:", firstTermId);
+      if (forcedTerm) {
+      console.log("✅ Forced Term:", forcedTerm);
 
-        setSelectedTerm(firstTermId);
+      setSelectedTerm(forcedTerm.id);
 
-        // ✅ SAVE FULL TERM
-        setSelectedTermData(firstTerm);
-      }else {
-          console.warn("⚠️ No terms found for this class");
+      // ✅ SAVE FULL TERM
+      setSelectedTermData(forcedTerm);
+      } else {
+      console.warn("⚠️ Term 2 not found");
 
-          setSelectedTerm(null);
-        }
+      setSelectedTerm(null);
+      }
       } catch (err) {
         console.error("❌ Failed to load terms", err);
         setError("Failed to load terms");
@@ -198,27 +197,18 @@ export default function GradebookDetail() {
 
         const backendTerms = termRes.data || [];
 
-        const normalizedTerms = [
-          {
-            ...(backendTerms.find((t) => t.name === "Term 1") || {}),
-            id: 1,
-            name: "Term 1",
-          },
-          {
-            ...(backendTerms.find((t) => t.name === "Term 2") || {}),
-            id: 2,
-            name: "Term 2",
-          },
-          {
-            ...(backendTerms.find((t) => t.name === "Term 3") || {}),
-            id: 3,
-            name: "Term 3",
-          },
-        ];
+        const normalizedTerms = backendTerms;
 
         setTerms(normalizedTerms);
 
-        const firstTerm = normalizedTerms[0];
+        const firstTerm = normalizedTerms.find(
+          (t) => t.name === "Term 2"
+        );
+
+        if (!firstTerm) {
+          throw new Error("Term 2 not found");
+        }
+
         const termId = firstTerm.id;
 
        // 🔒 VALIDATE TERM LOCK
@@ -955,7 +945,9 @@ useEffect(() => {
       <div className="mb-4">
         <select
           value={selectedTerm ?? ""}
-          onChange={(e) => setSelectedTerm(Number(e.target.value))}
+          onChange={(e) =>
+            setSelectedTerm(Number(e.target.value))
+          }
           className="border p-2"
         >
           {terms.length === 0 && (
