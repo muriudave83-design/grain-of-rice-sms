@@ -25,8 +25,11 @@ async function getTerms(req, res) {
 // POST /api/admin/terms
 async function createTerm(req, res) {
     try {
-        const { name, startDate, endDate, academicYear, classId } = req.body;
-        if (!name || !startDate || !endDate || !academicYear) {
+        const { name, startDate, endDate, academicYear, classId, } = req.body;
+        if (!name ||
+            !startDate ||
+            !endDate ||
+            !academicYear) {
             return res.status(400).json({
                 message: "All fields are required",
             });
@@ -34,10 +37,12 @@ async function createTerm(req, res) {
         const term = await client_1.prisma.term.create({
             data: {
                 name,
+                academicYear,
                 startDate: new Date(startDate),
                 endDate: new Date(endDate),
-                academicYear,
-                classId: Number(classId),
+                ...(classId && {
+                    classId: Number(classId),
+                }),
             },
         });
         return res.status(201).json(term);
@@ -83,9 +88,33 @@ exports.toggleTermLock = toggleTermLock;
 async function updateTerm(req, res) {
     try {
         const id = Number(req.params.id);
+        const { name, academicYear, startDate, endDate, classId, isLocked, } = req.body;
         const updated = await client_1.prisma.term.update({
             where: { id },
-            data: req.body,
+            data: {
+                ...(name !== undefined && {
+                    name,
+                }),
+                ...(academicYear !== undefined && {
+                    academicYear,
+                }),
+                ...(startDate !== undefined && {
+                    startDate: startDate
+                        ? new Date(startDate)
+                        : undefined,
+                }),
+                ...(endDate !== undefined && {
+                    endDate: endDate
+                        ? new Date(endDate)
+                        : undefined,
+                }),
+                ...(classId && {
+                    classId: Number(classId),
+                }),
+                ...(isLocked !== undefined && {
+                    isLocked,
+                }),
+            },
         });
         return res.json(updated);
     }

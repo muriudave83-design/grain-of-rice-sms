@@ -2,7 +2,10 @@ import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
 
 // GET /api/admin/terms
-export async function getTerms(req: Request, res: Response) {
+export async function getTerms(
+  req: Request,
+  res: Response
+) {
   try {
     const terms = await prisma.term.findMany({
       orderBy: { startDate: "desc" },
@@ -21,11 +24,25 @@ export async function getTerms(req: Request, res: Response) {
 }
 
 // POST /api/admin/terms
-export async function createTerm(req: Request, res: Response) {
+export async function createTerm(
+  req: Request,
+  res: Response
+) {
   try {
-    const { name, startDate, endDate, academicYear, classId } = req.body;
+    const {
+      name,
+      startDate,
+      endDate,
+      academicYear,
+      classId,
+    } = req.body;
 
-    if (!name || !startDate || !endDate || !academicYear) {
+    if (
+      !name ||
+      !startDate ||
+      !endDate ||
+      !academicYear
+    ) {
       return res.status(400).json({
         message: "All fields are required",
       });
@@ -34,10 +51,14 @@ export async function createTerm(req: Request, res: Response) {
     const term = await prisma.term.create({
       data: {
         name,
+        academicYear,
+
         startDate: new Date(startDate),
         endDate: new Date(endDate),
-        academicYear,
-        classId: Number(classId),
+
+        ...(classId && {
+          classId: Number(classId),
+        }),
       },
     });
 
@@ -54,7 +75,10 @@ export async function createTerm(req: Request, res: Response) {
 }
 
 // TOGGLE LOCK
-export const toggleTermLock = async (req: Request, res: Response) => {
+export const toggleTermLock = async (
+  req: Request,
+  res: Response
+) => {
   try {
     const id = Number(req.params.id);
 
@@ -81,20 +105,62 @@ export const toggleTermLock = async (req: Request, res: Response) => {
     console.error(error);
 
     return res.status(500).json({
-      message: "Failed to toggle term lock",
+      message:
+        "Failed to toggle term lock",
       error: error.message,
     });
   }
 };
 
 // UPDATE TERM
-export async function updateTerm(req: Request, res: Response) {
+export async function updateTerm(
+  req: Request,
+  res: Response
+) {
   try {
     const id = Number(req.params.id);
 
+    const {
+      name,
+      academicYear,
+      startDate,
+      endDate,
+      classId,
+      isLocked,
+    } = req.body;
+
     const updated = await prisma.term.update({
       where: { id },
-      data: req.body,
+
+      data: {
+        ...(name !== undefined && {
+          name,
+        }),
+
+        ...(academicYear !== undefined && {
+          academicYear,
+        }),
+
+        ...(startDate !== undefined && {
+          startDate: startDate
+            ? new Date(startDate)
+            : undefined,
+        }),
+
+        ...(endDate !== undefined && {
+          endDate: endDate
+            ? new Date(endDate)
+            : undefined,
+        }),
+
+        ...(classId && {
+          classId: Number(classId),
+        }),
+
+        ...(isLocked !== undefined && {
+          isLocked,
+        }),
+      },
     });
 
     return res.json(updated);
@@ -110,7 +176,10 @@ export async function updateTerm(req: Request, res: Response) {
 }
 
 // DELETE TERM
-export async function deleteTerm(req: Request, res: Response) {
+export async function deleteTerm(
+  req: Request,
+  res: Response
+) {
   try {
     const id = Number(req.params.id);
 
