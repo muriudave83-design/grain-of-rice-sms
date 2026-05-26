@@ -14,18 +14,21 @@ const getGrade = (avg) => {
         return "D";
     return "F";
 };
-// 🔥 NEW: SAVE COMMENT
+// 🔥 SAVE COMMENT
 const saveReportComment = async (req, res) => {
     try {
         const { studentId, teacherSubjectId, comment } = req.body;
         if (!studentId || !teacherSubjectId) {
-            return res.status(400).json({ message: "Missing fields" });
+            return res.status(400).json({
+                message: "Missing fields",
+            });
         }
         await client_1.prisma.reportComment.upsert({
             where: {
-                studentId_teacherSubjectId: {
+                studentId_teacherSubjectId_termId: {
                     studentId: Number(studentId),
                     teacherSubjectId: Number(teacherSubjectId),
+                    termId: 0
                 },
             },
             update: {
@@ -34,6 +37,7 @@ const saveReportComment = async (req, res) => {
             create: {
                 studentId: Number(studentId),
                 teacherSubjectId: Number(teacherSubjectId),
+                termId: null,
                 comment,
             },
         });
@@ -41,7 +45,9 @@ const saveReportComment = async (req, res) => {
     }
     catch (err) {
         console.error("Save comment error:", err);
-        res.status(500).json({ message: "Something went wrong" });
+        res.status(500).json({
+            message: "Something went wrong",
+        });
     }
 };
 exports.saveReportComment = saveReportComment;
@@ -49,16 +55,22 @@ const getStudentReport = async (req, res) => {
     const { studentId } = req.params;
     try {
         const student = await client_1.prisma.student.findUnique({
-            where: { id: Number(studentId) },
+            where: {
+                id: Number(studentId),
+            },
             include: {
                 class: true,
             },
         });
         if (!student) {
-            return res.status(404).json({ message: "Student not found" });
+            return res.status(404).json({
+                message: "Student not found",
+            });
         }
         const studentsInClass = await client_1.prisma.student.findMany({
-            where: { classId: student.classId },
+            where: {
+                classId: student.classId,
+            },
         });
         const subjects = await client_1.prisma.teacherSubject.findMany({
             where: {
@@ -84,7 +96,9 @@ const getStudentReport = async (req, res) => {
                 total += scoreObj.score * weight;
                 totalWeight += weight;
             });
-            return totalWeight > 0 ? total / totalWeight : 0;
+            return totalWeight > 0
+                ? total / totalWeight
+                : 0;
         };
         // 🔥 INCLUDE COMMENTS
         const report = await Promise.all(subjects.map(async (ts) => {
@@ -102,9 +116,10 @@ const getStudentReport = async (req, res) => {
             // ✅ FETCH COMMENT
             const existingComment = await client_1.prisma.reportComment.findUnique({
                 where: {
-                    studentId_teacherSubjectId: {
+                    studentId_teacherSubjectId_termId: {
                         studentId: Number(studentId),
                         teacherSubjectId: ts.id,
+                        termId: 0
                     },
                 },
             });
@@ -125,7 +140,9 @@ const getStudentReport = async (req, res) => {
                 const avg = calculateStudentAverage(s.id, ts?.assignments || []);
                 total += avg;
             });
-            const overall = subjects.length > 0 ? total / subjects.length : 0;
+            const overall = subjects.length > 0
+                ? total / subjects.length
+                : 0;
             return {
                 studentId: s.id,
                 avg: overall,
@@ -146,7 +163,9 @@ const getStudentReport = async (req, res) => {
     }
     catch (err) {
         console.error(err);
-        res.status(500).json({ message: "Error generating report" });
+        res.status(500).json({
+            message: "Error generating report",
+        });
     }
 };
 exports.getStudentReport = getStudentReport;

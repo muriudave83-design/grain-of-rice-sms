@@ -504,9 +504,10 @@ const saveReportComment = async (req, res) => {
         const { studentId, teacherSubjectId, comment } = req.body;
         const saved = await prisma.reportComment.upsert({
             where: {
-                studentId_teacherSubjectId: {
+                studentId_teacherSubjectId_termId: {
                     studentId,
                     teacherSubjectId,
+                    termId: 0
                 },
             },
             update: { comment },

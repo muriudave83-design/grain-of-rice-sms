@@ -26,6 +26,7 @@ GET /admin/attendance/summary
 router.get("/summary", async (req, res) => {
     try {
         const selectedDate = req.query.date;
+        const termId = Number(req.query.termId);
         const today = selectedDate
             ? new Date(selectedDate)
             : new Date();
@@ -39,7 +40,8 @@ router.get("/summary", async (req, res) => {
                     date: {
                         gte: today,
                         lt: tomorrow
-                    }
+                    },
+                    termId
                 }
             },
             select: {
@@ -85,6 +87,7 @@ GET /admin/attendance/by-class
 router.get("/by-class", async (req, res) => {
     try {
         const selectedDate = req.query.date;
+        const termId = Number(req.query.termId);
         const today = selectedDate
             ? new Date(selectedDate)
             : new Date();
@@ -96,6 +99,11 @@ router.get("/by-class", async (req, res) => {
                 students: {
                     include: {
                         attendanceEntries: {
+                            where: {
+                                session: {
+                                    termId
+                                }
+                            },
                             include: {
                                 session: true
                             }
@@ -153,6 +161,7 @@ router.get("/class/:classId", async (req, res) => {
     try {
         const classId = parseInt(req.params.classId);
         const selectedDate = req.query.date;
+        const termId = Number(req.query.termId);
         const today = selectedDate
             ? new Date(selectedDate)
             : new Date();
@@ -166,6 +175,11 @@ router.get("/class/:classId", async (req, res) => {
             include: {
                 user: true,
                 attendanceEntries: {
+                    where: {
+                        session: {
+                            termId
+                        }
+                    },
                     include: {
                         session: true
                     }

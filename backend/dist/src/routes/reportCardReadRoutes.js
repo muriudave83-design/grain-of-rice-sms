@@ -23,11 +23,15 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
         const classId = Number(req.params.classId);
         const termParam = req.params.term;
         if (Array.isArray(termParam)) {
-            return res.status(400).json({ message: "Invalid term parameter" });
+            return res.status(400).json({
+                message: "Invalid term parameter",
+            });
         }
         const termName = termParam;
         if (Number.isNaN(classId)) {
-            return res.status(400).json({ message: "Invalid classId" });
+            return res.status(400).json({
+                message: "Invalid classId",
+            });
         }
         const normalizedTermName = termName
             .toLowerCase()
@@ -42,14 +46,18 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
             },
         });
         if (!term) {
-            return res.status(404).json({ message: "Term not found" });
+            return res.status(404).json({
+                message: "Term not found",
+            });
         }
         const students = await client_1.prisma.student.findMany({
             where: {
                 classId,
                 isArchived: false,
             },
-            include: { user: true },
+            include: {
+                user: true,
+            },
         });
         const assessments = await client_1.prisma.assessment.findMany({
             where: {
@@ -64,41 +72,68 @@ router.get("/teacher/:classId/:term", authMiddleware_1.authenticate, (0, rolesMi
                 scores: true,
             },
         });
-        const report = students.map((student) => {
+        const report = await Promise.all(students.map(async (student) => {
             const subjectMap = {};
             assessments.forEach((assessment) => {
                 const score = assessment.scores.find((s) => s.studentId === student.id);
                 if (!score)
                     return;
-                const subjectName = assessment.subject?.name || `Subject ${assessment.subjectId}`;
+                const subjectName = assessment.subject?.name ||
+                    `Subject ${assessment.subjectId}`;
                 if (!subjectMap[subjectName]) {
-                    subjectMap[subjectName] = { total: 0, count: 0 };
+                    subjectMap[subjectName] = {
+                        total: 0,
+                        count: 0,
+                    };
                 }
                 subjectMap[subjectName].total += score.score;
                 subjectMap[subjectName].count++;
             });
             const subjects = Object.entries(subjectMap).map(([subject, data]) => {
-                const avg = data.count > 0 ? data.total / data.count : 0;
+                const avg = data.count > 0
+                    ? data.total / data.count
+                    : 0;
                 return {
                     subject,
                     average: avg,
                 };
             });
             const overallTotal = subjects.reduce((sum, s) => sum + s.average, 0);
-            const overallAverage = subjects.length > 0 ? overallTotal / subjects.length : 0;
+            const overallAverage = subjects.length > 0
+                ? overallTotal / subjects.length
+                : 0;
+            // ✅ FIXED ATTENDANCE DATA
+            const attendanceEntries = await client_1.prisma.attendanceEntry.findMany({
+                where: {
+                    studentId: student.id,
+                },
+            });
+            const present = attendanceEntries.filter((a) => a.status === "PRESENT").length;
+            const absent = attendanceEntries.filter((a) => a.status === "ABSENT").length;
+            const late = attendanceEntries.filter((a) => a.status === "LATE").length;
+            const totalAttendance = present + absent + late;
+            const attendanceRate = totalAttendance > 0
+                ? Math.round((present / totalAttendance) * 100)
+                : 0;
             return {
                 studentId: student.id,
                 name: student.user?.name ||
                     `${student.firstName} ${student.lastName}`,
                 subjects,
                 overallAverage,
+                present,
+                absent,
+                late,
+                attendanceRate,
             };
-        });
+        }));
         return res.json(report);
     }
     catch (err) {
         console.error("🔥 REPORT CARD ERROR:", err);
-        res.status(500).json({ message: "Failed to load report cards" });
+        return res.status(500).json({
+            message: "Failed to load report cards",
+        });
     }
 });
 /**
@@ -111,10 +146,14 @@ router.post("/teacher/:classId/:term/publish", authMiddleware_1.authenticate, (0
         const classId = Number(req.params.classId);
         const termParam = req.params.term;
         if (Number.isNaN(classId)) {
-            return res.status(400).json({ message: "Invalid classId" });
+            return res.status(400).json({
+                message: "Invalid classId",
+            });
         }
         if (Array.isArray(termParam)) {
-            return res.status(400).json({ message: "Invalid term parameter" });
+            return res.status(400).json({
+                message: "Invalid term parameter",
+            });
         }
         const normalizedTermName = termParam
             .toLowerCase()
@@ -129,7 +168,9 @@ router.post("/teacher/:classId/:term/publish", authMiddleware_1.authenticate, (0
             },
         });
         if (!term) {
-            return res.status(404).json({ message: "Term not found" });
+            return res.status(404).json({
+                message: "Term not found",
+            });
         }
         const result = await client_1.prisma.reportCard.updateMany({
             where: {
@@ -171,19 +212,29 @@ router.post("/teacher/:classId/:term/publish", authMiddleware_1.authenticate, (0
 router.get("/me", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.STUDENT]), async (req, res) => {
     const user = req.user;
     const student = await client_1.prisma.student.findFirst({
-        where: { userId: user.id },
-        select: { id: true },
+        where: {
+            userId: user.id,
+        },
+        select: {
+            id: true,
+        },
     });
     if (!student) {
-        return res.status(404).json({ message: "Student record not found" });
+        return res.status(404).json({
+            message: "Student record not found",
+        });
     }
     const termIdRaw = req.query.termId;
     if (typeof termIdRaw !== "string") {
-        return res.status(400).json({ message: "termId is required" });
+        return res.status(400).json({
+            message: "termId is required",
+        });
     }
     const termId = Number(termIdRaw);
     if (Number.isNaN(termId)) {
-        return res.status(400).json({ message: "Invalid termId" });
+        return res.status(400).json({
+            message: "Invalid termId",
+        });
     }
     const reportCard = await client_1.prisma.reportCard.findUnique({
         where: {
@@ -194,13 +245,17 @@ router.get("/me", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRo
         },
         include: {
             subjects: {
-                include: { subject: true },
+                include: {
+                    subject: true,
+                },
             },
             term: true,
             class: true,
         },
     });
-    if (!reportCard || reportCard.status !== client_3.ReportCardStatus.PUBLISHED) {
+    if (!reportCard ||
+        reportCard.status !==
+            client_3.ReportCardStatus.PUBLISHED) {
         return res.status(404).json({
             message: "Report card not available",
         });
@@ -213,10 +268,14 @@ router.get("/me", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRo
  * ============================================================
  */
 router.get("/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireRole)([client_2.Role.PARENT]), async (req, res) => {
-    const parentId = String(req.user.id); // ✅ FIXED
+    const parentId = String(req.user.id);
     const links = await client_1.prisma.parentStudent.findMany({
-        where: { parentId }, // ✅ FIXED
-        select: { studentId: true },
+        where: {
+            parentId,
+        },
+        select: {
+            studentId: true,
+        },
     });
     if (links.length === 0) {
         return res.json([]);
@@ -224,7 +283,9 @@ router.get("/parent", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requi
     const studentIds = links.map((l) => l.studentId);
     const reportCards = await client_1.prisma.reportCard.findMany({
         where: {
-            studentId: { in: studentIds },
+            studentId: {
+                in: studentIds,
+            },
             status: client_3.ReportCardStatus.PUBLISHED,
         },
         include: {
@@ -248,17 +309,23 @@ router.get("/:id", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireR
         });
     }
     const reportCard = await client_1.prisma.reportCard.findUnique({
-        where: { id },
+        where: {
+            id,
+        },
         include: {
             subjects: {
-                include: { subject: true },
+                include: {
+                    subject: true,
+                },
             },
             student: true,
             class: true,
             term: true,
         },
     });
-    if (!reportCard || reportCard.status !== client_3.ReportCardStatus.PUBLISHED) {
+    if (!reportCard ||
+        reportCard.status !==
+            client_3.ReportCardStatus.PUBLISHED) {
         return res.status(404).json({
             message: "Report card not available",
         });
@@ -266,7 +333,7 @@ router.get("/:id", authMiddleware_1.authenticate, (0, rolesMiddleware_1.requireR
     if (req.user.role === client_2.Role.PARENT) {
         const link = await client_1.prisma.parentStudent.findFirst({
             where: {
-                parentId: String(req.user.id), // ✅ FIXED
+                parentId: String(req.user.id),
                 studentId: reportCard.studentId,
             },
         });

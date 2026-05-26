@@ -28,14 +28,19 @@ router.get(
       const classId = Number(req.params.classId);
 
       const termParam = req.params.term;
+
       if (Array.isArray(termParam)) {
-        return res.status(400).json({ message: "Invalid term parameter" });
+        return res.status(400).json({
+          message: "Invalid term parameter",
+        });
       }
 
       const termName = termParam;
 
       if (Number.isNaN(classId)) {
-        return res.status(400).json({ message: "Invalid classId" });
+        return res.status(400).json({
+          message: "Invalid classId",
+        });
       }
 
       const normalizedTermName = termName
@@ -53,7 +58,9 @@ router.get(
       });
 
       if (!term) {
-        return res.status(404).json({ message: "Term not found" });
+        return res.status(404).json({
+          message: "Term not found",
+        });
       }
 
       const students = await prisma.student.findMany({
@@ -61,7 +68,9 @@ router.get(
           classId,
           isArchived: false,
         },
-        include: { user: true },
+        include: {
+          user: true,
+        },
       });
 
       const assessments = await prisma.assessment.findMany({
@@ -78,55 +87,118 @@ router.get(
         },
       });
 
-      const report = students.map((student) => {
-        const subjectMap: Record<string, { total: number; count: number }> = {};
+      const report = await Promise.all(
+        students.map(async (student) => {
+          const subjectMap: Record<
+            string,
+            {
+              total: number;
+              count: number;
+            }
+          > = {};
 
-        assessments.forEach((assessment) => {
-          const score = assessment.scores.find(
-            (s) => s.studentId === student.id
+          assessments.forEach((assessment) => {
+            const score = assessment.scores.find(
+              (s) => s.studentId === student.id
+            );
+
+            if (!score) return;
+
+            const subjectName =
+              assessment.subject?.name ||
+              `Subject ${assessment.subjectId}`;
+
+            if (!subjectMap[subjectName]) {
+              subjectMap[subjectName] = {
+                total: 0,
+                count: 0,
+              };
+            }
+
+            subjectMap[subjectName].total += score.score;
+            subjectMap[subjectName].count++;
+          });
+
+          const subjects = Object.entries(subjectMap).map(
+            ([subject, data]) => {
+              const avg =
+                data.count > 0
+                  ? data.total / data.count
+                  : 0;
+
+              return {
+                subject,
+                average: avg,
+              };
+            }
           );
 
-          if (!score) return;
+          const overallTotal = subjects.reduce(
+            (sum, s) => sum + s.average,
+            0
+          );
 
-          const subjectName =
-            assessment.subject?.name || `Subject ${assessment.subjectId}`;
+          const overallAverage =
+            subjects.length > 0
+              ? overallTotal / subjects.length
+              : 0;
 
-          if (!subjectMap[subjectName]) {
-            subjectMap[subjectName] = { total: 0, count: 0 };
-          }
+          // ✅ FIXED ATTENDANCE DATA
+          const attendanceEntries =
+            await prisma.attendanceEntry.findMany({
+              where: {
+                studentId: student.id,
+              },
+            });
 
-          subjectMap[subjectName].total += score.score;
-          subjectMap[subjectName].count++;
-        });
+          const present = attendanceEntries.filter(
+            (a) => a.status === "PRESENT"
+          ).length;
 
-        const subjects = Object.entries(subjectMap).map(([subject, data]) => {
-          const avg = data.count > 0 ? data.total / data.count : 0;
+          const absent = attendanceEntries.filter(
+            (a) => a.status === "ABSENT"
+          ).length;
+
+          const late = attendanceEntries.filter(
+            (a) => a.status === "LATE"
+          ).length;
+
+          const totalAttendance =
+            present + absent + late;
+
+          const attendanceRate =
+            totalAttendance > 0
+              ? Math.round(
+                  (present / totalAttendance) * 100
+                )
+              : 0;
 
           return {
-            subject,
-            average: avg,
+            studentId: student.id,
+
+            name:
+              student.user?.name ||
+              `${student.firstName} ${student.lastName}`,
+
+            subjects,
+            overallAverage,
+
+            present,
+            absent,
+            late,
+            attendanceRate,
           };
-        });
-
-        const overallTotal = subjects.reduce((sum, s) => sum + s.average, 0);
-        const overallAverage =
-          subjects.length > 0 ? overallTotal / subjects.length : 0;
-
-        return {
-          studentId: student.id,
-          name:
-            student.user?.name ||
-            `${student.firstName} ${student.lastName}`,
-          subjects,
-          overallAverage,
-        };
-      });
+        })
+      );
 
       return res.json(report);
 
     } catch (err) {
       console.error("🔥 REPORT CARD ERROR:", err);
-      res.status(500).json({ message: "Failed to load report cards" });
+
+      return res.status(500).json({
+        message: "Failed to load report cards",
+      });
     }
   }
 );
@@ -146,11 +218,15 @@ router.post(
       const termParam = req.params.term;
 
       if (Number.isNaN(classId)) {
-        return res.status(400).json({ message: "Invalid classId" });
+        return res.status(400).json({
+          message: "Invalid classId",
+        });
       }
 
       if (Array.isArray(termParam)) {
-        return res.status(400).json({ message: "Invalid term parameter" });
+        return res.status(400).json({
+          message: "Invalid term parameter",
+        });
       }
 
       const normalizedTermName = termParam
@@ -168,7 +244,9 @@ router.post(
       });
 
       if (!term) {
-        return res.status(404).json({ message: "Term not found" });
+        return res.status(404).json({
+          message: "Term not found",
+        });
       }
 
       const result = await prisma.reportCard.updateMany({
@@ -181,25 +259,28 @@ router.post(
         },
       });
 
-      const assessmentsUpdated = await prisma.assessment.updateMany({
-        where: {
-          classId,
-          termId: term.id,
-          status: "SUBMITTED",
-        },
-        data: {
-          status: "SUBMITTED",
-        },
-      });
+      const assessmentsUpdated =
+        await prisma.assessment.updateMany({
+          where: {
+            classId,
+            termId: term.id,
+            status: "SUBMITTED",
+          },
+          data: {
+            status: "SUBMITTED",
+          },
+        });
 
       return res.json({
         message: "Report cards published successfully",
         updated: result.count,
-        assessmentsUpdated: assessmentsUpdated.count,
+        assessmentsUpdated:
+          assessmentsUpdated.count,
       });
 
     } catch (err) {
       console.error("❌ PUBLISH ERROR:", err);
+
       return res.status(500).json({
         message: "Failed to publish report cards",
       });
@@ -220,43 +301,60 @@ router.get(
     const user = req.user!;
 
     const student = await prisma.student.findFirst({
-      where: { userId: user.id },
-      select: { id: true },
+      where: {
+        userId: user.id,
+      },
+      select: {
+        id: true,
+      },
     });
 
     if (!student) {
-      return res.status(404).json({ message: "Student record not found" });
+      return res.status(404).json({
+        message: "Student record not found",
+      });
     }
 
     const termIdRaw = req.query.termId;
 
     if (typeof termIdRaw !== "string") {
-      return res.status(400).json({ message: "termId is required" });
+      return res.status(400).json({
+        message: "termId is required",
+      });
     }
 
     const termId = Number(termIdRaw);
 
     if (Number.isNaN(termId)) {
-      return res.status(400).json({ message: "Invalid termId" });
+      return res.status(400).json({
+        message: "Invalid termId",
+      });
     }
 
-    const reportCard = await prisma.reportCard.findUnique({
-      where: {
-        studentId_termId: {
-          studentId: student.id,
-          termId,
+    const reportCard =
+      await prisma.reportCard.findUnique({
+        where: {
+          studentId_termId: {
+            studentId: student.id,
+            termId,
+          },
         },
-      },
-      include: {
-        subjects: {
-          include: { subject: true },
+        include: {
+          subjects: {
+            include: {
+              subject: true,
+            },
+          },
+          term: true,
+          class: true,
         },
-        term: true,
-        class: true,
-      },
-    });
+      });
 
-    if (!reportCard || reportCard.status !== ReportCardStatus.PUBLISHED) {
+    if (
+      !reportCard ||
+      reportCard.status !==
+        ReportCardStatus.PUBLISHED
+    ) {
       return res.status(404).json({
         message: "Report card not available",
       });
@@ -276,30 +374,41 @@ router.get(
   authenticate,
   requireRole([Role.PARENT]),
   async (req, res) => {
-    const parentId = String(req.user!.id); // ✅ FIXED
+    const parentId = String(req.user!.id);
 
-    const links = await prisma.parentStudent.findMany({
-      where: { parentId }, // ✅ FIXED
-      select: { studentId: true },
-    });
+    const links =
+      await prisma.parentStudent.findMany({
+        where: {
+          parentId,
+        },
+        select: {
+          studentId: true,
+        },
+      });
 
     if (links.length === 0) {
       return res.json([]);
     }
 
-    const studentIds = links.map((l) => l.studentId);
+    const studentIds = links.map(
+      (l) => l.studentId
+    );
 
-    const reportCards = await prisma.reportCard.findMany({
-      where: {
-        studentId: { in: studentIds },
-        status: ReportCardStatus.PUBLISHED,
-      },
-      include: {
-        student: true,
-        class: true,
-        term: true,
-      },
-    });
+    const reportCards =
+      await prisma.reportCard.findMany({
+        where: {
+          studentId: {
+            in: studentIds,
+          },
+          status:
+            ReportCardStatus.PUBLISHED,
+        },
+        include: {
+          student: true,
+          class: true,
+          term: true,
+        },
+      });
 
     res.json(reportCards);
   }
@@ -323,35 +432,47 @@ router.get(
       });
     }
 
-    const reportCard = await prisma.reportCard.findUnique({
-      where: { id },
-      include: {
-        subjects: {
-          include: { subject: true },
+    const reportCard =
+      await prisma.reportCard.findUnique({
+        where: {
+          id,
         },
-        student: true,
-        class: true,
-        term: true,
-      },
-    });
+        include: {
+          subjects: {
+            include: {
+              subject: true,
+            },
+          },
+          student: true,
+          class: true,
+          term: true,
+        },
+      });
 
-    if (!reportCard || reportCard.status !== ReportCardStatus.PUBLISHED) {
+    if (
+      !reportCard ||
+      reportCard.status !==
+        ReportCardStatus.PUBLISHED
+    ) {
       return res.status(404).json({
         message: "Report card not available",
       });
     }
 
     if (req.user!.role === Role.PARENT) {
-      const link = await prisma.parentStudent.findFirst({
-        where: {
-          parentId: String(req.user!.id), // ✅ FIXED
-          studentId: reportCard.studentId,
-        },
-      });
+      const link =
+        await prisma.parentStudent.findFirst({
+          where: {
+            parentId: String(req.user!.id),
+            studentId:
+              reportCard.studentId,
+          },
+        });
 
       if (!link) {
         return res.status(403).json({
-          message: "You are not allowed to view this report card",
+          message:
+            "You are not allowed to view this report card",
         });
       }
     }

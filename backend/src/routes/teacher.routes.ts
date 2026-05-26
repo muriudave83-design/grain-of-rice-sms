@@ -172,9 +172,13 @@ router.get("/terms/:classId", async (req, res) => {
 
     // ✅ STEP 2 — FETCH TERMS
     const terms = await prisma.term.findMany({
-      where: { classId },
-      orderBy: { createdAt: "asc" },
+      orderBy: [
+        { academicYear: "asc" },
+        { createdAt: "asc" },
+      ],
     });
+
+    console.log("📚 GLOBAL TERMS:", terms);
 
     // ✅ STEP 3 — AUTO-CREATE IF EMPTY
     if (terms.length === 0) {

@@ -20,6 +20,9 @@ const teacherDashboard = async (req, res) => {
         if (!user) {
             return res.status(401).json({ message: "Not authenticated" });
         }
+        const termId = req.query.termId
+            ? Number(req.query.termId)
+            : null;
         // Subjects owned by teacher
         const subjects = await prisma.subject.findMany({
             where: { teacherId: user.id },
@@ -30,13 +33,27 @@ const teacherDashboard = async (req, res) => {
         // Students across teacher's subjects
         const studentsCount = subjectIds.length
             ? await prisma.enrollment.count({
-                where: { subjectId: { in: subjectIds } },
+                where: {
+                    subjectId: { in: subjectIds },
+                    ...(termId
+                        ? {
+                            termId,
+                        }
+                        : {}),
+                },
             })
             : 0;
         // Assessments for these subjects
         const assessments = subjectIds.length
             ? await prisma.assessment.findMany({
-                where: { subjectId: { in: subjectIds } },
+                where: {
+                    subjectId: { in: subjectIds },
+                    ...(termId
+                        ? {
+                            termId,
+                        }
+                        : {}),
+                },
                 select: { id: true },
             })
             : [];
@@ -44,19 +61,29 @@ const teacherDashboard = async (req, res) => {
         if (assessments.length > 0 && subjectIds.length > 0) {
             const assessmentIds = assessments.map((a) => a.id);
             const enrollmentsCount = await prisma.enrollment.count({
-                where: { subjectId: { in: subjectIds } },
+                where: {
+                    subjectId: { in: subjectIds },
+                    ...(termId
+                        ? {
+                            termId,
+                        }
+                        : {}),
+                },
             });
             const existingScoresCount = await prisma.assessmentScore.count({
-                where: { assessmentId: { in: assessmentIds } },
+                where: {
+                    assessmentId: { in: assessmentIds },
+                    ...(termId
+                        ? {
+                            termId,
+                        }
+                        : {}),
+                },
             });
             // Expected scores = enrollments × assessments
             const expectedScores = enrollmentsCount * assessmentIds.length;
             missingCount = Math.max(0, expectedScores - existingScoresCount);
         }
-        // ✅ Average grade across teacher's subjects (Phase 2 compliant)
-        const termId = req.query.termId
-            ? Number(req.query.termId)
-            : null;
         // ✅ Average grade across teacher's subjects (TERM AWARE)
         const avg = await prisma.grade.aggregate({
             where: {
@@ -92,12 +119,23 @@ exports.teacherDashboard = teacherDashboard;
  */
 const adminDashboard = async (req, res) => {
     try {
+        const termId = req.query.termId
+            ? Number(req.query.termId)
+            : null;
         const [students, teachers, subjects] = await Promise.all([
             prisma.student.count(),
-            prisma.user.count({ where: { role: client_1.Role.TEACHER } }),
-            prisma.subject.count(),
+            prisma.user.count({
+                where: {
+                    role: client_1.Role.TEACHER,
+                },
+            }),
+            prisma.subject.count()
         ]);
-        res.json({ students, teachers, subjects });
+        res.json({
+            students,
+            teachers,
+            subjects,
+        });
     }
     catch (err) {
         console.error("adminDashboard error:", err);

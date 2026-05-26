@@ -17,7 +17,9 @@ const getStudentTranscript = async (req, res) => {
     }
     catch (err) {
         console.error("FETCH TRANSCRIPT ERROR:", err);
-        res.status(500).json({ message: "Failed to fetch transcript" });
+        res.status(500).json({
+            message: "Failed to fetch transcript",
+        });
     }
 };
 exports.getStudentTranscript = getStudentTranscript;
@@ -52,24 +54,33 @@ exports.addContactLog = addContactLog;
 // ✅ (OPTIONAL BUT IMPORTANT) — FETCH DETAILS WITH LOGS
 const getStudentDetails = async (req, res) => {
     const studentId = Number(req.params.id);
+    const termId = Number(req.query.termId);
     try {
         // attendance count
         const attendance = await client_1.prisma.attendanceEntry.count({
             where: {
                 studentId,
                 status: "ABSENT",
+                session: {
+                    termId,
+                },
             },
         });
         const present = await client_1.prisma.attendanceEntry.count({
             where: {
                 studentId,
                 status: "PRESENT",
+                session: {
+                    termId,
+                },
             },
         });
         // logs
         const logs = await client_1.prisma.parentContactLog.findMany({
             where: { studentId },
-            orderBy: { createdAt: "desc" }, // 🔥 IMPORTANT
+            orderBy: {
+                createdAt: "desc",
+            }, // 🔥 IMPORTANT
         });
         res.json({
             present,
@@ -95,11 +106,15 @@ const updateHealth = async (req, res) => {
                 healthNotes,
             },
         });
-        res.json({ message: "Health notes updated" });
+        res.json({
+            message: "Health notes updated",
+        });
     }
     catch (err) {
         console.error("UPDATE HEALTH ERROR:", err);
-        res.status(500).json({ message: "Failed to update health notes" });
+        res.status(500).json({
+            message: "Failed to update health notes",
+        });
     }
 };
 exports.updateHealth = updateHealth;

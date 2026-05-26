@@ -10,7 +10,9 @@ const client_1 = require("../prisma/client");
 async function getTerms(req, res) {
     try {
         const terms = await client_1.prisma.term.findMany({
-            orderBy: { startDate: "desc" },
+            orderBy: {
+                createdAt: "desc",
+            },
         });
         return res.json(terms);
     }
@@ -26,20 +28,21 @@ async function getTerms(req, res) {
 async function createTerm(req, res) {
     try {
         const { name, startDate, endDate, academicYear, classId, } = req.body;
-        if (!name ||
-            !startDate ||
-            !endDate ||
-            !academicYear) {
+        if (!name || !academicYear) {
             return res.status(400).json({
-                message: "All fields are required",
+                message: "Name and academic year are required",
             });
         }
         const term = await client_1.prisma.term.create({
             data: {
                 name,
-                academicYear,
-                startDate: new Date(startDate),
-                endDate: new Date(endDate),
+                academicYear: String(academicYear),
+                ...(startDate && {
+                    startDate: new Date(startDate),
+                }),
+                ...(endDate && {
+                    endDate: new Date(endDate),
+                }),
                 ...(classId && {
                     classId: Number(classId),
                 }),
@@ -48,7 +51,7 @@ async function createTerm(req, res) {
         return res.status(201).json(term);
     }
     catch (error) {
-        console.error(error);
+        console.error("CREATE TERM ERROR:", error);
         return res.status(500).json({
             message: "Failed to create term",
             error: error.message,
@@ -130,8 +133,30 @@ async function updateTerm(req, res) {
 async function deleteTerm(req, res) {
     try {
         const id = Number(req.params.id);
+        const existingAttendance = await client_1.prisma.attendanceSession.findFirst({
+            where: {
+                termId: id,
+            },
+        });
+        if (existingAttendance) {
+            return res.status(400).json({
+                message: "Cannot delete term with attendance records.",
+            });
+        }
+        const existingReports = await client_1.prisma.reportCard.findFirst({
+            where: {
+                termId: id,
+            },
+        });
+        if (existingReports) {
+            return res.status(400).json({
+                message: "Cannot delete term with report cards.",
+            });
+        }
         await client_1.prisma.term.delete({
-            where: { id },
+            where: {
+                id,
+            },
         });
         return res.json({
             success: true,

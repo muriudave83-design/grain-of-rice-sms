@@ -19,11 +19,9 @@ const checkSystemLock = async (res) => {
 const getDiscipline = async (req, res) => {
     const termId = Number(req.query.termId);
     const data = await prisma_1.default.discipline.findMany({
-        where: termId
-            ? {
-                termId,
-            }
-            : undefined,
+        where: {
+            termId,
+        },
         include: {
             student: true,
             term: true,
@@ -38,7 +36,7 @@ const addDiscipline = async (req, res) => {
     // 🔒 LOCK CHECK
     if (await checkSystemLock(res))
         return;
-    if (!studentId || !type) {
+    if (!studentId || !type || !termId) {
         return res.status(400).json({ error: "Missing fields" });
     }
     const record = await prisma_1.default.discipline.create({
@@ -46,7 +44,7 @@ const addDiscipline = async (req, res) => {
             studentId: Number(studentId),
             type,
             notes: note || "",
-            termId: termId ? Number(termId) : null,
+            termId: Number(termId),
         },
     });
     res.json(record);

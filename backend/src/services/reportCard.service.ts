@@ -116,18 +116,30 @@ export async function generateReportCardsForClass({
         throw new Error("Term not found");
       }
 
-      const attendanceAbsent = await tx.attendanceEntry.count({
+      const attendanceRecords = await tx.attendanceEntry.findMany({
         where: {
           studentId: student.id,
-          status: "ABSENT",
           session: {
             date: {
-              gte: term.startDate,
-              lte: term.endDate,
+              gte: new Date(term.startDate),
+              lte: new Date(term.endDate),
             },
           },
         },
+        include: {
+          session: true,
+        },
       });
+
+      console.log("📅 TERM:", term.name);
+      console.log("📅 START:", term.startDate);
+      console.log("📅 END:", term.endDate);
+      console.log("👨 STUDENT:", student.id);
+      console.log("📊 ATTENDANCE FOUND:", attendanceRecords.length);
+
+      const attendanceAbsent = attendanceRecords.filter(
+        (a) => a.status === "ABSENT"
+      ).length;
 
       console.log(
         `📅 Student ${student.id} absent days:`,

@@ -498,8 +498,9 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
     res.status(500).json({ error: "Bulk update failed" });
   }
 };
+
 //
-// 🧾 REPORTS — NOW TERM-AWARE ✅
+// 🧾 REPORTS — NOW TERM-AWARE + ATTENDANCE ✅
 //
 
 export const getReportData = async (req: Request, res: Response) => {
@@ -523,10 +524,16 @@ export const getReportData = async (req: Request, res: Response) => {
 
     const teacherId = (req as any).user.id;
 
+    /**
+     * STUDENTS
+     */
     const students = await prisma.student.findMany({
       where: { classId },
     });
 
+    /**
+     * SUBJECTS + ASSIGNMENTS
+     */
     const subjects = await prisma.teacherSubject.findMany({
       where: {
         classId,
@@ -543,50 +550,130 @@ export const getReportData = async (req: Request, res: Response) => {
       },
     });
 
+    /**
+     * COMMENTS
+     */
     const comments = await prisma.reportComment.findMany({
       where: {
         student: { classId },
       },
     });
 
-    const result = students.map((student) => {
-      const subjectResults = subjects.map((ts) => {
-        const assignments = ts.assignments ?? [];
-
-        // 🔥 Uses UPDATED grading logic (maxPoints already handled)
-        const avg = calculateFinalGradeForStudent(
-          student.id,
-          assignments
-        );
-
-        const letter = getLetterGrade(avg);
-
-        const commentObj = comments.find(
-          (c) =>
-            c.studentId === student.id &&
-            c.teacherSubjectId === ts.id
-        );
-
-        return {
-          teacherSubjectId: ts.id,
-          subjectName: ts.subject.name,
-          finalGrade: Number(avg.toFixed(1)),
-          letter,
-          comment: commentObj?.comment || "",
-        };
-      });
-
-      return {
-        studentId: student.id,
-        name: `${student.firstName} ${student.lastName}`,
-        subjects: subjectResults,
-      };
+    /**
+     * TERM
+     */
+    const term = await prisma.term.findUnique({
+      where: { id: termId },
     });
 
+    if (!term) {
+      return res.status(404).json({
+        error: "Term not found",
+      });
+    }
+
+    /**
+     * BUILD REPORTS
+     */
+    const result = await Promise.all(
+      students.map(async (student) => {
+
+        /**
+         * SUBJECT RESULTS
+         */
+        const subjectResults = subjects.map((ts) => {
+          const assignments = ts.assignments ?? [];
+
+          const avg = calculateFinalGradeForStudent(
+            student.id,
+            assignments
+          );
+
+          const letter = getLetterGrade(avg);
+
+          const commentObj = comments.find(
+            (c) =>
+              c.studentId === student.id &&
+              c.teacherSubjectId === ts.id
+          );
+
+          return {
+            teacherSubjectId: ts.id,
+            subjectName: ts.subject.name,
+            finalGrade: Number(avg.toFixed(1)),
+            letter,
+            comment: commentObj?.comment || "",
+          };
+        });
+
+        /**
+         * ATTENDANCE
+         */
+        const attendanceEntries =
+          await prisma.attendanceEntry.findMany({
+            where: {
+              studentId: student.id,
+              session: {
+                date: {
+                  gte: new Date(term.startDate),
+                  lte: new Date(term.endDate),
+                },
+              },
+            },
+            include: {
+              session: true,
+            },
+          });
+
+        console.log(
+          "📊 ATTENDANCE FOR STUDENT:",
+          student.id,
+          attendanceEntries.length
+        );
+
+        const present = attendanceEntries.filter(
+          (a) => a.status === "PRESENT"
+        ).length;
+
+        const absent = attendanceEntries.filter(
+          (a) => a.status === "ABSENT"
+        ).length;
+
+        const late = attendanceEntries.filter(
+          (a) => a.status === "LATE"
+        ).length;
+
+        const totalAttendance =
+          present + absent + late;
+
+        const attendanceRate =
+          totalAttendance > 0
+            ? Math.round(
+                (present / totalAttendance) * 100
+              )
+            : 0;
+
+        return {
+          studentId: student.id,
+          name: `${student.firstName} ${student.lastName}`,
+          subjects: subjectResults,
+
+          present,
+          absent,
+          late,
+          attendanceRate,
+        };
+      })
+    );
+
     res.json(result);
+
   } catch (err) {
     console.error("REPORT ERROR FULL STACK:", err);
-    res.status(500).json({ error: "Failed to generate report" });
+
+    res.status(500).json({
+      error: "Failed to generate report",
+    });
   }
 };
 
