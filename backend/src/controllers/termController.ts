@@ -11,9 +11,92 @@ export async function getTerms(
       orderBy: {
         createdAt: "desc",
       },
+
+      include: {
+        assignments: {
+          select: { id: true },
+        },
+
+        grades: {
+          select: { id: true },
+        },
+
+        attendanceSessions: {
+          select: { id: true },
+        },
+
+        reportCards: {
+          select: { id: true },
+        },
+
+        reportComments: {
+          select: { id: true },
+        },
+
+        discipline: {
+          select: { id: true },
+        },
+
+        transcripts: {
+          select: { id: true },
+        },
+
+        assessments: {
+          select: { id: true },
+        },
+
+        class: true,
+      },
     });
 
-    return res.json(terms);
+    const formattedTerms = terms.map((term) => {
+      const usageCount =
+        term.assignments.length +
+        term.grades.length +
+        term.attendanceSessions.length +
+        term.reportCards.length +
+        term.reportComments.length +
+        term.discipline.length +
+        term.transcripts.length +
+        term.assessments.length;
+
+      return {
+        ...term,
+
+        hasAcademicData:
+          usageCount > 0,
+
+        usageCount,
+
+        stats: {
+          assignments:
+            term.assignments.length,
+
+          grades:
+            term.grades.length,
+
+          attendance:
+            term.attendanceSessions.length,
+
+          reports:
+            term.reportCards.length,
+
+          comments:
+            term.reportComments.length,
+
+          discipline:
+            term.discipline.length,
+
+          transcripts:
+            term.transcripts.length,
+
+          assessments:
+            term.assessments.length,
+        },
+      };
+    });
+
+    return res.json(formattedTerms);
 
   } catch (error: any) {
     console.error(error);
@@ -191,31 +274,74 @@ export async function deleteTerm(
   try {
     const id = Number(req.params.id);
 
-    const existingAttendance =
-      await prisma.attendanceSession.findFirst({
-        where: {
-          termId: id,
-        },
-      });
+    const [
+      assignments,
+      grades,
+      attendance,
+      reportCards,
+      reportComments,
+      discipline,
+      transcripts,
+      assessments,
+    ] = await Promise.all([
+      prisma.assignment.count({
+        where: { termId: id },
+      }),
 
-    if (existingAttendance) {
+      prisma.grade.count({
+        where: { termId: id },
+      }),
+
+      prisma.attendanceSession.count({
+        where: { termId: id },
+      }),
+
+      prisma.reportCard.count({
+        where: { termId: id },
+      }),
+
+      prisma.reportComment.count({
+        where: { termId: id },
+      }),
+
+      prisma.discipline.count({
+        where: { termId: id },
+      }),
+
+      prisma.transcript.count({
+        where: { termId: id },
+      }),
+
+      prisma.assessment.count({
+        where: { termId: id },
+      }),
+    ]);
+
+    const totalUsage =
+      assignments +
+      grades +
+      attendance +
+      reportCards +
+      reportComments +
+      discipline +
+      transcripts +
+      assessments;
+
+    if (totalUsage > 0) {
       return res.status(400).json({
         message:
-          "Cannot delete term with attendance records.",
-      });
-    }
+          "Cannot delete term because it contains academic records. Archive the term instead.",
 
-    const existingReports =
-      await prisma.reportCard.findFirst({
-        where: {
-          termId: id,
+        stats: {
+          assignments,
+          grades,
+          attendance,
+          reportCards,
+          reportComments,
+          discipline,
+          transcripts,
+          assessments,
         },
-      });
-
-    if (existingReports) {
-      return res.status(400).json({
-        message:
-          "Cannot delete term with report cards.",
       });
     }
 
