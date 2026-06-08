@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-
+const API_URL = import.meta.env.VITE_API_URL;
 export default function TermManagement() {
   const [terms, setTerms] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -25,7 +25,7 @@ export default function TermManagement() {
     try {
       const token = localStorage.getItem("token");
 
-      const res = await fetch("/api/terms", {
+      const res = await fetch(`${API_URL}/terms`, {
         credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -50,7 +50,7 @@ export default function TermManagement() {
     try {
       const token = localStorage.getItem("token");
 
-      const res = await fetch("/api/admin/classes", {
+      const res = await fetch(`${API_URL}/admin/classes`, {
         credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -76,7 +76,7 @@ export default function TermManagement() {
       const token = localStorage.getItem("token");
 
       const validation = await fetch(
-        `/api/terms/validate?classId=${form.classId}&term=${form.name}`,
+          `${API_URL}/terms/validate?classId=${form.classId}&term=${form.name}`,
         {
           credentials: "include",
           headers: {
@@ -92,7 +92,7 @@ export default function TermManagement() {
         return;
       }
 
-      const res = await fetch("/api/terms", {
+      const res = await fetch(`${API_URL}/terms`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -137,7 +137,7 @@ export default function TermManagement() {
     try {
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`/api/terms/${id}`, {
+      const res = await fetch(`${API_URL}/terms/${id}`, {
         method: "PUT",
         credentials: "include",
         headers: {
@@ -175,7 +175,7 @@ export default function TermManagement() {
     try {
       const token = localStorage.getItem("token");
 
-      await fetch(`/api/terms/${id}/lock`, {
+      await fetch(`${API_URL}/terms/${id}/lock`, {
         method: "PUT",
         credentials: "include",
         headers: {
@@ -189,29 +189,45 @@ export default function TermManagement() {
     }
   }
 
-  async function deleteTerm(id) {
-    const confirmed = window.confirm(
-      "Delete this term?"
-    );
+async function deleteTerm(id) {
+  const confirmed = window.confirm(
+    "Delete this term?"
+  );
 
-    if (!confirmed) return;
+  if (!confirmed) return;
 
-    try {
-      const token = localStorage.getItem("token");
+  try {
+    const token = localStorage.getItem("token");
 
-      await fetch(`/api/terms/${id}`, {
+    const res = await fetch(
+      `${API_URL}/terms/${id}`,
+      {
         method: "DELETE",
         credentials: "include",
         headers: {
           Authorization: `Bearer ${token}`,
         },
-      });
+      }
+    );
 
-      fetchTerms();
-    } catch (err) {
-      console.error(err);
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(
+        data.message ||
+          "Failed to delete term"
+      );
+      return;
     }
+
+    alert("Term deleted successfully");
+
+    fetchTerms();
+  } catch (err) {
+    console.error(err);
+    alert("Delete failed");
   }
+}
 
   useEffect(() => {
     fetchTerms();

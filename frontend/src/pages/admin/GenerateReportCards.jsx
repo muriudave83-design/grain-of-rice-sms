@@ -3,6 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export default function GenerateReportCards() {
   const [termId, setTermId] = useState("");
   const [classId, setClassId] = useState("");
@@ -11,7 +13,7 @@ export default function GenerateReportCards() {
   const [result, setResult] = useState(null);
 
   async function generate() {
-    const res = await fetch("/api/report-cards/generate", {
+    const res = await fetch(`${API_URL}/report-cards/generate`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -21,6 +23,7 @@ export default function GenerateReportCards() {
         options: { force, strict },
       }),
     });
+
     const data = await res.json();
     setResult(data);
   }
@@ -30,10 +33,17 @@ export default function GenerateReportCards() {
       <h1 className="text-xl font-semibold">Generate Report Cards</h1>
 
       <div className="grid grid-cols-2 gap-4">
-        <Input placeholder="Term ID" value={termId}
-          onChange={e => setTermId(e.target.value)} />
-        <Input placeholder="Class ID" value={classId}
-          onChange={e => setClassId(e.target.value)} />
+        <Input
+          placeholder="Term ID"
+          value={termId}
+          onChange={(e) => setTermId(e.target.value)}
+        />
+
+        <Input
+          placeholder="Class ID"
+          value={classId}
+          onChange={(e) => setClassId(e.target.value)}
+        />
       </div>
 
       <div className="flex gap-6 items-center">
