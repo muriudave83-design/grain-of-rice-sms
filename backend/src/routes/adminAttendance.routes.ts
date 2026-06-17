@@ -110,6 +110,10 @@ router.get("/by-class", async (req, res) => {
     tomorrow.setDate(tomorrow.getDate() + 1)
 
     const classes = await prisma.class.findMany({
+      where: {
+        isArchived: false,
+      },
+
       include: {
         students: {
           include: {
