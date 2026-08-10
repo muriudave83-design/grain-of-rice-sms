@@ -13,6 +13,7 @@ import {
 // ✅ NEW IMPORT (CSV)
 import Papa from "papaparse";
 import { rankStudents } from "../../utils/ranking";
+import { formatGrade } from "../../utils/grading";
 
 export default function GradebookDetail() {
   console.log("🔥 REAL GRADEBOOK DETAIL FILE");
@@ -1150,7 +1151,7 @@ useEffect(() => {
                       grade
                     )}`}
                   >
-                    {grade}
+                    {formatGrade(grade)}
                   </td>
 
                   <td className="border p-2 font-semibold text-center">

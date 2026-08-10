@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
+import { getGradeDescription } from "../utils/gradeDescriptions";
 import { AssessmentType } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -602,6 +603,7 @@ export const getReportData = async (req: Request, res: Response) => {
             subjectName: ts.subject.name,
             finalGrade: Number(avg.toFixed(1)),
             letter,
+            gradeDescription: getGradeDescription(letter),
             comment: commentObj?.comment || "",
           };
         });

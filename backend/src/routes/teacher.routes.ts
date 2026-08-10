@@ -3,6 +3,7 @@ import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
 import prisma from "../prisma";
 import { generateTranscripts } from "../controllers/teacher.controller";
+import { getGradeDescription } from "../utils/gradeDescriptions";
 
 import {
   getTeacherSubjects,
@@ -92,14 +93,16 @@ router.get("/final-grades/:classId", async (req, res) => {
         if (grade >= 70) return "B";
         if (grade >= 60) return "C";
         if (grade >= 50) return "D";
-        return "E";
+        return "F";
       };
 
+      const letter = getLetter(rounded);
       return {
         studentId: student.studentId,
         name: student.name,
         average: rounded,
-        letter: getLetter(rounded),
+        letter,
+        gradeDescription: getGradeDescription(letter),
       };
     });
 

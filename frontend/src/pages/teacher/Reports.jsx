@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import apiClient from "../../services/apiClient";
 import BackButton from "../../components/BackButton";
+import { formatGrade } from "../../utils/grading";
 
 export default function Reports() {
   const [classId, setClassId] = useState("");
@@ -343,7 +344,7 @@ export default function Reports() {
                           {sub.finalGrade}%
                         </span>
 
-                        <span>{sub.letter}</span>
+                        <span>{formatGrade(sub.letter)}</span>
                       </div>
                     );
                   })}

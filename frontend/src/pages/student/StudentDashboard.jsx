@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "@/services/apiClient";
+import { formatGrade } from "@/utils/grading";
 
 const StudentDashboard = () => {
   const [student, setStudent] = useState(null);
@@ -109,7 +110,7 @@ const StudentDashboard = () => {
           }}
         >
           <h4>Grade</h4>
-          <p>{student?.overallGrade ?? "N/A"}</p>
+          <p>{formatGrade(student?.overallGrade, "N/A")}</p>
         </div>
       </div>
 

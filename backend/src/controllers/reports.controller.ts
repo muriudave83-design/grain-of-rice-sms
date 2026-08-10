@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
 import { Prisma } from "@prisma/client";
+import { getGradeDescription } from "../utils/gradeDescriptions";
 
 type TeacherSubjectWithRelations = Prisma.TeacherSubjectGetPayload<{
   include: {
@@ -185,11 +186,13 @@ export const getStudentReport = async (
             },
           });
 
+        const grade = getGrade(avg);
         return {
           teacherSubjectId: ts.id,
           subject: ts.subject.name,
           average: Number(avg.toFixed(1)),
-          grade: getGrade(avg),
+          grade,
+          gradeDescription: getGradeDescription(grade),
           position,
           totalStudents:
             studentAverages.length,

@@ -1,10 +1,11 @@
 import React from "react";
+import { formatGrade } from "@/utils/grading";
 import AdminLayout from "../../components/layout/AdminLayout";
 
 export default function GradesPage() {
   const mock = [
-    { id: 1, student: "Student A", exam: "Midterm", grade: "B+" },
-    { id: 2, student: "Student B", exam: "Final", grade: "A-" },
+    { id: 1, student: "Student A", exam: "Midterm", grade: "B" },
+    { id: 2, student: "Student B", exam: "Final", grade: "A" },
   ];
 
   return (
@@ -35,7 +36,7 @@ export default function GradesPage() {
                 <tr key={g.id} className="border-t">
                   <td className="p-3">{g.student}</td>
                   <td className="p-3">{g.exam}</td>
-                  <td className="p-3">{g.grade}</td>
+                  <td className="p-3">{formatGrade(g.grade)}</td>
                   <td className="p-3">
                     <button className="text-blue-600 text-xs mr-2">View</button>
                     <button className="text-green-600 text-xs mr-2">Edit</button>

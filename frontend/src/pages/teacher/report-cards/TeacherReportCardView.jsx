@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "@/services/apiClient";
 import AddComment from "./AddComment";
+import { formatGrade, getLetterGrade } from "@/utils/grading";
 
 export default function TeacherReportCardView() {
   const { id } = useParams();
@@ -52,6 +53,7 @@ export default function TeacherReportCardView() {
           <tr className="border-b">
             <th className="text-left py-2">Subject</th>
             <th className="text-left py-2">Final Score</th>
+            <th className="text-left py-2">Grade / Performance</th>
           </tr>
         </thead>
         <tbody>
@@ -59,6 +61,9 @@ export default function TeacherReportCardView() {
             <tr key={s.subjectId} className="border-b">
               <td className="py-2">{s.subject?.name}</td>
               <td className="py-2">{s.finalScore ?? "-"}</td>
+              <td className="py-2">
+                {formatGrade(getLetterGrade(s.finalScore ?? s.average))}
+              </td>
             </tr>
           ))}
         </tbody>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "@/services/apiClient";
 import { Link } from "react-router-dom";
+import { formatGrade } from "@/utils/grading";
 import { useAuth } from "@/context/AuthContext"; // ✅ IMPORT
 
 const ParentDashboard = () => {
@@ -72,7 +73,7 @@ const ParentDashboard = () => {
                 Overall Grade:{" "}
                 <span className="font-medium">
                   {child.overallGrade !== "N/A"
-                    ? child.overallGrade
+                    ? formatGrade(child.overallGrade, "-")
                     : "-"}
                 </span>
               </p>

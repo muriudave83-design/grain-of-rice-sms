@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 
 /* ------------------------------------------------------------------ */
 /* TEMP stub — Phase 9 Notifications not implemented yet               */
-/* Notifications must never block domain logic                          */
+/* Notifications must never block domain logic                         */
 /* ------------------------------------------------------------------ */
 const NotificationService = {
   emitEvent: (..._args: any[]) => {},
@@ -39,7 +39,7 @@ export class AttendanceSessionService {
         }
 
         /* ---------------------------------------------------- */
-        /* Prevent multiple attendance sessions per day         */
+        /* Prevent duplicate attendance sessions                 */
         /* ---------------------------------------------------- */
         const today = new Date(date);
         today.setHours(0, 0, 0, 0);
@@ -75,7 +75,6 @@ export class AttendanceSessionService {
         });
       });
     } catch (error: any) {
-      // Handle database unique constraint race condition
       if (error.code === "P2002") {
         throw {
           status: 409,
@@ -118,7 +117,6 @@ export class AttendanceSessionService {
         data: { status: AttendanceSessionStatus.SUBMITTED },
       });
 
-      // ✅ AUDIT: Attendance session submitted
       await createAuditLog({
         action: AuditAction.ATTENDANCE_SUBMITTED,
         entityType: "AttendanceSession",
@@ -131,7 +129,6 @@ export class AttendanceSessionService {
         },
       });
 
-      // 🔔 Domain notification (non-blocking)
       try {
         NotificationService.emitEvent({
           name: "attendance.submit",

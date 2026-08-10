@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import apiClient from "../../services/apiClient";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import BackButton from "../../components/BackButton";
+import { formatGrade } from "../../utils/grading";
 
 export default function FinalGrades() {
   const { classId } = useParams();
@@ -123,7 +124,7 @@ export default function FinalGrades() {
                       textAlign: "center",
                     }}
                   >
-                    {grade}
+                    {formatGrade(grade, "-")}
                   </td>
 
                   <td style={{ ...tdStyle, textAlign: "center" }}>

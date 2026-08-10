@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "@/services/apiClient";
+import { formatGrade } from "@/utils/grading";
 
 // ✅ Grade function
 function getGrade(avg) {
@@ -238,7 +239,7 @@ export default function ClassReportCards() {
                               : `${Math.round(subj.average)}%`}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {subj.grade}
+                            {formatGrade(subj.grade)}
                           </div>
                         </div>
                       ) : (
@@ -261,7 +262,7 @@ export default function ClassReportCards() {
                 </td>
 
                 <td className="py-2 px-2 font-bold">
-                  {getGrade(student.average)}
+                  {formatGrade(getGrade(student.average))}
                 </td>
               </tr>
             ))}

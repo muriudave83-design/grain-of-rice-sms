@@ -6,6 +6,7 @@
 console.log("🔥 reportCardRoutes.ts LOADED");
 
 import { Router } from "express";
+import { getGradeDescription } from "../utils/gradeDescriptions";
 import { prisma } from "../prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
@@ -29,7 +30,7 @@ function getGrade(avg: number) {
   if (avg >= 0.7) return "B";
   if (avg >= 0.6) return "C";
   if (avg >= 0.5) return "D";
-  return "E";
+  return "F";
 }
 
 /**
@@ -209,6 +210,7 @@ router.get(
             (normalizedAverage * 100).toFixed(2)
           ),
           grade: getGrade(normalizedAverage),
+          gradeDescription: getGradeDescription(getGrade(normalizedAverage)),
         });
       }
 
@@ -223,6 +225,7 @@ router.get(
           (overallAverage * 100).toFixed(2)
         ),
         overallGrade: getGrade(overallAverage),
+        overallGradeDescription: getGradeDescription(getGrade(overallAverage)),
       });
 
     } catch (err) {
@@ -456,6 +459,7 @@ router.get(
           ),
 
           grade: getGrade(normalizedAverage),
+          gradeDescription: getGradeDescription(getGrade(normalizedAverage)),
         });
       }
 
@@ -473,6 +477,7 @@ router.get(
         ),
 
         overallGrade: getGrade(overallAverage),
+        overallGradeDescription: getGradeDescription(getGrade(overallAverage)),
       });
 
     } catch (err) {
@@ -686,6 +691,7 @@ router.get(
             ),
 
             grade: getGrade(normalizedAverage),
+            gradeDescription: getGradeDescription(getGrade(normalizedAverage)),
           });
         }
 
@@ -706,6 +712,7 @@ router.get(
           ),
 
           overallGrade: getGrade(overallAverage),
+          overallGradeDescription: getGradeDescription(getGrade(overallAverage)),
         });
       }
 

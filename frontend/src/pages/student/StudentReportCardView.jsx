@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../services/apiClient";
+import { formatGrade } from "../../utils/grading";
 
 export default function StudentReportCardView() {
   const { studentId } = useParams();
@@ -147,7 +148,7 @@ export default function StudentReportCardView() {
               </td>
 
               <td style={td}>
-                {getGrade(subj.average)}
+                {formatGrade(getGrade(subj.average))}
               </td>
 
               {/* ✅ SAFE POSITION */}
@@ -169,7 +170,7 @@ export default function StudentReportCardView() {
 
       <div>
         <strong>Overall Grade:</strong>{" "}
-        {getGrade(overall)}
+        {formatGrade(getGrade(overall))}
       </div>
 
       {/* ✅ SAFE OVERALL POSITION */}

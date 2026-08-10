@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import apiClient from "../../services/apiClient";
+import { formatGrade } from "../../utils/grading";
 
 export default function TeacherStudentDetails() {
   const { id } = useParams();
@@ -135,7 +136,7 @@ export default function TeacherStudentDetails() {
           <div style={card}>
             <div style={label}>Grade</div>
             <div style={value}>
-              {calculateGrade(calculateAverage(data))}
+              {formatGrade(calculateGrade(calculateAverage(data)))}
             </div>
           </div>
         </div>
@@ -206,7 +207,7 @@ export default function TeacherStudentDetails() {
 
                     <td style={td}>
                       <span style={gradeBadge}>
-                        {getGrade(score)}
+                        {formatGrade(getGrade(score))}
                       </span>
                     </td>
                   </tr>
