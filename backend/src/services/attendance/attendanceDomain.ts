@@ -31,6 +31,18 @@ export function isAbsentForDay(entries: Pick<AttendanceFact, "period" | "status"
     afternoon?.status === AttendanceStatus.ABSENT;
 }
 
+export function summarizeCurrentAttendance(
+  entries: Pick<AttendanceFact, "period" | "status">[],
+) {
+  const marked = entries.length > 0;
+  const absent = marked && isAbsentForDay(entries);
+  return {
+    marked,
+    absent,
+    present: marked && !absent,
+  };
+}
+
 export function countAbsentDays(entries: AttendanceFact[]): number {
   const byDate = new Map<string, AttendanceFact[]>();
   for (const entry of entries) {

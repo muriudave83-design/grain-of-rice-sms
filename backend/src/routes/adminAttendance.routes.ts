@@ -1,8 +1,7 @@
 import express from "express"
 import { PrismaClient } from "@prisma/client"
 import { markAttendance, startAfternoonAttendance } from "../controllers/attendance/markAttendance.controller"
-import { statusesByPeriod } from "../services/attendance/attendanceDomain"
-import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain"
+import { statusesByPeriod, summarizeCurrentAttendance } from "../services/attendance/attendanceDomain"
 import { getAttendanceReport } from "../controllers/attendance.controller"
 
 // 🔐 AUTH & RBAC
@@ -27,7 +26,8 @@ GET /admin/attendance/summary
 router.get("/summary", async (req, res) => {
   try {
     const selectedDate = req.query.date as string | undefined
-    const termId = Number(req.query.termId)
+    const requestedTermId = Number(req.query.termId)
+    const termId = Number.isInteger(requestedTermId) ? requestedTermId : undefined
 
     const today = selectedDate
       ? new Date(selectedDate)
@@ -38,7 +38,9 @@ router.get("/summary", async (req, res) => {
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
 
-    const totalStudents = await prisma.student.count()
+    const totalStudents = await prisma.student.count({
+      where: { isArchived: false },
+    })
 
     const todayEntries = await prisma.attendanceEntry.findMany({
       where: {
@@ -47,8 +49,9 @@ router.get("/summary", async (req, res) => {
             gte: today,
             lt: tomorrow
           },
-          termId
-        }
+          ...(termId !== undefined ? { termId } : {}),
+        },
+        student: { isArchived: false },
       },
       select: {
         studentId: true,
@@ -65,13 +68,9 @@ router.get("/summary", async (req, res) => {
     let absent = 0
 
     byStudent.forEach(entries => {
-      const daily = summarizeAttendanceDays(entries.map(entry => ({
-        period: entry.period,
-        status: entry.status,
-        date: entry.session.date,
-      })))
+      const daily = summarizeCurrentAttendance(entries)
       if (daily.absent) absent++
-      else if (daily.completedDays) present++
+      else if (daily.present) present++
     })
 
     const attendanceRate =
@@ -102,7 +101,8 @@ GET /admin/attendance/by-class
 router.get("/by-class", async (req, res) => {
   try {
     const selectedDate = req.query.date as string | undefined
-    const termId = Number(req.query.termId)
+    const requestedTermId = Number(req.query.termId)
+    const termId = Number.isInteger(requestedTermId) ? requestedTermId : undefined
 
     const today = selectedDate
       ? new Date(selectedDate)
@@ -120,12 +120,14 @@ router.get("/by-class", async (req, res) => {
 
       include: {
         students: {
+          where: { isArchived: false },
           include: {
             attendanceEntries: {
               where: {
                 session: {
-                  termId
-                }
+                  date: { gte: today, lt: tomorrow },
+                  ...(termId !== undefined ? { termId } : {}),
+                },
               },
               include: {
                 session: true
@@ -144,18 +146,11 @@ router.get("/by-class", async (req, res) => {
       let late = 0
 
       students.forEach(student => {
-        const entries = student.attendanceEntries.filter(entry => {
-          const date = new Date(entry.session.date)
-          return date >= today && date < tomorrow
-        })
-        const daily = summarizeAttendanceDays(entries.map(entry => ({
-          period: entry.period,
-          status: entry.status,
-          date: entry.session.date,
-        })))
+        const entries = student.attendanceEntries
+        const daily = summarizeCurrentAttendance(entries)
         if (daily.absent) absent++
-        else if (daily.completedDays) present++
-        if (daily.late) late++
+        else if (daily.present) present++
+        if (entries.some(entry => entry.status === "LATE")) late++
       })
 
       const totalStudents = students.length
