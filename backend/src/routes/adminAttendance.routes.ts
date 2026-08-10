@@ -66,17 +66,19 @@ router.get("/summary", async (req, res) => {
 
     let present = 0
     let absent = 0
+    let completed = 0
 
     byStudent.forEach(entries => {
       const daily = summarizeCurrentAttendance(entries)
       if (daily.absent) absent++
       else if (daily.present) present++
+      if (daily.completed) completed++
     })
 
     const attendanceRate =
-      totalStudents > 0
+      totalStudents > 0 && completed === totalStudents
         ? ((present / totalStudents) * 100).toFixed(1)
-        : "0"
+        : null
 
     res.json({
       totalStudents,
@@ -144,12 +146,14 @@ router.get("/by-class", async (req, res) => {
       let present = 0
       let absent = 0
       let late = 0
+      let completed = 0
 
       students.forEach(student => {
         const entries = student.attendanceEntries
         const daily = summarizeCurrentAttendance(entries)
         if (daily.absent) absent++
         else if (daily.present) present++
+        if (daily.completed) completed++
         if (entries.some(entry => entry.status === "LATE")) late++
       })
 
@@ -165,8 +169,8 @@ router.get("/by-class", async (req, res) => {
         late,
         notMarked,
         attendanceRate:
-          totalStudents === 0
-            ? 0
+          totalStudents === 0 || completed !== totalStudents
+            ? null
             : Math.round((present / totalStudents) * 100),
       }
     })

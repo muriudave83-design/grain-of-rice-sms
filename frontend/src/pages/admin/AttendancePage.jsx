@@ -60,7 +60,7 @@ export default function AttendancePage() {
           </div>
 
           <div className="bg-white border rounded-lg p-4 shadow-sm">
-            <p className="text-gray-500 text-sm">Present</p>
+            <p className="text-gray-500 text-sm">Attended</p>
             <h2 className="text-xl text-green-600 font-semibold">
               {summary.present}
             </h2>
@@ -76,7 +76,9 @@ export default function AttendancePage() {
           <div className="bg-white border rounded-lg p-4 shadow-sm">
             <p className="text-gray-500 text-sm">Attendance Rate</p>
             <h2 className="text-xl text-blue-600 font-semibold">
-              {summary.attendanceRate}%
+              {summary.attendanceRate === null
+                ? "Incomplete"
+                : `${summary.attendanceRate}%`}
             </h2>
           </div>
         </div>
@@ -91,7 +93,7 @@ export default function AttendancePage() {
             <tr className="bg-gray-100 text-left text-sm">
               <th className="p-3 border">Class</th>
               <th className="p-3 border">Total</th>
-              <th className="p-3 border">Present</th>
+              <th className="p-3 border">Attended</th>
               <th className="p-3 border">Absent</th>
               <th className="p-3 border">Not Marked</th>
             </tr>

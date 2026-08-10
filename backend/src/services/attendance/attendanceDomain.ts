@@ -36,10 +36,14 @@ export function summarizeCurrentAttendance(
 ) {
   const marked = entries.length > 0;
   const absent = marked && isAbsentForDay(entries);
+  const legacy = entries.some((entry) => entry.period === AttendancePeriod.LEGACY);
+  const morning = entries.some((entry) => entry.period === AttendancePeriod.MORNING);
+  const afternoon = entries.some((entry) => entry.period === AttendancePeriod.AFTERNOON);
   return {
     marked,
     absent,
     present: marked && !absent,
+    completed: legacy || (morning && afternoon),
   };
 }
 
