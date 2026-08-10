@@ -4,6 +4,7 @@ import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
 import { authorizeStudentAccess } from "../middlewares/ownershipMiddleware";
 import { getStudentTranscript, updateHealth } from "../controllers/student.controller";
+import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -288,16 +289,18 @@ router.get(
 
         select: {
           status: true,
+          period: true,
+          session: { select: { date: true } },
         },
       });
 
-      const present = attendance.filter(
-        (a) => a.status === "PRESENT"
-      ).length;
-
-      const absent = attendance.filter(
-        (a) => a.status === "ABSENT"
-      ).length;
+      const attendanceSummary = summarizeAttendanceDays(attendance.map((entry) => ({
+        period: entry.period,
+        status: entry.status,
+        date: entry.session.date,
+      })));
+      const present = attendanceSummary.present;
+      const absent = attendanceSummary.absent;
 
       // ✅ PARENT LOGS
       const logs = await prisma.parentContactLog.findMany({

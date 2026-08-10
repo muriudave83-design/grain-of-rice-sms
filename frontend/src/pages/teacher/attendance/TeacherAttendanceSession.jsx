@@ -53,7 +53,10 @@ export default function TeacherAttendanceSession() {
         const initial = {};
 
         studentsList.forEach((s) => {
-          initial[s.id] = "PRESENT";
+          const morning = (res.data.entries || []).find(
+            (entry) => entry.studentId === s.id && entry.period === "MORNING"
+          );
+          initial[s.id] = morning?.status || "PRESENT";
         });
 
         setRecords(initial);
@@ -84,13 +87,14 @@ export default function TeacherAttendanceSession() {
           records: Object.entries(records).map(([studentId, status]) => ({
             studentId: Number(studentId),
             status,
+            period: "MORNING",
           })),
         };
 
         await api.post(`/attendance/sessions/${sessionId}/records`, payload);
 
         setLastSavedRecords(records);
-      } catch (err) {
+      } catch {
         console.error("Autosave failed");
       }
     }, 3000);
@@ -153,6 +157,7 @@ export default function TeacherAttendanceSession() {
         records: Object.entries(records).map(([studentId, status]) => ({
           studentId: Number(studentId),
           status,
+          period: "MORNING",
         })),
       };
 
@@ -161,7 +166,7 @@ export default function TeacherAttendanceSession() {
       setLastSavedRecords(records);
 
       finishSaving();
-    } catch (err) {
+    } catch {
       alert("Error saving attendance");
     }
   }

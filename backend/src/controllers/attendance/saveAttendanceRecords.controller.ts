@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { AttendancePeriod, AttendanceStatus, PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -7,6 +7,7 @@ export async function saveAttendanceRecords(req: Request, res: Response) {
   try {
     const sessionId = Number(req.params.id);
     const { records } = req.body;
+    const period = AttendancePeriod.MORNING;
 
     const session = await prisma.attendanceSession.findUnique({
       where: { id: sessionId },
@@ -25,9 +26,10 @@ export async function saveAttendanceRecords(req: Request, res: Response) {
     for (const record of records) {
       await prisma.attendanceEntry.upsert({
         where: {
-          attendanceSessionId_studentId: {
+          attendanceSessionId_studentId_period: {
             attendanceSessionId: sessionId,
             studentId: record.studentId,
+            period,
           },
         },
         update: {
@@ -36,6 +38,7 @@ export async function saveAttendanceRecords(req: Request, res: Response) {
         create: {
           attendanceSessionId: sessionId,
           studentId: record.studentId,
+          period,
           status: record.status,
         },
       });

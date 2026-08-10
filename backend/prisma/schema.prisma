@@ -322,13 +322,14 @@ model AttendanceEntry {
   id                  Int               @id @default(autoincrement())
   attendanceSessionId Int
   studentId           Int
+  period              AttendancePeriod
   status              AttendanceStatus
   note                String?
   createdAt           DateTime          @default(now())
   session             AttendanceSession @relation(fields: [attendanceSessionId], references: [id])
   student             Student           @relation(fields: [studentId], references: [id])
 
-  @@unique([attendanceSessionId, studentId])
+  @@unique([attendanceSessionId, studentId, period])
 }
 
 model AuditLog {
@@ -498,6 +499,12 @@ enum AttendanceStatus {
   ABSENT
   LATE
   EXCUSED
+}
+
+enum AttendancePeriod {
+  LEGACY
+  MORNING
+  AFTERNOON
 }
 
 enum AuditAction {

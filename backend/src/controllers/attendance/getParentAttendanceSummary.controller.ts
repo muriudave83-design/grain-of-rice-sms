@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../../prisma/client";
+import { summarizeAttendanceDays } from "../../services/attendance/attendanceDomain";
 
 type AttendanceStatus = "PRESENT" | "ABSENT" | "LATE" | "EXCUSED";
 
@@ -25,6 +26,7 @@ export const getParentAttendanceSummary = async (
     },
     select: {
         status: true,
+        period: true,
         session: {
         select: {
             id: true,
@@ -44,17 +46,19 @@ export const getParentAttendanceSummary = async (
       });
     }
 
-    const summary: Record<AttendanceStatus, number> & { TOTAL: number } = {
-      PRESENT: 0,
-      ABSENT: 0,
-      LATE: 0,
-      EXCUSED: 0,
-      TOTAL: entries.length,
+    const daily = summarizeAttendanceDays(entries.map((entry) => ({
+      period: entry.period,
+      status: entry.status,
+      date: entry.session.date,
+    })));
+    const summary = {
+      PRESENT: daily.present,
+      ABSENT: daily.absent,
+      LATE: daily.late,
+      EXCUSED: daily.excused,
+      TOTAL: daily.totalDays,
+      INCOMPLETE: daily.incomplete,
     };
-
-    for (const e of entries as { status: AttendanceStatus }[]) {
-      summary[e.status]++;
-    }
 
     return res.json({
       student: { id: studentId },

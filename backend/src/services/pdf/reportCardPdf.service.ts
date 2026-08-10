@@ -2,6 +2,7 @@ import PDFDocument from "pdfkit";
 import { prisma } from "../../prisma/client";
 import { ReportCardStatus } from "@prisma/client";
 import { formatGrade } from "../../utils/gradeDescriptions";
+import { summarizeAttendanceDays } from "../attendance/attendanceDomain";
 
 const getLetterGrade = (average: number) => {
   const score = average >= 0 && average <= 1 ? average * 100 : average;
@@ -50,7 +51,14 @@ export async function generateReportCardPdf(
   const attendanceRecords = await prisma.attendanceEntry.findMany({
     where: {
       studentId: reportCard.student.id,
+      session: {
+        date: {
+          gte: reportCard.term.startDate,
+          lte: reportCard.term.endDate,
+        },
+      },
     },
+    include: { session: true },
   });
 
   console.log("REPORT STUDENT ID:", reportCard.student.id);
@@ -65,17 +73,16 @@ export async function generateReportCardPdf(
     allAttendance.map(a => a.studentId)
   );
 
-  const present = attendanceRecords.filter(a => a.status === "PRESENT").length;
-  const absent = attendanceRecords.filter(a => a.status === "ABSENT").length;
-  const late = attendanceRecords.filter(a => a.status === "LATE").length;
-
-  const total = attendanceRecords.length || 1;
-
+  const dailyAttendance = summarizeAttendanceDays(attendanceRecords.map((entry) => ({
+    period: entry.period,
+    status: entry.status,
+    date: entry.session.date,
+  })));
   const attendance = {
-    present,
-    absent,
-    late,
-    percentage: Math.round((present / total) * 100),
+    ...dailyAttendance,
+    percentage: dailyAttendance.completedDays > 0
+      ? Math.round(((dailyAttendance.completedDays - dailyAttendance.absent) / dailyAttendance.completedDays) * 100)
+      : 0,
   };
 
   // 3️⃣ Create PDF document

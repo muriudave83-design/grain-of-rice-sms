@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
+import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
 
 // ✅ EXISTING FUNCTION (UNCHANGED)
 export const getStudentTranscript = async (
@@ -71,27 +72,22 @@ export const getStudentDetails = async (
 
   try {
     // attendance count
-    const attendance = await prisma.attendanceEntry.count({
+    const attendanceEntries = await prisma.attendanceEntry.findMany({
       where: {
         studentId,
-        status: "ABSENT",
-
         session: {
           termId,
         },
       },
+      include: { session: true },
     });
-
-    const present = await prisma.attendanceEntry.count({
-      where: {
-        studentId,
-        status: "PRESENT",
-
-        session: {
-          termId,
-        },
-      },
-    });
+    const attendanceSummary = summarizeAttendanceDays(attendanceEntries.map((entry) => ({
+      period: entry.period,
+      status: entry.status,
+      date: entry.session.date,
+    })));
+    const attendance = attendanceSummary.absent;
+    const present = attendanceSummary.present;
 
     // logs
     const logs = await prisma.parentContactLog.findMany({

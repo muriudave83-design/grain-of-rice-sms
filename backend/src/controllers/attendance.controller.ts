@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
 import { AttendanceSessionService } from "../services/attendance/attendanceSession.service";
+import { countAbsentDays, summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
 
 export class AttendanceController {
   static async submitSession(
@@ -118,7 +119,7 @@ export const getAttendanceReport = async (
             },
           });
 
-        const latestMap = new Map();
+        const dailyMap = new Map<string, typeof allRecords>();
 
         for (const record of allRecords) {
           const sessionDate = new Date(record.session.date)
@@ -127,38 +128,39 @@ export const getAttendanceReport = async (
 
           const key = `${record.studentId}-${sessionDate}`;
 
-          if (!latestMap.has(key)) {
-            latestMap.set(key, record);
-          }
+          dailyMap.set(key, [...(dailyMap.get(key) ?? []), record]);
         }
 
-        const latestRecords = [...latestMap.values()];
-
-        const report = latestRecords.map(
-      (record) => ({
+        const report = [...dailyMap.values()].map((records) => {
+          const record = records[0];
+          const daily = summarizeAttendanceDays(records.map((entry) => ({
+            period: entry.period,
+            status: entry.status,
+            date: entry.session.date,
+          })));
+          return {
         studentId: record.student.id,
         studentName: `${record.student.firstName} ${record.student.lastName}`,
         admissionNumber:
           record.student.admissionNo || "N/A",
-        status: record.status,
+        legacyStatus: records.find((entry) => entry.period === "LEGACY")?.status ?? null,
+        morningStatus: records.find((entry) => entry.period === "MORNING")?.status ?? null,
+        afternoonStatus: records.find((entry) => entry.period === "AFTERNOON")?.status ?? null,
+        status: daily.absent === 1 ? "ABSENT" : daily.incomplete === 1 ? "INCOMPLETE" : "PRESENT",
+        absentForDay: daily.absent === 1,
         date: record.session.date,
-      })
-    );
+      }});
 
       const summary = {
     totalStudents: report.length,
 
-    present: report.filter(
-      (r) => r.status === "PRESENT"
-    ).length,
+    present: report.filter((r) => r.status === "PRESENT").length,
 
     absent: report.filter(
       (r) => r.status === "ABSENT"
     ).length,
 
-    late: report.filter(
-      (r) => r.status === "LATE"
-    ).length,
+    late: report.filter((r) => r.morningStatus === "LATE" || r.afternoonStatus === "LATE" || r.legacyStatus === "LATE").length,
   };
 
     return res.json({
@@ -220,25 +222,21 @@ export const getStudentAttendanceSummary =
           where: {
             studentId: student.id,
           },
+          include: { session: true },
         });
 
-      const totalDays = records.length;
-
-      const present = records.filter(
-        (record) =>
-          record.status === "PRESENT"
-      ).length;
-
-      const absent = records.filter(
-        (record) =>
-          record.status === "ABSENT"
-      ).length;
+      const daily = summarizeAttendanceDays(records.map((entry) => ({
+        period: entry.period,
+        status: entry.status,
+        date: entry.session.date,
+      })));
+      const { totalDays, present, absent } = daily;
 
       const percentage =
         totalDays === 0
           ? 0
           : Math.round(
-              (present / totalDays) * 100
+              ((daily.completedDays - absent) / Math.max(daily.completedDays, 1)) * 100
             );
 
       return res.json({
@@ -373,11 +371,10 @@ export const getStudentAbsenceCount = async (
     const end = new Date(endDate as string);
     end.setHours(23, 59, 59, 999);
 
-    const absentCount =
-      await prisma.attendanceEntry.count({
+    const absenceEntries =
+      await prisma.attendanceEntry.findMany({
         where: {
           studentId: Number(studentId),
-          status: "ABSENT",
           session: {
             date: {
               gte: start,
@@ -385,7 +382,13 @@ export const getStudentAbsenceCount = async (
             },
           },
         },
+        include: { session: true },
       });
+    const absentCount = countAbsentDays(absenceEntries.map((entry) => ({
+      period: entry.period,
+      status: entry.status,
+      date: entry.session.date,
+    })));
 
     return res.json({
       studentId: Number(studentId),

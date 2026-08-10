@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import { getGradeDescription } from "../utils/gradeDescriptions";
 import { AssessmentType } from "@prisma/client";
+import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
 
 const prisma = new PrismaClient();
 
@@ -633,25 +634,18 @@ export const getReportData = async (req: Request, res: Response) => {
           attendanceEntries.length
         );
 
-        const present = attendanceEntries.filter(
-          (a) => a.status === "PRESENT"
-        ).length;
-
-        const absent = attendanceEntries.filter(
-          (a) => a.status === "ABSENT"
-        ).length;
-
-        const late = attendanceEntries.filter(
-          (a) => a.status === "LATE"
-        ).length;
-
-        const totalAttendance =
-          present + absent + late;
+        const dailyAttendance = summarizeAttendanceDays(attendanceEntries.map((entry) => ({
+          period: entry.period,
+          status: entry.status,
+          date: entry.session.date,
+        })));
+        const { present, absent, late } = dailyAttendance;
+        const totalAttendance = dailyAttendance.completedDays;
 
         const attendanceRate =
           totalAttendance > 0
             ? Math.round(
-                (present / totalAttendance) * 100
+                ((totalAttendance - absent) / totalAttendance) * 100
               )
             : 0;
 

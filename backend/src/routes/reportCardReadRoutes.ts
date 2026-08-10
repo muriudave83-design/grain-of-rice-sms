@@ -5,6 +5,7 @@ import { requireRole } from "../middlewares/rolesMiddleware";
 import { Role } from "@prisma/client";
 import { AssessmentStatus } from "@prisma/client";
 import { ReportCardStatus } from "@prisma/client";
+import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
 
 const router = Router();
 
@@ -149,27 +150,21 @@ router.get(
               where: {
                 studentId: student.id,
               },
+              include: { session: true },
             });
 
-          const present = attendanceEntries.filter(
-            (a) => a.status === "PRESENT"
-          ).length;
-
-          const absent = attendanceEntries.filter(
-            (a) => a.status === "ABSENT"
-          ).length;
-
-          const late = attendanceEntries.filter(
-            (a) => a.status === "LATE"
-          ).length;
-
-          const totalAttendance =
-            present + absent + late;
+          const attendance = summarizeAttendanceDays(attendanceEntries.map((entry) => ({
+            period: entry.period,
+            status: entry.status,
+            date: entry.session.date,
+          })));
+          const { present, absent, late } = attendance;
+          const totalAttendance = attendance.completedDays;
 
           const attendanceRate =
             totalAttendance > 0
               ? Math.round(
-                  (present / totalAttendance) * 100
+                  ((totalAttendance - absent) / totalAttendance) * 100
                 )
               : 0;
 

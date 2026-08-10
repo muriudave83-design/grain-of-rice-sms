@@ -1,5 +1,6 @@
 import { prisma } from "../prisma/client";
 import { ReportCardStatus } from "@prisma/client";
+import { countAbsentDays } from "./attendance/attendanceDomain";
 
 type GenerateReportCardsInput = {
   classId: number;
@@ -137,9 +138,11 @@ export async function generateReportCardsForClass({
       console.log("👨 STUDENT:", student.id);
       console.log("📊 ATTENDANCE FOUND:", attendanceRecords.length);
 
-      const attendanceAbsent = attendanceRecords.filter(
-        (a) => a.status === "ABSENT"
-      ).length;
+      const attendanceAbsent = countAbsentDays(attendanceRecords.map((entry) => ({
+        period: entry.period,
+        status: entry.status,
+        date: entry.session.date,
+      })));
 
       console.log(
         `📅 Student ${student.id} absent days:`,

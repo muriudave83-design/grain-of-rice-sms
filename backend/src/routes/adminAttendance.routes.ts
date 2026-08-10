@@ -1,6 +1,8 @@
 import express from "express"
 import { PrismaClient } from "@prisma/client"
-import { markAttendance } from "../controllers/attendance/markAttendance.controller"
+import { markAttendance, startAfternoonAttendance } from "../controllers/attendance/markAttendance.controller"
+import { statusesByPeriod } from "../services/attendance/attendanceDomain"
+import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain"
 import { getAttendanceReport } from "../controllers/attendance.controller"
 
 // 🔐 AUTH & RBAC
@@ -50,24 +52,26 @@ router.get("/summary", async (req, res) => {
       },
       select: {
         studentId: true,
-        status: true
+        status: true,
+        period: true,
+        session: { select: { date: true } },
       }
     })
 
-    const studentStatusMap = new Map<number, string>()
-
-    todayEntries.forEach(entry => {
-      if (!studentStatusMap.has(entry.studentId)) {
-        studentStatusMap.set(entry.studentId, entry.status)
-      }
-    })
+    const byStudent = new Map<number, typeof todayEntries>()
+    todayEntries.forEach(entry => byStudent.set(entry.studentId, [...(byStudent.get(entry.studentId) ?? []), entry]))
 
     let present = 0
     let absent = 0
 
-    studentStatusMap.forEach(status => {
-      if (status === "PRESENT") present++
-      if (status === "ABSENT") absent++
+    byStudent.forEach(entries => {
+      const daily = summarizeAttendanceDays(entries.map(entry => ({
+        period: entry.period,
+        status: entry.status,
+        date: entry.session.date,
+      })))
+      if (daily.absent) absent++
+      else if (daily.completedDays) present++
     })
 
     const attendanceRate =
@@ -137,21 +141,21 @@ router.get("/by-class", async (req, res) => {
 
       let present = 0
       let absent = 0
+      let late = 0
 
       students.forEach(student => {
-        let status = "NOT_MARKED"
-
-        for (const entry of [...student.attendanceEntries].reverse()) {
-          const sessionDate = new Date(entry.session.date)
-
-          if (sessionDate >= today && sessionDate < tomorrow) {
-            status = entry.status
-            break
-          }
-        }
-
-        if (status === "PRESENT") present++
-        if (status === "ABSENT") absent++
+        const entries = student.attendanceEntries.filter(entry => {
+          const date = new Date(entry.session.date)
+          return date >= today && date < tomorrow
+        })
+        const daily = summarizeAttendanceDays(entries.map(entry => ({
+          period: entry.period,
+          status: entry.status,
+          date: entry.session.date,
+        })))
+        if (daily.absent) absent++
+        else if (daily.completedDays) present++
+        if (daily.late) late++
       })
 
       const totalStudents = students.length
@@ -163,6 +167,7 @@ router.get("/by-class", async (req, res) => {
         totalStudents,
         present,
         absent,
+        late,
         notMarked,
         attendanceRate:
           totalStudents === 0
@@ -190,7 +195,6 @@ router.get("/class/:classId", async (req, res) => {
   try {
     const classId = parseInt(req.params.classId)
     const selectedDate = req.query.date as string | undefined
-    const termId = Number(req.query.termId)
 
     const today = selectedDate
       ? new Date(selectedDate)
@@ -201,18 +205,21 @@ router.get("/class/:classId", async (req, res) => {
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
 
+    const sessions = await prisma.attendanceSession.findMany({
+      where: { classId, date: { gte: today, lt: tomorrow } },
+      select: { id: true },
+    })
+    const sessionIds = sessions.map((session) => session.id)
+
     const students = await prisma.student.findMany({
       where: {
-        classId: classId
+        classId: classId,
+        isArchived: false,
       },
       include: {
         user: true,
         attendanceEntries: {
-          where: {
-            session: {
-              termId
-            }
-          },
+          where: { attendanceSessionId: { in: sessionIds } },
           include: {
             session: true
           }
@@ -221,25 +228,24 @@ router.get("/class/:classId", async (req, res) => {
     })
 
     const result = students.map(student => {
-      let status = "NOT_MARKED"
-
-      for (const entry of [...student.attendanceEntries].reverse()) {
-        const sessionDate = new Date(entry.session.date)
-
-        if (sessionDate >= today && sessionDate < tomorrow) {
-          status = entry.status
-          break
-        }
-      }
+      const statuses = statusesByPeriod(student.attendanceEntries.map((entry) => ({
+        period: entry.period,
+        status: entry.status,
+      })))
 
       return {
         studentId: student.id,
         name: `${student.firstName} ${student.lastName}`,
-        status
+        ...statuses,
       }
     })
 
-    res.json(result)
+    res.json({
+      students: result,
+      afternoonInitialized: result.some((student) => student.afternoonStatus !== null),
+      legacyOnly: result.some((student) => student.legacyStatus !== null) &&
+        !result.some((student) => student.morningStatus !== null || student.afternoonStatus !== null),
+    })
 
   } catch (error) {
     console.error(error)
@@ -255,6 +261,7 @@ Admin Mark Attendance
 POST /admin/attendance/mark
 */
 router.post("/mark", markAttendance)
+router.post("/class/:classId/start-afternoon", startAfternoonAttendance)
 
 /*
 Admin Attendance Report

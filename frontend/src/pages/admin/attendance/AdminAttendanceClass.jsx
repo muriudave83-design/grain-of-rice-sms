@@ -1,272 +1,190 @@
-import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import apiClient from "../../../services/apiClient";
+
+const STATUSES = ["PRESENT", "ABSENT", "LATE", "EXCUSED"];
+
+function PeriodControls({ status, disabled, onMark }) {
+  if (disabled) return <span className="text-gray-500">Not Started</span>;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {STATUSES.map((value) => (
+        <button
+          key={value}
+          onClick={() => onMark(value)}
+          className={`px-2 py-1 rounded text-xs border ${
+            status === value ? "bg-gray-900 text-white" : "bg-white hover:bg-gray-100"
+          }`}
+        >
+          {value[0] + value.slice(1).toLowerCase()}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function periodCounts(students, key) {
+  const counts = { PRESENT: 0, ABSENT: 0, LATE: 0, EXCUSED: 0, NOT_MARKED: 0 };
+  for (const student of students) counts[student[key] ?? "NOT_MARKED"]++;
+  return counts;
+}
 
 export default function AdminAttendanceClass() {
   const { classId } = useParams();
   const navigate = useNavigate();
-
   const [students, setStudents] = useState([]);
+  const [afternoonInitialized, setAfternoonInitialized] = useState(false);
+  const [legacyOnly, setLegacyOnly] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
 
-  const [selectedDate, setSelectedDate] = useState(
-  new Date().toISOString().split("T")[0]
-    );
-
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     try {
       const res = await apiClient.get(
-        `/admin/attendance/class/${classId}?date=${selectedDate}`
+        `/admin/attendance/class/${classId}?date=${selectedDate}`,
       );
-
-      setStudents(res.data);
-
-      console.log("CLASS ATTENDANCE:", res.data);
-    } catch (err) {
-      console.error("Failed to fetch class attendance:", err);
+      setStudents(res.data.students ?? res.data ?? []);
+      setAfternoonInitialized(Boolean(res.data.afternoonInitialized));
+      setLegacyOnly(Boolean(res.data.legacyOnly));
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchStudents();
   }, [classId, selectedDate]);
 
-  // ✅ Normalize status (VERY IMPORTANT)
-  const normalizedStudents = students.map((s) => ({
-    ...s,
-    status: s.status || "NOT_MARKED",
-  }));
+  useEffect(() => {
+    setLoading(true);
+    fetchStudents().catch((error) => console.error("Failed to fetch attendance", error));
+  }, [fetchStudents]);
 
-  // ✅ SAFE COUNTS (ALWAYS CONSISTENT)
-  const total = normalizedStudents.length;
+  const markAttendance = async (studentId, status, period, refresh = true) => {
+    await apiClient.post("/admin/attendance/mark", {
+      studentId,
+      classId: Number(classId),
+      status,
+      period,
+      date: selectedDate,
+    });
+    if (refresh) await fetchStudents();
+  };
 
-  const presentCount = normalizedStudents.filter(
-    (s) => s.status === "PRESENT"
-  ).length;
+  const markAllPresent = async (period) => {
+    await Promise.all(
+      students.map((student) => markAttendance(student.studentId, "PRESENT", period, false)),
+    );
+    await fetchStudents();
+  };
 
-  const absentCount = normalizedStudents.filter(
-    (s) => s.status === "ABSENT"
-  ).length;
-
-  const lateCount = normalizedStudents.filter(
-    (s) => s.status === "LATE"
-  ).length;
-
-  const marked = presentCount + absentCount + lateCount;
-
-  const notMarkedCount = total - marked;
-
-  const attendanceRate =
-    total === 0 ? 0 : Math.round((presentCount / total) * 100);
-
-  // 📅 Today label
-  const today = new Date().toLocaleDateString();
-
-  // ✅ Mark attendance
-  const markAttendance = async (studentId, status) => {
+  const startAfternoon = async () => {
     try {
-      await apiClient.post("/admin/attendance/mark", {
-        studentId,
-        classId,
-        status,
+      await apiClient.post(`/admin/attendance/class/${classId}/start-afternoon`, {
         date: selectedDate,
       });
-
-      fetchStudents();
-    } catch (err) {
-      console.error("Failed to mark attendance:", err);
+      await fetchStudents();
+    } catch (error) {
+      alert(error.response?.data?.message ?? "Unable to start afternoon attendance");
     }
   };
 
-  // ✅ Mark all present
-  const markAllPresent = async () => {
-    try {
-        await Promise.all(
-          normalizedStudents.map((student) =>
-            apiClient.post("/admin/attendance/mark", {
-              studentId: student.studentId,
-              classId,
-              status: "PRESENT",
-              date: selectedDate,
-            })
-          )
-        );
+  if (loading) return <p className="p-6">Loading class attendance...</p>;
 
-      fetchStudents();
-    } catch (err) {
-      console.error("Failed to mark all present:", err);
-    }
-  };
-
-  if (loading) {
-    return <p className="p-6">Loading class attendance...</p>;
-  }
+  const morning = periodCounts(students, "morningStatus");
+  const afternoon = periodCounts(students, "afternoonStatus");
+  const dailyAbsent = students.filter(
+    (student) => student.morningStatus === "ABSENT" && student.afternoonStatus === "ABSENT",
+  ).length;
 
   return (
     <div className="p-6">
-      {/* 🔙 BACK BUTTON */}
       <button
         onClick={() => navigate("/dashboard/admin/attendance")}
-        className="mb-4 px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
+        className="mb-4 px-4 py-2 bg-gray-700 text-white rounded"
       >
         ← Back to Attendance
       </button>
 
-      <h1 className="text-xl font-semibold mb-1">
-        Class Attendance (Class ID: {classId})
-      </h1>
+      <h1 className="text-xl font-semibold mb-4">Class Attendance</h1>
+      <input
+        type="date"
+        value={selectedDate}
+        onChange={(event) => setSelectedDate(event.target.value)}
+        className="border rounded px-3 py-2 mb-4"
+      />
 
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">
-          Select Attendance Date
-        </label>
-
-        <input
-          type="date"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          className="border rounded px-3 py-2"
-        />
-      </div>
-
-      {/* 📅 TODAY */}
-      <p className="text-sm text-gray-500 mb-4">
-        Showing attendance for:{" "}
-        <span className="font-medium">{today}</span>
-      </p>
-
-      {/* ✅ SUMMARY CARDS */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
-        <div className="p-4 rounded-xl bg-gray-800 text-white shadow">
-          <p className="text-xs">Total</p>
-          <p className="text-2xl font-bold">{total}</p>
+      {legacyOnly && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded">
+          Historical single-session attendance is shown as legacy data and has not been
+          converted to Morning or Afternoon.
         </div>
+      )}
 
-        <div className="p-4 rounded-xl bg-green-600 text-white shadow">
-          <p className="text-xs">Present</p>
-          <p className="text-2xl font-bold">{presentCount}</p>
+      <div className="grid md:grid-cols-3 gap-4 mb-6">
+        <div className="border rounded p-4">
+          <h2 className="font-semibold">Morning</h2>
+          <p>Present {morning.PRESENT} · Absent {morning.ABSENT} · Late {morning.LATE}</p>
+          <p>Excused {morning.EXCUSED} · Not marked {morning.NOT_MARKED}</p>
         </div>
-
-        <div className="p-4 rounded-xl bg-red-600 text-white shadow">
-          <p className="text-xs">Absent</p>
-          <p className="text-2xl font-bold">{absentCount}</p>
+        <div className="border rounded p-4">
+          <h2 className="font-semibold">Afternoon</h2>
+          <p>Present {afternoon.PRESENT} · Absent {afternoon.ABSENT} · Late {afternoon.LATE}</p>
+          <p>Excused {afternoon.EXCUSED} · Not marked {afternoon.NOT_MARKED}</p>
         </div>
-
-        <div className="p-4 rounded-xl bg-yellow-500 text-black shadow">
-          <p className="text-xs">Late</p>
-          <p className="text-2xl font-bold">{lateCount}</p>
-        </div>
-
-        <div className="p-4 rounded-xl bg-gray-300 text-black shadow">
-          <p className="text-xs">Not Marked</p>
-          <p className="text-2xl font-bold">{notMarkedCount}</p>
+        <div className="border rounded p-4">
+          <h2 className="font-semibold">Daily result</h2>
+          <p>Full-day absent: {dailyAbsent}</p>
+          <p>Total active students: {students.length}</p>
         </div>
       </div>
 
-      {/* 📊 ATTENDANCE RATE */}
-      <div className="mb-6 p-4 bg-black text-white rounded-xl">
-        <p className="text-sm text-gray-400">Attendance Rate</p>
-        <p className="text-2xl font-bold">{attendanceRate}%</p>
-      </div>
-
-      {/* MARK ALL */}
-      <div className="mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         <button
-          onClick={markAllPresent}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          onClick={() => markAllPresent("MORNING")}
+          className="px-4 py-2 bg-blue-600 text-white rounded"
         >
-          Mark All Present
+          Mark All Morning Present
         </button>
-      </div>
-
-      <div className="bg-white border rounded p-4">
-        {normalizedStudents.length === 0 ? (
-          <p>No students found.</p>
+        {!afternoonInitialized ? (
+          <button onClick={startAfternoon} className="px-4 py-2 bg-purple-600 text-white rounded">
+            Start Afternoon
+          </button>
         ) : (
-          <table className="w-full border">
-            <thead>
-              <tr className="bg-gray-100 text-left">
-                <th className="p-3 border">Student</th>
-                <th className="p-3 border">Status</th>
-                <th className="p-3 border">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {normalizedStudents.map((student) => {
-                const status = student.status;
-
-                return (
-                  <tr key={student.studentId} className="border-t">
-                    <td className="p-3 border">{student.name}</td>
-
-                    <td className="p-3 border">
-                      <span
-                        className={`px-2 py-1 rounded text-sm font-medium
-                          ${
-                            status === "PRESENT"
-                              ? "bg-green-100 text-green-700"
-                              : status === "ABSENT"
-                              ? "bg-red-100 text-red-700"
-                              : status === "LATE"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : "bg-gray-100 text-gray-600"
-                          }
-                        `}
-                      >
-                        {status}
-                      </span>
-                    </td>
-
-                    <td className="p-3 border space-x-2">
-                      <button
-                        onClick={() =>
-                          markAttendance(student.studentId, "PRESENT")
-                        }
-                        className={`px-3 py-1 rounded text-white ${
-                          status === "PRESENT"
-                            ? "bg-green-800"
-                            : "bg-green-600 hover:bg-green-700"
-                        }`}
-                      >
-                        Present
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          markAttendance(student.studentId, "ABSENT")
-                        }
-                        className={`px-3 py-1 rounded text-white ${
-                          status === "ABSENT"
-                            ? "bg-red-800"
-                            : "bg-red-600 hover:bg-red-700"
-                        }`}
-                      >
-                        Absent
-                      </button>
-
-                      <button
-                        onClick={() =>
-                          markAttendance(student.studentId, "LATE")
-                        }
-                        className={`px-3 py-1 rounded text-white ${
-                          status === "LATE"
-                            ? "bg-yellow-700"
-                            : "bg-yellow-500 hover:bg-yellow-600"
-                        }`}
-                      >
-                        Late
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <button
+            onClick={() => markAllPresent("AFTERNOON")}
+            className="px-4 py-2 bg-indigo-600 text-white rounded"
+          >
+            Mark All Afternoon Present
+          </button>
         )}
       </div>
+
+      <table className="w-full border bg-white">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="p-3 border text-left">Student</th>
+            <th className="p-3 border text-left">Morning</th>
+            <th className="p-3 border text-left">Afternoon</th>
+          </tr>
+        </thead>
+        <tbody>
+          {students.map((student) => (
+            <tr key={student.studentId}>
+              <td className="p-3 border">{student.name}</td>
+              <td className="p-3 border">
+                <PeriodControls
+                  status={student.morningStatus}
+                  onMark={(status) => markAttendance(student.studentId, status, "MORNING")}
+                />
+              </td>
+              <td className="p-3 border">
+                <PeriodControls
+                  status={student.afternoonStatus}
+                  disabled={!afternoonInitialized}
+                  onMark={(status) => markAttendance(student.studentId, status, "AFTERNOON")}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
