@@ -33,6 +33,7 @@ export default function Reports() {
         {
           studentId,
           teacherSubjectId,
+          termId,
           comment: value,
         }
       );
@@ -46,6 +47,12 @@ export default function Reports() {
       console.error(
         "SAVE COMMENT ERROR:",
         err.response?.data || err
+      );
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err?.message ||
+          "Failed to save comment"
       );
     }
   };
@@ -66,6 +73,14 @@ export default function Reports() {
         setClasses(res.data);
       } catch (err) {
         console.error(err);
+        setTerms([]);
+        setTermId(null);
+        setError(
+          err?.response?.data?.error ||
+            err?.response?.data?.message ||
+            err?.message ||
+            "Failed to load terms"
+        );
       }
     };
 

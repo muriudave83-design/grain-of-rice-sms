@@ -29,7 +29,6 @@ export default function GradebookDetail() {
   const [lockMessage, setLockMessage] = useState("");
 
   // ❌ OLD (will be removed from UI but kept temporarily safe)
-  const [newAssignment, setNewAssignment] = useState("");
 
   // 🔥 NEW MODAL STATE
   const [showModal, setShowModal] = useState(false);
@@ -52,7 +51,7 @@ export default function GradebookDetail() {
   const [selectedTerm, setSelectedTerm] = useState(null);
 
   // 🆕 FULL TERM OBJECT
-  const [selectedTermData, setSelectedTermData] = useState(null);
+  const [_selectedTermData, setSelectedTermData] = useState(null);
 
   // 🆕 ATTENDANCE STATE
   const [attendanceMap, setAttendanceMap] = useState({});
@@ -154,7 +153,15 @@ export default function GradebookDetail() {
       }
       } catch (err) {
         console.error("❌ Failed to load terms", err);
-        setError("Failed to load terms");
+        setTerms([]);
+        setSelectedTerm(null);
+        setSelectedTermData(null);
+        setError(
+          err?.response?.data?.error ||
+            err?.response?.data?.message ||
+            err?.message ||
+            "Failed to load terms"
+        );
         setLoading(false);
       }
     }
@@ -372,6 +379,7 @@ useEffect(() => {
           });
         } catch (err) {
           console.error("Reorder failed", err);
+          alert(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to reorder assignments");
         }
       };
 
@@ -522,27 +530,9 @@ useEffect(() => {
         });
       } catch (err) {
         console.error("Failed to create assignment", err);
+        alert(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to create assignment");
       }
     };
-
-  const getStudentTotal = (student) => {
-    if (!assignments) return 0;
-
-    let total = 0;
-
-    assignments.forEach((a) => {
-      const scoreObj = a.scores?.find(
-        (s) => String(s.studentId) === String(student.id)
-      );
-
-      if (!scoreObj) return;
-
-      const weight = a.weight || 1;
-      total += scoreObj.score * weight;
-    });
-
-    return total;
-  };
 
   const getStudentAverage = (student) => {
     if (!assignments || assignments.length === 0) {
@@ -629,6 +619,7 @@ useEffect(() => {
         setContextMenu(null);
       } catch (err) {
         console.error("Lock toggle failed", err);
+        alert(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to update assignment lock");
       }
     };
 
@@ -651,6 +642,7 @@ useEffect(() => {
       setContextMenu(null);
     } catch (err) {
       console.error("Delete failed", err);
+      alert(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to delete assignment");
     }
   };
 
@@ -677,6 +669,7 @@ useEffect(() => {
         });
       } catch (err) {
         console.error("Rename failed", err);
+        alert(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to rename assignment");
       }
     };
 
@@ -703,6 +696,7 @@ useEffect(() => {
       });
     } catch (err) {
       console.error("Weight update failed", err);
+      alert(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to update assignment weight");
     }
   };
 
@@ -810,14 +804,14 @@ useEffect(() => {
           navigate(0);
         } catch (err) {
           console.error("Import failed", err);
-          alert("Import failed ❌");
+          alert(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Import failed");
         }
       },
     });
   };
 
   // 🧾 GENERATE TRANSCRIPTS
-  const handleGenerateTranscript = async () => {
+  const _handleGenerateTranscript = async () => {
     if (!data?.class?.id) {
       alert("Class not loaded");
       return;
@@ -832,7 +826,7 @@ useEffect(() => {
       alert("Transcripts generated ✅");
     } catch (err) {
       console.error("Transcript error", err);
-      alert("Failed to generate transcripts ❌");
+      alert(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to generate transcripts");
     }
   };
 
@@ -917,6 +911,7 @@ useEffect(() => {
       });
     } catch (err) {
       console.error("Failed to save score", err);
+      alert(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to save score");
     } finally {
       setSaving(false);
     }
@@ -1129,7 +1124,6 @@ useEffect(() => {
 
           <tbody>
             {rankedStudents.map((student) => {
-              const total = getStudentTotal(student);
               const final = getFinalGrade(student);
               const avg = final;
               const grade = getGrade(final);

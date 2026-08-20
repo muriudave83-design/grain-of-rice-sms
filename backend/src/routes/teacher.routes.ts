@@ -139,8 +139,23 @@ router.put("/assignment/:id/lock", async (req, res) => {
     const { id } = req.params;
     const { isLocked } = req.body;
 
+    if (typeof isLocked !== "boolean") {
+      return res.status(400).json({ message: "isLocked must be a boolean" });
+    }
+
+    const owned = await prisma.assignment.findFirst({
+      where: {
+        id: Number(id),
+        teacherSubject: { teacherId: req.user!.id },
+      },
+      select: { id: true },
+    });
+    if (!owned) {
+      return res.status(404).json({ message: "Assignment not found" });
+    }
+
     const assignment = await prisma.assignment.update({
-      where: { id: Number(id) },
+      where: { id: owned.id },
       data: { isLocked },
     });
 
@@ -163,48 +178,28 @@ router.get("/terms/:classId", async (req, res) => {
     }
 
     // ✅ STEP 1 — VERIFY CLASS EXISTS
-    const existingClass = await prisma.class.findUnique({
-      where: { id: classId },
+    const assigned = await prisma.teacherSubject.findFirst({
+      where: { classId, teacherId: req.user!.id },
+      select: { id: true },
     });
 
-    if (!existingClass) {
-      return res.status(404).json({
-        error: "Class not found",
-      });
+    if (!assigned) {
+      return res.status(403).json({ error: "Not assigned to this class" });
     }
 
     // ✅ STEP 2 — FETCH TERMS
     const terms = await prisma.term.findMany({
+      where: { classId },
       orderBy: [
         { academicYear: "asc" },
         { createdAt: "asc" },
       ],
     });
 
-    console.log("📚 GLOBAL TERMS:", terms);
-
-    // ✅ STEP 3 — AUTO-CREATE IF EMPTY
     if (terms.length === 0) {
-      console.warn("⚠️ No terms found — auto-creating one");
-
-      const now = new Date();
-
-      const newTerm = await prisma.term.create({
-        data: {
-          name: "Term 1",
-          classId,
-
-          startDate: now,
-          endDate: new Date(
-            now.getFullYear(),
-            now.getMonth() + 3,
-            now.getDate()
-          ),
-          academicYear: `${now.getFullYear()}/${now.getFullYear() + 1}`,
-        },
+      return res.status(404).json({
+        error: "No term is configured for this class. Contact an administrator.",
       });
-
-      return res.json([newTerm]);
     }
 
     res.json(terms);

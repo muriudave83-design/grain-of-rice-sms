@@ -3,9 +3,9 @@ import apiClient from "../../services/apiClient";
 
 export default function AdminTeacherSubjectAssignments() {
   const [teachers, setTeachers] = useState([]);
-  const [subjects, setSubjects] = useState([]);
   const [classes, setClasses] = useState([]);
   const [assignments, setAssignments] = useState([]);
+  const [classSubjects, setClassSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
@@ -18,20 +18,30 @@ export default function AdminTeacherSubjectAssignments() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (!form.classId) {
+      setClassSubjects([]);
+      return;
+    }
+
+    apiClient
+      .get(`/admin/class-subjects/${form.classId}`)
+      .then((res) => setClassSubjects(res.data || []))
+      .catch(() => setClassSubjects([]));
+  }, [form.classId]);
+
   async function fetchData() {
     setLoading(true);
 
     try {
-      const [teachersRes, subjectsRes, classesRes, assignmentsRes] =
+      const [teachersRes, classesRes, assignmentsRes] =
         await Promise.all([
           apiClient.get("/admin/users?role=TEACHER"),
-          apiClient.get("/admin/subjects"),
           apiClient.get("/admin/classes"),
           apiClient.get("/admin/teacher-subjects"),
         ]);
 
       setTeachers(teachersRes.data || []);
-      setSubjects(subjectsRes.data || []);
       setClasses(classesRes.data || []);
       setAssignments(assignmentsRes.data || []);
     } catch (err) {
@@ -75,7 +85,7 @@ export default function AdminTeacherSubjectAssignments() {
       await fetchData();
     } catch (err) {
       console.error("Failed to assign teacher", err);
-      alert("Failed to assign teacher");
+      alert(err?.response?.data?.message || err?.message || "Failed to assign teacher");
     }
   }
 
@@ -92,7 +102,7 @@ export default function AdminTeacherSubjectAssignments() {
       setAssignments((prev) => prev.filter((a) => a.id !== id));
     } catch (err) {
       console.error("Failed to remove assignment", err);
-      alert("Failed to remove assignment");
+      alert(err?.response?.data?.message || err?.message || "Failed to remove assignment");
     }
   }
 
@@ -143,7 +153,7 @@ export default function AdminTeacherSubjectAssignments() {
           >
             <option value="">Select subject</option>
 
-            {subjects.map((s) => (
+            {classSubjects.map((entry) => entry.subject).filter(Boolean).map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
               </option>
@@ -156,7 +166,7 @@ export default function AdminTeacherSubjectAssignments() {
             className="p-2 border rounded"
             value={form.classId}
             onChange={(e) =>
-              setForm({ ...form, classId: e.target.value })
+              setForm({ ...form, classId: e.target.value, subjectId: "" })
             }
           >
             <option value="">Select Grade</option>

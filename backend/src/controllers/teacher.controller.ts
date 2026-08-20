@@ -119,8 +119,8 @@ export const getGradebook = async (req: Request, res: Response) => {
   const termId = req.query.termId ? Number(req.query.termId) : null;
 
   try {
-    const gradebook = await prisma.teacherSubject.findUnique({
-      where: { id: Number(id) },
+    const gradebook = await prisma.teacherSubject.findFirst({
+      where: { id: Number(id), teacherId: (req as any).user.id },
       include: {
         class: {
           include: { students: true },
@@ -155,8 +155,16 @@ export const getClassStudents = async (req: Request, res: Response) => {
   const { classId } = req.params;
 
   try {
+    const permitted = await prisma.teacherSubject.findFirst({
+      where: { classId: Number(classId), teacherId: (req as any).user.id },
+      select: { id: true },
+    });
+    if (!permitted) {
+      return res.status(403).json({ message: "Not assigned to this class" });
+    }
+
     const students = await prisma.student.findMany({
-      where: { classId: Number(classId) },
+      where: { classId: Number(classId), isArchived: false },
       select: {
         id: true,
         firstName: true,
@@ -186,6 +194,7 @@ export const upsertScore = async (req: Request, res: Response) => {
   try {
     const assignment = await prisma.assignment.findUnique({
       where: { id: assignmentId },
+      include: { teacherSubject: { select: { teacherId: true, classId: true } } },
     });
 
     if (!assignment) {
@@ -198,6 +207,26 @@ export const upsertScore = async (req: Request, res: Response) => {
       return res.status(403).json({
         message: "Assignment is locked",
       });
+    }
+
+    if (assignment.teacherSubject.teacherId !== (req as any).user.id) {
+      return res.status(403).json({ message: "Not authorized for this assignment" });
+    }
+
+    const student = await prisma.student.findFirst({
+      where: {
+        id: Number(studentId),
+        classId: assignment.teacherSubject.classId,
+        isArchived: false,
+      },
+      select: { id: true },
+    });
+    if (!student) {
+      return res.status(400).json({ message: "Student is not active in this assignment's class" });
+    }
+
+    if (scoreNumber > assignment.maxPoints) {
+      return res.status(400).json({ message: "Score exceeds assignment maximum" });
     }
 
     const existing = await prisma.score.findFirst({
@@ -280,11 +309,27 @@ export const createAssignment = async (req: Request, res: Response) => {
       }
 
     const tsId = Number(teacherSubjectId);
+    const numericTermId = Number(termId);
+    const teacherSubject = await prisma.teacherSubject.findFirst({
+      where: { id: tsId, teacherId: (req as any).user.id },
+      select: { classId: true },
+    });
+    if (!teacherSubject) {
+      return res.status(403).json({ message: "Not authorized for this class and subject" });
+    }
+
+    const term = await prisma.term.findFirst({
+      where: { id: numericTermId, classId: teacherSubject.classId },
+      select: { id: true },
+    });
+    if (!term) {
+      return res.status(400).json({ message: "Term does not belong to the assigned class" });
+    }
 
     const last = await prisma.assignment.findFirst({
       where: {
         teacherSubjectId: tsId,
-        termId: Number(termId),
+        termId: numericTermId,
       },
       orderBy: { position: "desc" },
     });
@@ -318,9 +363,20 @@ export const createAssignment = async (req: Request, res: Response) => {
 };
 export const deleteAssignment = async (req: Request, res: Response) => {
   try {
-    await prisma.assignment.delete({
-      where: { id: Number(req.params.id) },
+    const assignment = await prisma.assignment.findFirst({
+      where: {
+        id: Number(req.params.id),
+        teacherSubject: { teacherId: (req as any).user.id },
+      },
+      select: { id: true, isLocked: true, _count: { select: { scores: true } } },
     });
+
+    if (!assignment) return res.status(404).json({ message: "Assignment not found" });
+    if (assignment.isLocked || assignment._count.scores > 0) {
+      return res.status(409).json({ message: "Cannot delete locked or scored academic work" });
+    }
+
+    await prisma.assignment.delete({ where: { id: assignment.id } });
 
     res.json({ message: "Deleted" });
   } catch (err) {
@@ -331,8 +387,18 @@ export const deleteAssignment = async (req: Request, res: Response) => {
 
 export const updateAssignment = async (req: Request, res: Response) => {
   try {
+    const assignment = await prisma.assignment.findFirst({
+      where: {
+        id: Number(req.params.id),
+        teacherSubject: { teacherId: (req as any).user.id },
+      },
+      select: { id: true, isLocked: true },
+    });
+    if (!assignment) return res.status(404).json({ message: "Assignment not found" });
+    if (assignment.isLocked) return res.status(409).json({ message: "Assignment is locked" });
+
     const updated = await prisma.assignment.update({
-      where: { id: Number(req.params.id) },
+      where: { id: assignment.id },
       data: {
         ...(req.body.title !== undefined && { title: req.body.title }),
         ...(req.body.weight !== undefined && { weight: req.body.weight }),
@@ -364,6 +430,25 @@ export const updateAssignment = async (req: Request, res: Response) => {
 export const reorderAssignments = async (req: Request, res: Response) => {
   try {
     const { assignments } = req.body;
+
+    if (!Array.isArray(assignments) || assignments.length === 0) {
+      return res.status(400).json({ error: "No assignments provided" });
+    }
+
+    const ids = [...new Set(assignments.map((a: any) => Number(a.id)))];
+    if (ids.some((id) => !Number.isInteger(id))) {
+      return res.status(400).json({ error: "Invalid assignment id" });
+    }
+
+    const ownedCount = await prisma.assignment.count({
+      where: {
+        id: { in: ids },
+        teacherSubject: { teacherId: (req as any).user.id },
+      },
+    });
+    if (ownedCount !== ids.length) {
+      return res.status(403).json({ error: "Cannot reorder another teacher's assignments" });
+    }
 
     await prisma.$transaction(
       assignments.map((a: { id: number; position: number }) =>
@@ -410,13 +495,30 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
     const uniqueUpdates = dedupeUpdates(updates);
 
     const assignmentIds = [
-      ...new Set(uniqueUpdates.map((u: any) => u.assignmentId)),
+      ...new Set(uniqueUpdates.map((u: any) => Number(u.assignmentId))),
     ];
 
     const assignments = await prisma.assignment.findMany({
-      where: { id: { in: assignmentIds } },
-      select: { id: true, isLocked: true },
+      where: {
+        id: { in: assignmentIds },
+        teacherSubject: { teacherId: (req as any).user.id },
+      },
+      select: {
+        id: true,
+        isLocked: true,
+        maxPoints: true,
+        teacherSubject: { select: { classId: true } },
+      },
     });
+
+    const studentIds = [
+      ...new Set(uniqueUpdates.map((u: any) => Number(u.studentId))),
+    ];
+    const students = await prisma.student.findMany({
+      where: { id: { in: studentIds }, isArchived: false },
+      select: { id: true, classId: true },
+    });
+    const studentMap = new Map(students.map((student) => [student.id, student]));
 
     const assignmentMap = new Map(
       assignments.map((a) => [a.id, a])
@@ -430,7 +532,8 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
     const validUpdates: any[] = [];
 
     uniqueUpdates.forEach((u: any) => {
-      const assignment = assignmentMap.get(u.assignmentId);
+      const assignment = assignmentMap.get(Number(u.assignmentId));
+      const student = studentMap.get(Number(u.studentId));
       const score = Number(u.score);
 
       let status = "valid";
@@ -441,14 +544,18 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
       } else if (assignment.isLocked) {
         status = "locked";
         skippedLocked++;
-      } else if (!isValidScore(score)) {
+      } else if (!student || student.classId !== assignment.teacherSubject.classId) {
+        status = "invalid-student";
+        invalid++;
+      } else if (!isValidScore(score) || score > assignment.maxPoints) {
         status = "invalid-score";
         invalid++;
       } else {
         validUpdates.push({
-          studentId: u.studentId,
-          assignmentId: u.assignmentId,
+          studentId: Number(u.studentId),
+          assignmentId: Number(u.assignmentId),
           score,
+          maxPoints: assignment.maxPoints,
         });
       }
 
@@ -479,7 +586,7 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
               assignmentId: u.assignmentId,
             },
           },
-          update: { score: u.score },
+          update: { score: u.score, maxPoints: u.maxPoints },
           create: u,
         })
       )
@@ -530,7 +637,7 @@ export const getReportData = async (req: Request, res: Response) => {
      * STUDENTS
      */
     const students = await prisma.student.findMany({
-      where: { classId },
+      where: { classId, isArchived: false },
     });
 
     /**
@@ -679,18 +786,52 @@ export const getReportData = async (req: Request, res: Response) => {
 
 export const saveReportComment = async (req: Request, res: Response) => {
   try {
-    const { studentId, teacherSubjectId, comment } = req.body;
+    const { studentId, teacherSubjectId, termId, comment } = req.body;
+
+    if (!studentId || !teacherSubjectId || !termId) {
+      return res.status(400).json({ error: "studentId, teacherSubjectId, and termId are required" });
+    }
+
+    const teacherSubject = await prisma.teacherSubject.findFirst({
+      where: {
+        id: Number(teacherSubjectId),
+        teacherId: (req as any).user.id,
+      },
+      select: { classId: true },
+    });
+    if (!teacherSubject) {
+      return res.status(403).json({ error: "Not authorized for this subject" });
+    }
+
+    const [student, term] = await Promise.all([
+      prisma.student.findFirst({
+        where: { id: Number(studentId), classId: teacherSubject.classId, isArchived: false },
+        select: { id: true },
+      }),
+      prisma.term.findFirst({
+        where: { id: Number(termId), classId: teacherSubject.classId },
+        select: { id: true },
+      }),
+    ]);
+    if (!student || !term) {
+      return res.status(400).json({ error: "Student or term does not belong to this class" });
+    }
 
     const saved = await prisma.reportComment.upsert({
       where: {
         studentId_teacherSubjectId_termId: {
-          studentId,
-          teacherSubjectId,
-          termId: 0
+          studentId: Number(studentId),
+          teacherSubjectId: Number(teacherSubjectId),
+          termId: Number(termId),
         },
       },
       update: { comment },
-      create: { studentId, teacherSubjectId, comment },
+      create: {
+        studentId: Number(studentId),
+        teacherSubjectId: Number(teacherSubjectId),
+        termId: Number(termId),
+        comment,
+      },
     });
 
     res.json(saved);
@@ -715,7 +856,7 @@ export const generateTranscripts = async (req: Request, res: Response) => {
 
   try {
     const students = await prisma.student.findMany({
-      where: { classId },
+      where: { classId, isArchived: false },
     });
 
     const subjects = await prisma.teacherSubject.findMany({

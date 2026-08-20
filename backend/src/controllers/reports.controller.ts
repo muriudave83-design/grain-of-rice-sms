@@ -29,12 +29,34 @@ export const saveReportComment = async (
   res: Response
 ) => {
   try {
-    const { studentId, teacherSubjectId, comment } = req.body;
+    const { studentId, teacherSubjectId, termId, comment } = req.body;
 
-    if (!studentId || !teacherSubjectId) {
+    if (!studentId || !teacherSubjectId || !termId) {
       return res.status(400).json({
         message: "Missing fields",
       });
+    }
+
+    const teacherSubject = await prisma.teacherSubject.findFirst({
+      where: { id: Number(teacherSubjectId), teacherId: req.user!.id },
+      select: { classId: true },
+    });
+    if (!teacherSubject) {
+      return res.status(403).json({ message: "Not authorized for this subject" });
+    }
+
+    const [student, term] = await Promise.all([
+      prisma.student.findFirst({
+        where: { id: Number(studentId), classId: teacherSubject.classId, isArchived: false },
+        select: { id: true },
+      }),
+      prisma.term.findFirst({
+        where: { id: Number(termId), classId: teacherSubject.classId },
+        select: { id: true },
+      }),
+    ]);
+    if (!student || !term) {
+      return res.status(400).json({ message: "Student or term does not belong to this class" });
     }
 
     await prisma.reportComment.upsert({
@@ -42,7 +64,7 @@ export const saveReportComment = async (
         studentId_teacherSubjectId_termId: {
           studentId: Number(studentId),
           teacherSubjectId: Number(teacherSubjectId),
-          termId: 0
+          termId: Number(termId)
         },
       },
 
@@ -53,7 +75,7 @@ export const saveReportComment = async (
       create: {
         studentId: Number(studentId),
         teacherSubjectId: Number(teacherSubjectId),
-        termId: null,
+        termId: Number(termId),
         comment,
       },
     });
@@ -89,6 +111,25 @@ export const getStudentReport = async (
       return res.status(404).json({
         message: "Student not found",
       });
+    }
+
+    const user = req.user!;
+    if (user.role === "STUDENT" && student.userId !== user.id) {
+      return res.status(403).json({ message: "Not allowed to view this student" });
+    }
+    if (user.role === "TEACHER") {
+      const assigned = await prisma.teacherSubject.findFirst({
+        where: { teacherId: user.id, classId: student.classId },
+        select: { id: true },
+      });
+      if (!assigned) return res.status(403).json({ message: "Not assigned to this class" });
+    }
+    if (user.role === "PARENT") {
+      const linked = await prisma.parentStudent.findFirst({
+        where: { studentId: student.id, parent: { userId: user.id } },
+        select: { id: true },
+      });
+      if (!linked) return res.status(403).json({ message: "Not linked to this student" });
     }
 
     const studentsInClass =

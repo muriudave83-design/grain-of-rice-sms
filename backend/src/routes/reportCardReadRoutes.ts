@@ -49,8 +49,17 @@ router.get(
         .replace("term", "term ")
         .trim();
 
+      const assigned = await prisma.teacherSubject.findFirst({
+        where: { teacherId: req.user!.id, classId },
+        select: { id: true },
+      });
+      if (!assigned) {
+        return res.status(403).json({ message: "Not assigned to this class" });
+      }
+
       const term = await prisma.term.findFirst({
         where: {
+          classId,
           name: {
             equals: normalizedTermName,
             mode: "insensitive",
@@ -149,6 +158,7 @@ router.get(
             await prisma.attendanceEntry.findMany({
               where: {
                 studentId: student.id,
+                session: { termId: term.id },
               },
               include: { session: true },
             });
@@ -369,12 +379,18 @@ router.get(
   authenticate,
   requireRole([Role.PARENT]),
   async (req, res) => {
-    const parentId = String(req.user!.id);
+    const parent = await prisma.parent.findUnique({
+      where: { userId: req.user!.id },
+      select: { id: true },
+    });
+    if (!parent) {
+      return res.json([]);
+    }
 
     const links =
       await prisma.parentStudent.findMany({
         where: {
-          parentId,
+          parentId: parent.id,
         },
         select: {
           studentId: true,
@@ -455,10 +471,17 @@ router.get(
     }
 
     if (req.user!.role === Role.PARENT) {
+      const parent = await prisma.parent.findUnique({
+        where: { userId: req.user!.id },
+        select: { id: true },
+      });
+      if (!parent) {
+        return res.status(403).json({ message: "Parent profile is not linked" });
+      }
       const link =
         await prisma.parentStudent.findFirst({
           where: {
-            parentId: String(req.user!.id),
+            parentId: parent.id,
             studentId:
               reportCard.studentId,
           },

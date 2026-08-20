@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { PrismaClient, Role } from "@prisma/client";
+import { Prisma, PrismaClient, Role } from "@prisma/client";
 import { authenticate } from "../../middlewares/authMiddleware";
 import { requireRole } from "../../middlewares/rolesMiddleware";
 
@@ -97,12 +97,43 @@ router.delete(
   requireRole([Role.ADMIN]),
   async (req, res) => {
     try {
-      await prisma.classSubject.delete({
-        where: { id: Number(req.params.id) },
-      });
+      const id = Number(req.params.id);
+      if (!id) {
+        return res.status(400).json({ message: "Invalid class-subject assignment id" });
+      }
+
+      const outcome = await prisma.$transaction(async (tx) => {
+        const classSubject = await tx.classSubject.findUnique({ where: { id } });
+        if (!classSubject) return "already-removed" as const;
+
+        const teacherAssignmentCount = await tx.teacherSubject.count({
+          where: {
+            classId: classSubject.classId,
+            subjectId: classSubject.subjectId,
+          },
+        });
+        if (teacherAssignmentCount > 0) return "in-use" as const;
+
+        await tx.classSubject.delete({ where: { id } });
+        return "removed" as const;
+      }, { isolationLevel: "Serializable" });
+
+      if (outcome === "already-removed") {
+        return res.json({ message: "Class-subject assignment was already removed" });
+      }
+      if (outcome === "in-use") {
+        return res.status(409).json({
+          message: "Remove the teacher assignment before removing this subject from the class",
+        });
+      }
 
       res.json({ message: "Removed successfully" });
     } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034") {
+        return res.status(409).json({
+          message: "Academic structure changed concurrently; refresh and try again",
+        });
+      }
       console.error(err);
       res.status(500).json({
         message: "Failed to remove subject from class",

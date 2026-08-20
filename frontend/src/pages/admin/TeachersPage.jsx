@@ -49,6 +49,7 @@ export default function TeachersPage() {
       fetchData();
     } catch (err) {
       console.error("Failed to assign subject to teacher", err);
+      alert(err?.response?.data?.message || err?.message || "Failed to assign teacher");
     }
   }
 
@@ -60,6 +61,7 @@ export default function TeachersPage() {
       fetchData();
     } catch (err) {
       console.error("Failed to remove assignment", err);
+      alert(err?.response?.data?.message || err?.message || "Failed to remove assignment");
     }
   }
 
