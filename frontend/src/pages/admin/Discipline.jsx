@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import apiClient from "../../services/apiClient";
+import StudentSearchSelect from "../../components/StudentSearchSelect";
 
 export default function Discipline() {
   const [records, setRecords] = useState([]);
   const [students, setStudents] = useState([]);
   const [terms, setTerms] = useState([]);
 
-  const [studentId, setStudentId] = useState("");
+  const [filterStudentId, setFilterStudentId] = useState("");
+  const [addStudentId, setAddStudentId] = useState("");
   const [termId, setTermId] = useState("");
 
   const [type, setType] = useState("");
@@ -57,13 +59,13 @@ export default function Discipline() {
       return;
     }
 
-    if (!studentId || !type) {
+    if (!addStudentId || !type) {
       return alert("Student and type required");
     }
 
     try {
       await apiClient.post("/discipline", {
-        studentId: Number(studentId),
+        studentId: Number(addStudentId),
         termId: termId ? Number(termId) : null,
         type,
         note,
@@ -82,7 +84,7 @@ export default function Discipline() {
 
   // FILTER
   const filtered = records.filter((r) => {
-    if (studentId && r.studentId !== Number(studentId)) return false;
+    if (filterStudentId && r.studentId !== Number(filterStudentId)) return false;
     if (termId && r.termId !== Number(termId)) return false;
     return true;
   });
@@ -93,19 +95,13 @@ export default function Discipline() {
 
       {/* FILTERS */}
       <div className="flex flex-wrap gap-3">
-        <select
-          value={studentId}
-          onChange={(e) => setStudentId(e.target.value)}
-          className="border p-2 rounded"
+        <StudentSearchSelect
+          students={students}
+          value={filterStudentId}
+          onChange={setFilterStudentId}
+          placeholder="Filter student by name or number"
           disabled={isLocked}
-        >
-          <option value="">All Students</option>
-          {students.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.firstName} ({s.admissionNo})
-            </option>
-          ))}
-        </select>
+        />
 
         <select
           value={termId}
@@ -123,19 +119,13 @@ export default function Discipline() {
       </div>
             {/* ADD FORM */}
       <form onSubmit={handleAdd} className="flex flex-wrap gap-3">
-        <select
-          value={studentId}
-          onChange={(e) => setStudentId(e.target.value)}
-          className="border p-2 rounded"
+        <StudentSearchSelect
+          students={students}
+          value={addStudentId}
+          onChange={setAddStudentId}
+          placeholder="Select student by name or number"
           disabled={isLocked}
-        >
-          <option value="">Select Student</option>
-          {students.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.firstName} ({s.admissionNo})
-            </option>
-          ))}
-        </select>
+        />
 
         <select
           value={termId}
