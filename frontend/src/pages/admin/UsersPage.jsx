@@ -187,6 +187,13 @@ export default function UsersPage() {
             password: form.password,
             forcePasswordChange: true,
           });
+        } else if (form.role === "ADMIN") {
+          await apiClient.post("/admin/users/admin", {
+            name: form.name,
+            email: form.email,
+            password: form.password,
+            forcePasswordChange: true,
+          });
         }
       }
 

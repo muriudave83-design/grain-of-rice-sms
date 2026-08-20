@@ -8,6 +8,7 @@ import {
   archiveUser,
   updateUser,
 } from "../controllers/admin.users.controller";
+import { normalizeEmail } from "../utils/password";
 
 const router = Router();
 
@@ -151,7 +152,10 @@ router.post(
   requireRole(["ADMIN"]),
   async (req, res) => {
     try {
-      const { name, email, password } = req.body;
+      const { name, password } = req.body;
+      const email = typeof req.body.email === "string"
+        ? normalizeEmail(req.body.email)
+        : "";
 
       if (!name || !email || !password) {
         return res.status(400).json({ message: "Missing fields" });
@@ -172,11 +176,55 @@ router.post(
           role: "TEACHER",
           mustChangePassword: true,
         },
+        select: { id: true, name: true, email: true, role: true },
       });
 
       return res.status(201).json(user);
     } catch (error: any) {
       console.error("Failed to create teacher:", error);
+      return res.status(400).json({ message: error.message });
+    }
+  }
+);
+
+/**
+ * CREATE ADMIN
+ */
+router.post(
+  "/users/admin",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    try {
+      const { name, password } = req.body;
+      const email = typeof req.body.email === "string"
+        ? normalizeEmail(req.body.email)
+        : "";
+
+      if (!name || !email || !password) {
+        return res.status(400).json({ message: "Missing fields" });
+      }
+
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        return res.status(409).json({ message: "User already exists" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await prisma.user.create({
+        data: {
+          name: name.trim(),
+          email,
+          password: hashedPassword,
+          role: "ADMIN",
+          mustChangePassword: true,
+        },
+        select: { id: true, name: true, email: true, role: true },
+      });
+
+      return res.status(201).json(user);
+    } catch (error: any) {
+      console.error("Failed to create admin:", error);
       return res.status(400).json({ message: error.message });
     }
   }
@@ -191,7 +239,10 @@ router.post(
   requireRole(["ADMIN"]),
   async (req, res) => {
     try {
-      const { name, email, password } = req.body;
+      const { name, password } = req.body;
+      const email = typeof req.body.email === "string"
+        ? normalizeEmail(req.body.email)
+        : "";
 
       if (!name || !email || !password) {
         return res.status(400).json({
@@ -221,6 +272,7 @@ router.post(
           role: "ATTENDANCE_OFFICER",
           mustChangePassword: true,
         },
+        select: { id: true, name: true, email: true, role: true },
       });
 
       return res.status(201).json(user);
@@ -246,7 +298,10 @@ router.post(
   requireRole(["ADMIN"]),
   async (req, res) => {
     try {
-      const { name, email, password } = req.body;
+      const { name, password } = req.body;
+      const email = typeof req.body.email === "string"
+        ? normalizeEmail(req.body.email)
+        : "";
 
       if (!name || !email || !password) {
         return res.status(400).json({ message: "Missing fields" });
@@ -274,7 +329,11 @@ router.post(
             },
           },
         },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
           parent: true,
         },
       });
@@ -296,7 +355,10 @@ router.post(
   requireRole(["ADMIN"]),
   async (req, res) => {
     try {
-      const { firstName, lastName, email, password, classId } = req.body;
+      const { firstName, lastName, password, classId, admissionNo } = req.body;
+      const email = typeof req.body.email === "string"
+        ? normalizeEmail(req.body.email)
+        : "";
 
       if (!firstName || !email || !password || !classId) {
         return res.status(400).json({
@@ -328,12 +390,19 @@ router.post(
             create: {
               firstName,
               lastName,
-              admissionNo: Math.floor(Math.random() * 100000).toString(),
+              admissionNo:
+                typeof admissionNo === "string" && admissionNo.trim()
+                  ? admissionNo.trim()
+                  : Math.floor(Math.random() * 100000).toString(),
               classId: Number(classId), // ✅ REQUIRED FIX
             },
           },
         },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
           student: true,
         },
       });

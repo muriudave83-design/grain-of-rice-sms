@@ -133,7 +133,9 @@ router.post("/students", async (req, res) => {
     lastName = lastName?.trim();
     admissionNo = admissionNo?.trim();
     classId = Number(classId);
-    parentId = parentId ? Number(parentId) : null;
+    parentId = typeof parentId === "string" && parentId.trim()
+      ? parentId.trim()
+      : null;
 
     if (
       typeof firstName !== "string" ||
@@ -179,33 +181,37 @@ router.post("/students", async (req, res) => {
     const defaultPassword = "student123";
     const hashedPassword = await bcrypt.hash(defaultPassword, 10);
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        role: "STUDENT",
-        name: `${firstName} ${lastName}`,
-      },
-    });
-
-    const student = await prisma.student.create({
-      data: {
-        firstName,
-        lastName,
-        admissionNo,
-        classId,
-        userId: user.id,
-      },
-    });
-
-    if (parentId) {
-      await prisma.parentStudent.create({
+    const student = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
         data: {
-          parentId,
-          studentId: student.id,
+          email,
+          password: hashedPassword,
+          role: "STUDENT",
+          name: `${firstName} ${lastName}`,
         },
       });
-    }
+
+      const createdStudent = await tx.student.create({
+        data: {
+          firstName,
+          lastName,
+          admissionNo,
+          classId,
+          userId: user.id,
+        },
+      });
+
+      if (parentId) {
+        await tx.parentStudent.create({
+          data: {
+            parentId,
+            studentId: createdStudent.id,
+          },
+        });
+      }
+
+      return createdStudent;
+    });
 
     res.json({
       message: "Student and login account created successfully.",

@@ -262,7 +262,7 @@ export default function AdminStudents() {
       };
 
       if (form.parentId) {
-        payload.parentId = Number(form.parentId);
+        payload.parentId = form.parentId;
       }
 
       await apiClient.post("/admin/students", payload);

@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { PrismaClient, AuditAction } from "@prisma/client";
 import jwt from "jsonwebtoken";
 import { createAuditLog } from "../services/auditLog.service";
-import { hashPassword, verifyPassword } from "../utils/password";
+import { hashPassword, normalizeEmail, verifyPassword } from "../utils/password";
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
@@ -17,7 +17,9 @@ export const registerUser = async (req: Request, res: Response) => {
   try {
     const { name, role } = req.body;
 
-    const email = req.body.email?.toLowerCase()?.trim();
+    const email = typeof req.body.email === "string"
+      ? normalizeEmail(req.body.email)
+      : undefined;
 
     if (!email) {
       return res.status(400).json({ message: "Email is required" });
@@ -85,7 +87,9 @@ export const loginUser = async (req: Request, res: Response) => {
       });
     }
 
-    const email = req.body.email?.toLowerCase()?.trim();
+    const email = typeof req.body.email === "string"
+      ? normalizeEmail(req.body.email)
+      : undefined;
     const { password } = req.body;
 
     if (!email || !password) {
@@ -102,13 +106,6 @@ export const loginUser = async (req: Request, res: Response) => {
     if (!user || user.isArchived) {
       return res.status(401).json({
         message: "Invalid credentials",
-      });
-    }
-
-    if (user.mustChangePassword) {
-      return res.json({
-        requirePasswordChange: true,
-        userId: user.id,
       });
     }
 
@@ -129,6 +126,18 @@ export const loginUser = async (req: Request, res: Response) => {
         message: "Invalid credentials",
       });
     }
+
+    if (user.mustChangePassword) {
+      return res.json({
+        requirePasswordChange: true,
+        userId: user.id,
+      });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
 
     const token = jwt.sign(
       {
