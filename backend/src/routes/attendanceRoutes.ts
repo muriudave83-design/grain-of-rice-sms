@@ -20,6 +20,11 @@ import {
 
 import { getTodaySession } from "../controllers/attendance/getTodaySession.controller";
 import { getClassAttendance } from "../controllers/attendance/getClassAttendance.controller";
+import {
+  markAllPresent,
+  markAttendance,
+  startAfternoonAttendance,
+} from "../controllers/attendance/markAttendance.controller";
 
 const router = Router();
 
@@ -32,6 +37,25 @@ const asyncHandler =
   (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
+
+router.post(
+  "/mark",
+  authenticate,
+  requireRole([Role.TEACHER, Role.ATTENDANCE_OFFICER, Role.ADMIN]),
+  asyncHandler(markAttendance),
+);
+router.post(
+  "/mark-all",
+  authenticate,
+  requireRole([Role.TEACHER, Role.ATTENDANCE_OFFICER, Role.ADMIN]),
+  asyncHandler(markAllPresent),
+);
+router.post(
+  "/class/:classId/start-afternoon",
+  authenticate,
+  requireRole([Role.TEACHER, Role.ATTENDANCE_OFFICER, Role.ADMIN]),
+  asyncHandler(startAfternoonAttendance),
+);
 
 /* =========================================================
    TEACHER / ATTENDANCE OFFICER OPERATIONS (WRITE ACCESS)

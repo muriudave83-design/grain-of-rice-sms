@@ -1,6 +1,6 @@
 import express from "express"
 import { PrismaClient } from "@prisma/client"
-import { markAttendance, startAfternoonAttendance } from "../controllers/attendance/markAttendance.controller"
+import { markAllPresent, markAttendance, startAfternoonAttendance } from "../controllers/attendance/markAttendance.controller"
 import { statusesByPeriod, summarizeCurrentAttendance } from "../services/attendance/attendanceDomain"
 import { getAttendanceReport } from "../controllers/attendance.controller"
 
@@ -204,11 +204,12 @@ router.get("/class/:classId", async (req, res) => {
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
 
-    const sessions = await prisma.attendanceSession.findMany({
+    const session = await prisma.attendanceSession.findFirst({
       where: { classId, date: { gte: today, lt: tomorrow } },
       select: { id: true },
+      orderBy: { id: "desc" },
     })
-    const sessionIds = sessions.map((session) => session.id)
+    const sessionIds = session ? [session.id] : []
 
     const students = await prisma.student.findMany({
       where: {
@@ -260,6 +261,7 @@ Admin Mark Attendance
 POST /admin/attendance/mark
 */
 router.post("/mark", markAttendance)
+router.post("/mark-all", markAllPresent)
 router.post("/class/:classId/start-afternoon", startAfternoonAttendance)
 
 /*

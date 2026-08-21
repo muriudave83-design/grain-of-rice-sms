@@ -19,6 +19,7 @@ export const getTodaySession = async (req: Request, res: Response) => {
           lt: tomorrow,
         },
       },
+      orderBy: { id: "desc" },
     });
 
     if (!session) {

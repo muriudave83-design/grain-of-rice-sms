@@ -39,11 +39,12 @@ export function summarizeCurrentAttendance(
   const legacy = entries.some((entry) => entry.period === AttendancePeriod.LEGACY);
   const morning = entries.some((entry) => entry.period === AttendancePeriod.MORNING);
   const afternoon = entries.some((entry) => entry.period === AttendancePeriod.AFTERNOON);
+  const completed = legacy || (morning && afternoon);
   return {
     marked,
     absent,
-    present: marked && !absent,
-    completed: legacy || (morning && afternoon),
+    present: completed && !absent,
+    completed,
   };
 }
 
@@ -104,7 +105,10 @@ export function buildAfternoonCopies<T extends { studentId: number; status: Atte
   return morningEntries.map((entry) => ({
     studentId: entry.studentId,
     period: AttendancePeriod.AFTERNOON,
-    status: entry.status,
+    status:
+      entry.status === AttendanceStatus.LATE
+        ? AttendanceStatus.PRESENT
+        : entry.status,
     note: entry.note ?? null,
   }));
 }

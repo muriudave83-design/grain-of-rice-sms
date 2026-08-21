@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Role } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -39,8 +39,16 @@ export async function getAttendanceSession(req: Request, res: Response) {
       });
     }
 
+    if (req.user?.role === Role.TEACHER) {
+      const assignment = await prisma.teacherSubject.findFirst({
+        where: { teacherId: req.user.id, classId: session.classId },
+        select: { id: true },
+      });
+      if (!assignment) return res.status(403).json({ message: "Forbidden" });
+    }
+
     const students = await prisma.student.findMany({
-      where: { classId: session.classId },
+      where: { classId: session.classId, isArchived: false },
       orderBy: [
         { firstName: "asc" },
         { lastName: "asc" }

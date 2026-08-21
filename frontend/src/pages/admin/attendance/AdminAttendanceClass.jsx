@@ -68,9 +68,11 @@ export default function AdminAttendanceClass() {
   };
 
   const markAllPresent = async (period) => {
-    await Promise.all(
-      students.map((student) => markAttendance(student.studentId, "PRESENT", period, false)),
-    );
+    await apiClient.post("/admin/attendance/mark-all", {
+      classId: Number(classId),
+      period,
+      date: selectedDate,
+    });
     await fetchStudents();
   };
 
