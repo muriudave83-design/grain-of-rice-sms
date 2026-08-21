@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
+import { Role } from "@prisma/client";
 import { prisma } from "../prisma/client";
 import { AttendanceSessionService } from "../services/attendance/attendanceSession.service";
-import { countAbsentDays, summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
+import { countAbsentDays, dailyAttendanceResult, summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
 
 export class AttendanceController {
   static async submitSession(
@@ -71,16 +72,36 @@ export const getAttendanceReport = async (
       });
     }
 
+    const requestedClassId = Number(classId);
     const start = new Date(startDate as string);
     start.setHours(0, 0, 0, 0);
 
     const end = new Date(endDate as string);
     end.setHours(23, 59, 59, 999);
 
+    if (!Number.isInteger(requestedClassId) || Number.isNaN(start.getTime()) ||
+      Number.isNaN(end.getTime()) || start > end) {
+      return res.status(400).json({ message: "Invalid class or date range" });
+    }
+
+    if (req.user?.role === Role.TEACHER) {
+      const assignment = await prisma.teacherSubject.findFirst({
+        where: { teacherId: req.user.id, classId: requestedClassId },
+        select: { id: true },
+      });
+      if (!assignment) return res.status(403).json({ message: "You are not assigned to this class" });
+    }
+
+    const schoolClass = await prisma.class.findFirst({
+      where: { id: requestedClassId, isArchived: false },
+      select: { id: true },
+    });
+    if (!schoolClass) return res.status(404).json({ message: "Active class not found" });
+
     const sessions =
       await prisma.attendanceSession.findMany({
         where: {
-          classId: Number(classId),
+          classId: requestedClassId,
           date: {
             gte: start,
             lte: end,
@@ -90,18 +111,30 @@ export const getAttendanceReport = async (
           id: true,
           date: true,
         },
+        orderBy: { id: "desc" },
       });
 
     if (sessions.length === 0) {
       return res.json({
         records: [],
-        summary: [],
+        summary: {
+          totalStudents: 0,
+          totalStudentDays: 0,
+          present: 0,
+          absent: 0,
+          late: 0,
+          excused: 0,
+          incomplete: 0,
+        },
       });
     }
 
-    const sessionIds = sessions.map(
-      (session) => session.id
-    );
+    const latestSessionByDate = new Map<string, number>();
+    for (const session of sessions) {
+      const dateKey = session.date.toISOString().slice(0, 10);
+      if (!latestSessionByDate.has(dateKey)) latestSessionByDate.set(dateKey, session.id);
+    }
+    const sessionIds = [...latestSessionByDate.values()];
 
         const allRecords =
           await prisma.attendanceEntry.findMany({
@@ -109,6 +142,7 @@ export const getAttendanceReport = async (
               attendanceSessionId: {
                 in: sessionIds,
               },
+              student: { isArchived: false, classId: requestedClassId },
             },
             include: {
               student: true,
@@ -138,6 +172,11 @@ export const getAttendanceReport = async (
             status: entry.status,
             date: entry.session.date,
           })));
+          const status = dailyAttendanceResult(records.map((entry) => ({
+            period: entry.period,
+            status: entry.status,
+            date: entry.session.date,
+          })));
           return {
         studentId: record.student.id,
         studentName: `${record.student.firstName} ${record.student.lastName}`,
@@ -146,22 +185,20 @@ export const getAttendanceReport = async (
         legacyStatus: records.find((entry) => entry.period === "LEGACY")?.status ?? null,
         morningStatus: records.find((entry) => entry.period === "MORNING")?.status ?? null,
         afternoonStatus: records.find((entry) => entry.period === "AFTERNOON")?.status ?? null,
-        status: daily.absent === 1 ? "ABSENT" : daily.incomplete === 1 ? "INCOMPLETE" : "PRESENT",
+        status,
         absentForDay: daily.absent === 1,
         date: record.session.date,
       }});
 
       const summary = {
-    totalStudents: report.length,
-
-    present: report.filter((r) => r.status === "PRESENT").length,
-
-    absent: report.filter(
-      (r) => r.status === "ABSENT"
-    ).length,
-
-    late: report.filter((r) => r.morningStatus === "LATE" || r.afternoonStatus === "LATE" || r.legacyStatus === "LATE").length,
-  };
+        totalStudents: new Set(report.map((record) => record.studentId)).size,
+        totalStudentDays: report.length,
+        present: report.filter((record) => record.status === "PRESENT").length,
+        absent: report.filter((record) => record.status === "ABSENT").length,
+        late: report.filter((record) => record.status === "LATE").length,
+        excused: report.filter((record) => record.status === "EXCUSED").length,
+        incomplete: report.filter((record) => record.status === "INCOMPLETE").length,
+      };
 
     return res.json({
       records: report,

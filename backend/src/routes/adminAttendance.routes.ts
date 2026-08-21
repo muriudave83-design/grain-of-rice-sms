@@ -19,6 +19,21 @@ Only authenticated ADMIN users can access anything in this file
 router.use(authenticate)
 router.use(requireRole([Role.ADMIN, Role.ATTENDANCE_OFFICER]))
 
+/* Attendance-scoped class discovery; does not grant class-management access. */
+router.get("/classes", async (_req, res) => {
+  try {
+    const classes = await prisma.class.findMany({
+      where: { isArchived: false },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    })
+    return res.json(classes)
+  } catch (error) {
+    console.error("Failed to load attendance report classes", error)
+    return res.status(500).json({ message: "Failed to load classes" })
+  }
+})
+
 /*
 Admin Attendance Summary
 GET /admin/attendance/summary

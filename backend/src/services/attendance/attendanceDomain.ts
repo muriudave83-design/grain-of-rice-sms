@@ -86,6 +86,15 @@ export function summarizeAttendanceDays(entries: AttendanceFact[]) {
   return { totalDays: byDate.size, completedDays: byDate.size - incomplete, present, absent, late, excused, incomplete };
 }
 
+export function dailyAttendanceResult(entries: AttendanceFact[]) {
+  const daily = summarizeAttendanceDays(entries);
+  if (daily.absent === 1) return "ABSENT";
+  if (daily.incomplete === 1) return "INCOMPLETE";
+  if (daily.late === 1) return "LATE";
+  if (daily.excused === 1) return "EXCUSED";
+  return "PRESENT";
+}
+
 export function statusesByPeriod(
   entries: Pick<AttendanceFact, "period" | "status">[],
 ) {
