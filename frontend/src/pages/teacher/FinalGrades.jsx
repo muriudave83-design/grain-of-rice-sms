@@ -3,6 +3,7 @@ import apiClient from "../../services/apiClient";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import BackButton from "../../components/BackButton";
 import { formatGrade } from "../../utils/grading";
+import { buildFinalGradesCsv, filenamePart } from "../../utils/finalGradesCsv";
 
 export default function FinalGrades() {
   const { classId } = useParams();
@@ -13,8 +14,12 @@ export default function FinalGrades() {
 
   const [data, setData] = useState([]);
   const [terms, setTerms] = useState([]);
+  const [className, setClassName] = useState(`Class ${classId}`);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [publishing, setPublishing] = useState(false);
+  const [published, setPublished] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     const fetchTerms = async () => {
@@ -47,10 +52,29 @@ export default function FinalGrades() {
   }, [classId, termId, setSearchParams]);
 
   useEffect(() => {
+    const fetchClassName = async () => {
+      try {
+        const res = await apiClient.get("/teacher/classes");
+        const selectedClass = (res.data || []).find(
+          (entry) => entry.id === Number(classId)
+        );
+        if (selectedClass?.name) setClassName(selectedClass.name);
+      } catch (err) {
+        console.error("Failed to load class name:", err);
+      }
+    };
+
+    fetchClassName();
+  }, [classId]);
+
+  useEffect(() => {
     if (!classId || !termId) {
       setData([]);
       return;
     }
+
+    let cancelled = false;
+    setData([]);
 
     const fetchData = async () => {
       try {
@@ -59,9 +83,10 @@ export default function FinalGrades() {
         const res = await apiClient.get(
           `/teacher/final-grades/${classId}?termId=${termId}`
         );
-        setData(res.data || []);
+        if (!cancelled) setData(res.data || []);
       } catch (err) {
         console.error("Final Grades fetch error:", err);
+        if (cancelled) return;
         setData([]);
         setError(
           err?.response?.data?.error ||
@@ -70,19 +95,90 @@ export default function FinalGrades() {
             "Failed to load final grades"
         );
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchData();
+    return () => {
+      cancelled = true;
+    };
   }, [classId, termId]);
+
+  useEffect(() => {
+    setPublished(false);
+  }, [termId]);
+
+  const selectedTerm = terms.find((term) => term.id === termId);
+
+  const handlePublish = async () => {
+    if (!termId) return;
+
+    try {
+      setPublishing(true);
+      setError("");
+      await apiClient.post(`/teacher/final-grades/${classId}/publish`, { termId });
+      setPublished(true);
+    } catch (err) {
+      setError(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to publish final grades"
+      );
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const handleExport = () => {
+    if (!termId || data.length === 0) return;
+
+    const csv = buildFinalGradesCsv({ data, className, term: selectedTerm });
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${filenamePart(className)}-${filenamePart(selectedTerm?.name)}-final-grades.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleGenerateTranscripts = async () => {
+    if (!termId) return;
+
+    try {
+      setGenerating(true);
+      setError("");
+      const res = await apiClient.post("/teacher/transcript/generate", {
+        classId: Number(classId),
+        termId,
+      });
+      const generated = res.data?.generated || 0;
+      const existing = res.data?.existing || 0;
+      window.alert(
+        generated > 0
+          ? `Generated ${generated} transcript${generated === 1 ? "" : "s"}.`
+          : `${existing} transcript${existing === 1 ? "" : "s"} already existed; no snapshots were changed.`
+      );
+    } catch (err) {
+      setError(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          err?.message ||
+          "Failed to generate transcripts"
+      );
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <BackButton />
 
       <h1 className="text-2xl font-bold mb-1">Final Grades</h1>
-      <p className="text-sm text-gray-500 mb-4">Class: {classId}</p>
+      <p className="text-sm text-gray-500 mb-4">Class: {className}</p>
 
       <select
         value={termId ?? ""}
@@ -103,11 +199,26 @@ export default function FinalGrades() {
       {loading && <p className="mb-4">Loading...</p>}
 
       <div className="mb-4 flex gap-2">
-        <button className="bg-blue-600 text-white px-4 py-2 rounded">
-          Publish Final Grades
+        <button
+          onClick={handlePublish}
+          disabled={!termId || !selectedTerm || data.length === 0 || loading || publishing || published}
+          className="bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded"
+        >
+          {publishing ? "Publishing..." : published ? "Published" : "Publish Final Grades"}
         </button>
-        <button className="bg-gray-200 px-4 py-2 rounded">
-          Export (Coming Soon)
+        <button
+          onClick={handleExport}
+          disabled={!termId || !selectedTerm || data.length === 0 || loading}
+          className="bg-gray-200 disabled:text-gray-400 px-4 py-2 rounded"
+        >
+          Export CSV
+        </button>
+        <button
+          onClick={handleGenerateTranscripts}
+          disabled={!termId || !selectedTerm || data.length === 0 || loading || generating}
+          className="bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded"
+        >
+          {generating ? "Generating..." : "Generate Transcripts"}
         </button>
         <button
           onClick={() => navigate("/teacher/classes")}

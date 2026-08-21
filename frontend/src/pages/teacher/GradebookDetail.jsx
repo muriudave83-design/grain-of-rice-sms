@@ -712,26 +712,6 @@ useEffect(() => {
     });
   };
 
-  // 🧾 GENERATE TRANSCRIPTS
-  const _handleGenerateTranscript = async () => {
-    if (!data?.class?.id) {
-      alert("Class not loaded");
-      return;
-    }
-
-    try {
-      await apiClient.post("/teacher/transcript/generate", {
-        classId: data.class.id,
-        termId: selectedTerm,
-      });
-
-      alert("Transcripts generated ✅");
-    } catch (err) {
-      console.error("Transcript error", err);
-      alert(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to generate transcripts");
-    }
-  };
-
   // 🧠 SCORE SAVE
     const handleScoreChange = async (
       studentId,
@@ -883,13 +863,6 @@ useEffect(() => {
           className="border p-2"
         />
 
-        <button
-          disabled
-          title="Coming soon"
-          className="bg-gray-400 text-white px-4 py-2 cursor-not-allowed opacity-70"
-        >
-          Generate Transcripts (will be unlocked in a future update)
-        </button>
       </div>
 
       {/* 🔥 NEW BUTTON */}

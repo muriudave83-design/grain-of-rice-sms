@@ -26,7 +26,7 @@ const dedupeUpdates = (updates: any[]) => {
 // 🧠 ✅ SINGLE SOURCE OF TRUTH (GRADEBOOK ENGINE)
 //
 
-const calculateFinalGradeForStudent = (
+export const calculateFinalGradeForStudent = (
   studentId: number,
   assignments: any[]
 ) => {
@@ -312,7 +312,7 @@ export const createAssignment = async (req: Request, res: Response) => {
     const numericTermId = Number(termId);
     const teacherSubject = await prisma.teacherSubject.findFirst({
       where: { id: tsId, teacherId: (req as any).user.id },
-      select: { classId: true },
+      select: { classId: true, subjectId: true },
     });
     if (!teacherSubject) {
       return res.status(403).json({ message: "Not authorized for this class and subject" });
@@ -324,6 +324,20 @@ export const createAssignment = async (req: Request, res: Response) => {
     });
     if (!term) {
       return res.status(400).json({ message: "Term does not belong to the assigned class" });
+    }
+
+    const publishedGrade = await prisma.grade.findFirst({
+      where: {
+        subjectId: teacherSubject.subjectId,
+        termId: numericTermId,
+        student: { classId: teacherSubject.classId },
+      },
+      select: { id: true },
+    });
+    if (publishedGrade) {
+      return res.status(409).json({
+        message: "Final grades are already published for this subject and term",
+      });
     }
 
     const last = await prisma.assignment.findFirst({
@@ -633,6 +647,24 @@ export const getReportData = async (req: Request, res: Response) => {
 
     const teacherId = (req as any).user.id;
 
+    const [assigned, term] = await Promise.all([
+      prisma.teacherSubject.findFirst({
+        where: { classId, teacherId },
+        select: { id: true },
+      }),
+      prisma.term.findFirst({
+        where: { id: termId, classId },
+      }),
+    ]);
+
+    if (!assigned) {
+      return res.status(403).json({ error: "Not assigned to this class" });
+    }
+
+    if (!term) {
+      return res.status(404).json({ error: "Term not found for this class" });
+    }
+
     /**
      * STUDENTS
      */
@@ -667,19 +699,6 @@ export const getReportData = async (req: Request, res: Response) => {
         student: { classId },
       },
     });
-
-    /**
-     * TERM
-     */
-    const term = await prisma.term.findUnique({
-      where: { id: termId },
-    });
-
-    if (!term) {
-      return res.status(404).json({
-        error: "Term not found",
-      });
-    }
 
     /**
      * BUILD REPORTS
@@ -759,6 +778,7 @@ export const getReportData = async (req: Request, res: Response) => {
         return {
           studentId: student.id,
           name: `${student.firstName} ${student.lastName}`,
+          admissionNo: student.admissionNo,
           subjects: subjectResults,
 
           present,
@@ -845,73 +865,247 @@ export const saveReportComment = async (req: Request, res: Response) => {
 // 🧾 TRANSCRIPTS — NOW TERM-AWARE ✅
 //
 
-export const generateTranscripts = async (req: Request, res: Response) => {
-  const { classId, termId } = req.body;
-
-  if (!termId) {
-    return res.status(400).json({
-      error: "termId required",
-    });
-  }
-
+export const publishFinalGrades = async (req: Request, res: Response) => {
   try {
-    const students = await prisma.student.findMany({
-      where: { classId, isArchived: false },
-    });
+    const classId = Number(req.params.classId);
+    const termId = Number(req.body.termId);
+    const teacherId = (req as any).user.id;
 
-    const subjects = await prisma.teacherSubject.findMany({
-      where: { classId },
-      include: {
-        subject: true,
-        assignments: {
-          where: {
-            termId: Number(termId),
-          },
-          include: { scores: true },
+    if (!classId || !termId) {
+      return res.status(400).json({ error: "classId and termId are required" });
+    }
+
+    const [term, students, teacherSubjects] = await Promise.all([
+      prisma.term.findFirst({ where: { id: termId, classId }, select: { id: true } }),
+      prisma.student.findMany({
+        where: { classId, isArchived: false },
+        select: { id: true, firstName: true, lastName: true },
+      }),
+      prisma.teacherSubject.findMany({
+        where: { teacherId, classId },
+        include: {
+          subject: { select: { id: true, name: true } },
+          assignments: { where: { termId }, include: { scores: true } },
         },
-      },
-    });
+      }),
+    ]);
 
-    for (const student of students) {
-      const existing = await prisma.transcript.findUnique({
-        where: {
-          studentId_classId_termId: {
-            studentId: student.id,
-            classId,
-            termId: Number(termId),
-          },
-        },
-      });
+    if (teacherSubjects.length === 0) {
+      return res.status(403).json({ error: "Not assigned to this class" });
+    }
+    if (!term) {
+      return res.status(400).json({ error: "Term does not belong to this class" });
+    }
+    if (students.length === 0) {
+      return res.status(400).json({ error: "No active students are assigned to this class" });
+    }
 
-      if (existing) continue;
+    const missing: Array<{
+      studentId?: number;
+      student?: string;
+      subject: string;
+      assignment?: string;
+    }> = [];
 
-      const transcript = await prisma.transcript.create({
-        data: {
-          studentId: student.id,
-          classId,
-          termId: Number(termId),
-        },
-      });
+    for (const teacherSubject of teacherSubjects) {
+      if (teacherSubject.assignments.length === 0) {
+        missing.push({ subject: teacherSubject.subject.name });
+        continue;
+      }
 
-      for (const ts of subjects) {
-        // 🔥 Uses UPDATED grading logic
-        const avg = calculateFinalGradeForStudent(
-          student.id,
-          ts.assignments
-        );
-
-        await prisma.transcriptEntry.create({
-          data: {
-            transcriptId: transcript.id,
-            subjectName: ts.subject.name,
-            finalGrade: Number(avg.toFixed(1)),
-            letterGrade: getLetterGrade(avg),
-          },
+      if (teacherSubject.assignments.some((assignment) => assignment.maxPoints <= 0)) {
+        return res.status(409).json({
+          error: `Cannot publish ${teacherSubject.subject.name}: assignment max points must be greater than zero.`,
         });
+      }
+
+      const totalWeight = teacherSubject.assignments.reduce(
+        (sum, assignment) => sum + (assignment.weight ?? 1),
+        0
+      );
+      if (totalWeight <= 0) {
+        return res.status(409).json({
+          error: `Cannot publish ${teacherSubject.subject.name}: total assignment weight must be greater than zero.`,
+        });
+      }
+
+      for (const student of students) {
+        for (const assignment of teacherSubject.assignments) {
+          if (!assignment.scores.some((score) => score.studentId === student.id)) {
+            missing.push({
+              studentId: student.id,
+              student: `${student.firstName} ${student.lastName}`,
+              subject: teacherSubject.subject.name,
+              assignment: assignment.title,
+            });
+          }
+        }
       }
     }
 
-    res.json({ success: true });
+    if (missing.length > 0) {
+      return res.status(409).json({
+        error: "Final grades cannot be published until every active student has a score for every assignment.",
+        missing,
+      });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      let publishedGrades = 0;
+
+      for (const teacherSubject of teacherSubjects) {
+        for (const student of students) {
+          const total = Number(
+            calculateFinalGradeForStudent(student.id, teacherSubject.assignments).toFixed(1)
+          );
+
+          await tx.grade.upsert({
+            where: {
+              studentId_subjectId_termId: {
+                studentId: student.id,
+                subjectId: teacherSubject.subjectId,
+                termId,
+              },
+            },
+            update: { average: total / 100, total },
+            create: {
+              studentId: student.id,
+              subjectId: teacherSubject.subjectId,
+              termId,
+              average: total / 100,
+              total,
+            },
+          });
+          publishedGrades++;
+        }
+
+        await tx.assignment.updateMany({
+          where: { id: { in: teacherSubject.assignments.map((assignment) => assignment.id) } },
+          data: { isLocked: true },
+        });
+      }
+
+      return { publishedGrades };
+    });
+
+    return res.json({
+      success: true,
+      ...result,
+      message: "Final grades published and contributing assignments locked.",
+    });
+  } catch (err) {
+    console.error("PUBLISH FINAL GRADES ERROR:", err);
+    return res.status(500).json({ error: "Failed to publish final grades" });
+  }
+};
+
+export const generateTranscripts = async (req: Request, res: Response) => {
+  try {
+    const classId = Number(req.body.classId);
+    const termId = Number(req.body.termId);
+    const teacherId = (req as any).user.id;
+
+    if (!classId || !termId) {
+      return res.status(400).json({ error: "classId and termId are required" });
+    }
+
+    const [assigned, term, students, classSubjects] = await Promise.all([
+      prisma.teacherSubject.findFirst({
+        where: { teacherId, classId },
+        select: { id: true },
+      }),
+      prisma.term.findFirst({
+        where: { id: termId, classId },
+        select: { id: true },
+      }),
+      prisma.student.findMany({
+        where: { classId, isArchived: false },
+        select: { id: true },
+      }),
+      prisma.classSubject.findMany({
+        where: { classId },
+        include: { subject: { select: { id: true, name: true } } },
+      }),
+    ]);
+
+    if (!assigned) {
+      return res.status(403).json({ error: "Not assigned to this class" });
+    }
+    if (!term) {
+      return res.status(400).json({ error: "Term does not belong to this class" });
+    }
+    if (students.length === 0) {
+      return res.status(400).json({ error: "No active students are assigned to this class" });
+    }
+    if (classSubjects.length === 0) {
+      return res.status(400).json({ error: "No subjects are configured for this class" });
+    }
+
+    const studentIds = students.map((student) => student.id);
+    const subjectIds = classSubjects.map((entry) => entry.subjectId);
+    const grades = await prisma.grade.findMany({
+      where: {
+        termId,
+        studentId: { in: studentIds },
+        subjectId: { in: subjectIds },
+      },
+    });
+    const gradeMap = new Map(
+      grades.map((grade) => [`${grade.studentId}-${grade.subjectId}`, grade])
+    );
+    const missing = students.flatMap((student) =>
+      classSubjects
+        .filter((entry) => !gradeMap.has(`${student.id}-${entry.subjectId}`))
+        .map((entry) => ({ studentId: student.id, subject: entry.subject.name }))
+    );
+
+    if (missing.length > 0) {
+      return res.status(409).json({
+        error: "All class subjects must have published final grades before transcripts can be generated.",
+        missing,
+      });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      let generated = 0;
+      let existing = 0;
+
+      for (const student of students) {
+        const prior = await tx.transcript.findUnique({
+          where: { studentId_classId_termId: { studentId: student.id, classId, termId } },
+          select: { id: true },
+        });
+        if (prior) {
+          existing++;
+          continue;
+        }
+
+        const studentGrades = classSubjects.map((entry) => ({
+          subjectName: entry.subject.name,
+          grade: gradeMap.get(`${student.id}-${entry.subjectId}`)!,
+        }));
+
+        await tx.transcript.create({
+          data: {
+            studentId: student.id,
+            classId,
+            termId,
+            entries: {
+              create: studentGrades.map(({ subjectName, grade }) => ({
+                subjectName,
+                finalGrade: Number(grade.total.toFixed(1)),
+                letterGrade: getLetterGrade(grade.total),
+              })),
+            },
+          },
+        });
+        generated++;
+      }
+
+      return { generated, existing };
+    });
+
+    res.json({ success: true, ...result });
   } catch (err) {
     console.error("TRANSCRIPT ERROR:", err);
     res.status(500).json({ message: "Failed to generate transcripts" });

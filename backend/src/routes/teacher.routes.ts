@@ -18,6 +18,7 @@ import {
   bulkUpdateScores,
   getReportData,
   saveReportComment,
+  publishFinalGrades,
 } from "../controllers/teacher.controller";
 
 const router = Router();
@@ -59,15 +60,24 @@ router.get("/final-grades/:classId", async (req, res) => {
     };
 
     let jsonData: any = [];
+    let responseStatus = 200;
 
     const mockRes: any = {
       json: (data: any) => {
         jsonData = data;
+        return mockRes;
       },
-      status: () => mockRes,
+      status: (status: number) => {
+        responseStatus = status;
+        return mockRes;
+      },
     };
 
     await getReportData(mockReq, mockRes);
+
+    if (!Array.isArray(jsonData)) {
+      return res.status(responseStatus).json(jsonData);
+    }
 
     const results = jsonData.map((student: any) => {
       const subjects = student.subjects || [];
@@ -76,8 +86,13 @@ router.get("/final-grades/:classId", async (req, res) => {
         return {
           studentId: student.studentId,
           name: student.name,
+          admissionNo: student.admissionNo,
           average: 0,
           letter: "-",
+          gradeDescription: null,
+          subjects: [],
+          position: null,
+          remarks: "",
         };
       }
 
@@ -100,19 +115,38 @@ router.get("/final-grades/:classId", async (req, res) => {
       return {
         studentId: student.studentId,
         name: student.name,
+        admissionNo: student.admissionNo,
         average: rounded,
         letter,
         gradeDescription: getGradeDescription(letter),
+        subjects: subjects.map((subject: any) => subject.subjectName),
+        position: null,
+        remarks: "",
       };
     });
 
-    res.json(results);
+    const ranked = [...results].sort((a, b) => b.average - a.average);
+    const positions = new Map<number, number>();
+    ranked.forEach((student, index) => {
+      const previous = ranked[index - 1];
+      const position = previous && previous.average === student.average
+        ? positions.get(previous.studentId)!
+        : index + 1;
+      positions.set(student.studentId, position);
+    });
+
+    res.json(results.map((student: any) => ({
+      ...student,
+      position: positions.get(student.studentId) ?? null,
+    })));
 
   } catch (err) {
     console.error("FINAL GRADES ERROR:", err);
     res.status(500).json({ message: "Server error" });
   }
 });
+
+router.post("/final-grades/:classId/publish", publishFinalGrades);
 
 //
 // 🧱 SCORES
@@ -148,10 +182,30 @@ router.put("/assignment/:id/lock", async (req, res) => {
         id: Number(id),
         teacherSubject: { teacherId: req.user!.id },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        termId: true,
+        teacherSubject: { select: { subjectId: true, classId: true } },
+      },
     });
     if (!owned) {
       return res.status(404).json({ message: "Assignment not found" });
+    }
+
+    if (!isLocked) {
+      const publishedGrade = await prisma.grade.findFirst({
+        where: {
+          subjectId: owned.teacherSubject.subjectId,
+          termId: owned.termId,
+          student: { classId: owned.teacherSubject.classId },
+        },
+        select: { id: true },
+      });
+      if (publishedGrade) {
+        return res.status(409).json({
+          message: "Published final-grade assignments cannot be unlocked",
+        });
+      }
     }
 
     const assignment = await prisma.assignment.update({
