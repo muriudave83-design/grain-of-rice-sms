@@ -8,6 +8,7 @@ import {
   toggleTermLock,
   updateTerm,
   deleteTerm,
+  getTermDeletePreviewController,
 } from "../controllers/termController";
 
 const router = Router();
@@ -100,6 +101,13 @@ router.put(
   toggleTermLock
 );
 
+router.get(
+  "/:id/delete-preview",
+  authenticate,
+  requireRole(["ADMIN"]),
+  getTermDeletePreviewController
+);
+
 router.put(
   "/:id",
   authenticate,
@@ -108,7 +116,7 @@ router.put(
 );
 
 router.delete(
-  "/:id",
+  "/:id/with-data",
   authenticate,
   requireRole(["ADMIN"]),
   deleteTerm

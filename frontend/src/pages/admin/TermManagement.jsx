@@ -20,6 +20,9 @@ export default function TermManagement() {
 
   const [editingTerm, setEditingTerm] =
     useState(null);
+  const [deletePreview, setDeletePreview] = useState(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   async function fetchTerms() {
     try {
@@ -189,43 +192,54 @@ export default function TermManagement() {
     }
   }
 
-async function deleteTerm(id) {
-  const confirmed = window.confirm(
-    "Delete this term?"
-  );
-
-  if (!confirmed) return;
-
+async function openDeletePreview(id) {
   try {
     const token = localStorage.getItem("token");
-
-    const res = await fetch(
-      `${API_URL}/terms/${id}`,
-      {
-        method: "DELETE",
-        credentials: "include",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
+    const res = await fetch(`${API_URL}/terms/${id}/delete-preview`, {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+    });
     const data = await res.json();
-
     if (!res.ok) {
-      alert(
-        data.message ||
-          "Failed to delete term"
-      );
+      alert(data.message || "Failed to preview term deletion");
       return;
     }
+    setDeletePreview(data);
+    setDeleteConfirmation("");
+  } catch (err) {
+    console.error(err);
+    alert("Failed to preview term deletion");
+  }
+}
 
-    alert("Term deleted successfully");
-
+async function deleteTermData() {
+  if (!deletePreview || deleteConfirmation !== deletePreview.confirmation) return;
+  try {
+    setDeleteBusy(true);
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${API_URL}/terms/${deletePreview.term.id}/with-data`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ confirmation: deleteConfirmation }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.message || "Term deletion rolled back");
+      return;
+    }
+    alert(data.message);
+    setDeletePreview(null);
+    setDeleteConfirmation("");
     fetchTerms();
   } catch (err) {
     console.error(err);
-    alert("Delete failed");
+    alert("Term deletion rolled back");
+  } finally {
+    setDeleteBusy(false);
   }
 }
 
@@ -441,16 +455,77 @@ async function deleteTerm(id) {
               {/* DELETE */}
               <button
                 onClick={() =>
-                  deleteTerm(t.id)
+                  openDeletePreview(t.id)
                 }
                 className="bg-red-600 text-white px-3 py-1 rounded"
               >
-                Delete
+                Delete Term Data
               </button>
             </div>
           </div>
         ))}
       </div>
+
+      {deletePreview && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-4">
+            <h2 className="text-xl font-bold text-red-700">Permanently Delete Term Data</h2>
+            <p>
+              Delete {deletePreview.term.name} for {deletePreview.term.class.name} ({deletePreview.term.academicYear})?
+            </p>
+            <p className="font-semibold">
+              This permanently deletes only records explicitly attached to this Term. This cannot be undone.
+            </p>
+            <div>
+              <h3 className="font-semibold">Will delete</h3>
+              <ul className="grid grid-cols-2 gap-x-4 text-sm">
+                {Object.entries(deletePreview.willDelete).map(([name, count]) => (
+                  <li key={name}>{name}: {count}</li>
+                ))}
+              </ul>
+              <p className="mt-2 font-semibold">Total related records: {deletePreview.totalRelatedRecords}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-green-700">Will preserve</h3>
+              <p className="text-sm">{deletePreview.willPreserve.join(", ")}</p>
+              <p className="text-sm">{deletePreview.financialData}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-amber-700">Unresolved / not owned (preserved)</h3>
+              <ul className="text-sm">
+                {Object.entries(deletePreview.unresolvedNotOwned).map(([name, count]) => (
+                  <li key={name}>{name}: {count}</li>
+                ))}
+              </ul>
+            </div>
+            <label className="block font-medium">
+              Type <span className="font-bold">{deletePreview.confirmation}</span> to confirm
+              <input
+                className="border p-2 w-full mt-1"
+                value={deleteConfirmation}
+                onChange={(event) => setDeleteConfirmation(event.target.value)}
+                autoComplete="off"
+              />
+            </label>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setDeletePreview(null); setDeleteConfirmation(""); }}
+                disabled={deleteBusy}
+                className="border px-4 py-2 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteTermData}
+                disabled={deleteBusy || deleteConfirmation !== deletePreview.confirmation}
+                className="bg-red-700 disabled:bg-gray-400 text-white px-4 py-2 rounded"
+              >
+                {deleteBusy ? "Deleting..." : "Delete Term and Data"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingTerm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">

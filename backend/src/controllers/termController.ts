@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
+import { deleteTermData, getTermDeletePreview } from "../services/termDeletion.service";
 
 // GET /api/admin/terms
 export async function getTerms(
@@ -266,101 +267,39 @@ export async function updateTerm(
   }
 }
 
-// DELETE TERM
+export async function getTermDeletePreviewController(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid term ID" });
+  try {
+    return res.json(await getTermDeletePreview(prisma, id));
+  } catch (error: any) {
+    return res.status(error?.status ?? 500).json({ message: error?.message ?? "Failed to preview term deletion" });
+  }
+}
+
+// DELETE TERM AND ITS PROVEN TERM-OWNED DATA
 export async function deleteTerm(
   req: Request,
   res: Response
 ) {
   try {
     const id = Number(req.params.id);
-
-    const [
-      assignments,
-      grades,
-      attendance,
-      reportCards,
-      reportComments,
-      discipline,
-      transcripts,
-      assessments,
-    ] = await Promise.all([
-      prisma.assignment.count({
-        where: { termId: id },
-      }),
-
-      prisma.grade.count({
-        where: { termId: id },
-      }),
-
-      prisma.attendanceSession.count({
-        where: { termId: id },
-      }),
-
-      prisma.reportCard.count({
-        where: { termId: id },
-      }),
-
-      prisma.reportComment.count({
-        where: { termId: id },
-      }),
-
-      prisma.discipline.count({
-        where: { termId: id },
-      }),
-
-      prisma.transcript.count({
-        where: { termId: id },
-      }),
-
-      prisma.assessment.count({
-        where: { termId: id },
-      }),
-    ]);
-
-    const totalUsage =
-      assignments +
-      grades +
-      attendance +
-      reportCards +
-      reportComments +
-      discipline +
-      transcripts +
-      assessments;
-
-    if (totalUsage > 0) {
-      return res.status(400).json({
-        message:
-          "Cannot delete term because it contains academic records. Archive the term instead.",
-
-        stats: {
-          assignments,
-          grades,
-          attendance,
-          reportCards,
-          reportComments,
-          discipline,
-          transcripts,
-          assessments,
-        },
-      });
-    }
-
-    await prisma.term.delete({
-      where: {
-        id,
-      },
-    });
-
+    if (!Number.isInteger(id)) return res.status(400).json({ message: "Invalid term ID" });
+    const preview = await deleteTermData(prisma, id, req.body?.confirmation);
     return res.json({
       success: true,
+      message: `Term and ${preview.totalRelatedRecords} related records deleted successfully`,
+      deleted: preview.willDelete,
     });
 
   } catch (error: any) {
     console.error(error);
-
-    return res.status(500).json({
-      message: "Failed to delete term",
-      error: error.message,
-    });
+    if (error?.status) return res.status(error.status).json({ message: error.message });
+    if (error?.code === "P2003") {
+      return res.status(409).json({
+        message: "Cannot delete this Term because unresolved records still reference it. Term deletion rolled back.",
+      });
+    }
+    return res.status(500).json({ message: "Term deletion rolled back" });
   }
 }
