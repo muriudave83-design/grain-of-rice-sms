@@ -9,9 +9,25 @@ import {
   updateTerm,
   deleteTerm,
   getTermDeletePreviewController,
+  previewStartNewTerm,
+  startNewTerm,
 } from "../controllers/termController";
 
 const router = Router();
+
+router.post(
+  "/start-new-term/preview",
+  authenticate,
+  requireRole(["ADMIN"]),
+  previewStartNewTerm
+);
+
+router.post(
+  "/start-new-term",
+  authenticate,
+  requireRole(["ADMIN"]),
+  startNewTerm
+);
 
 /**
  * GET /api/terms

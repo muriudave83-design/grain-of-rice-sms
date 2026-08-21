@@ -23,6 +23,15 @@ export default function TermManagement() {
   const [deletePreview, setDeletePreview] = useState(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [schoolForm, setSchoolForm] = useState({
+    name: "",
+    academicYear: "",
+    startDate: "",
+    endDate: "",
+  });
+  const [startPreview, setStartPreview] = useState(null);
+  const [startConfirmation, setStartConfirmation] = useState("");
+  const [startBusy, setStartBusy] = useState(false);
 
   async function fetchTerms() {
     try {
@@ -243,6 +252,66 @@ async function deleteTermData() {
   }
 }
 
+async function previewNewTerm() {
+  try {
+    setStartBusy(true);
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${API_URL}/terms/start-new-term/preview`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(schoolForm),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.message || "Failed to preview new Term");
+      return;
+    }
+    setStartPreview(data);
+    setStartConfirmation("");
+  } catch (err) {
+    console.error(err);
+    alert("Failed to preview new Term");
+  } finally {
+    setStartBusy(false);
+  }
+}
+
+async function startNewTerm() {
+  if (!startPreview || startConfirmation !== startPreview.confirmation) return;
+  try {
+    setStartBusy(true);
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${API_URL}/terms/start-new-term`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ ...schoolForm, confirmation: startConfirmation }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(data.message || "Start New Term rolled back");
+      return;
+    }
+    alert(data.message);
+    setStartPreview(null);
+    setStartConfirmation("");
+    setSchoolForm({ name: "", academicYear: "", startDate: "", endDate: "" });
+    fetchTerms();
+  } catch (err) {
+    console.error(err);
+    alert("Start New Term rolled back");
+  } finally {
+    setStartBusy(false);
+  }
+}
+
   useEffect(() => {
     fetchTerms();
     fetchClasses();
@@ -257,6 +326,59 @@ async function deleteTermData() {
       <p className="text-sm text-gray-600 mb-4">
         Terms are class-specific. Creating a term for one class does not configure it for any other class.
       </p>
+
+      <section className="border-2 border-indigo-200 bg-indigo-50 rounded p-5 mb-8">
+        <h2 className="text-xl font-bold">Start New Term for All Active Classes</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Preview and create one class-specific Term for every active class. Archived classes and exact duplicates are skipped.
+        </p>
+        <div className="grid md:grid-cols-4 gap-4">
+          <label className="text-sm font-medium">Term
+            <select
+              className="border p-2 w-full mt-1"
+              value={schoolForm.name}
+              onChange={(event) => setSchoolForm({ ...schoolForm, name: event.target.value })}
+            >
+              <option value="">Select Term</option>
+              {SYSTEM_TERMS.map((term) => <option key={term} value={term}>{term}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-medium">Academic Year
+            <input
+              className="border p-2 w-full mt-1"
+              placeholder="2026 or 2026/2027"
+              value={schoolForm.academicYear}
+              onChange={(event) => setSchoolForm({ ...schoolForm, academicYear: event.target.value })}
+            />
+          </label>
+          <label className="text-sm font-medium">Start Date
+            <input
+              type="date"
+              className="border p-2 w-full mt-1"
+              value={schoolForm.startDate}
+              onChange={(event) => setSchoolForm({ ...schoolForm, startDate: event.target.value })}
+            />
+          </label>
+          <label className="text-sm font-medium">End Date
+            <input
+              type="date"
+              className="border p-2 w-full mt-1"
+              value={schoolForm.endDate}
+              onChange={(event) => setSchoolForm({ ...schoolForm, endDate: event.target.value })}
+            />
+          </label>
+        </div>
+        <button
+          onClick={previewNewTerm}
+          disabled={startBusy}
+          className="mt-4 bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded"
+        >
+          {startBusy ? "Checking..." : "Preview All Active Classes"}
+        </button>
+      </section>
+
+      <h2 className="text-xl font-bold mb-2">Create Term for One Class</h2>
+      <p className="text-sm text-gray-600 mb-4">Use this for a new class, special program, or one missing class Term.</p>
 
       <div className="grid grid-cols-5 gap-4 mb-4">
         <label className="text-sm font-medium">
@@ -465,6 +587,62 @@ async function deleteTermData() {
           </div>
         ))}
       </div>
+
+      {startPreview && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-4">
+            <h2 className="text-xl font-bold">Start {startPreview.proposal.name} — {startPreview.proposal.academicYear}</h2>
+            <p>Permanent school data and historical Term data are unaffected.</p>
+            <div>
+              <h3 className="font-semibold text-green-700">Will create ({startPreview.totalCreate})</h3>
+              <p className="text-sm">{startPreview.willCreate.map((item) => item.className).join(", ") || "None"}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold">Exact duplicates skipped ({startPreview.totalSkip})</h3>
+              <p className="text-sm">{startPreview.skipped.map((item) => item.className).join(", ") || "None"}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-600">Archived classes excluded ({startPreview.archivedClassesExcluded.length})</h3>
+              <p className="text-sm">{startPreview.archivedClassesExcluded.map((item) => item.className).join(", ") || "None"}</p>
+            </div>
+            <div>
+              <h3 className="font-semibold text-red-700">Conflicts ({startPreview.totalConflicts})</h3>
+              {startPreview.conflicts.length ? (
+                <ul className="text-sm list-disc pl-5">
+                  {startPreview.conflicts.map((item) => <li key={item.classId}>{item.className}: {item.reason}</li>)}
+                </ul>
+              ) : <p className="text-sm">None</p>}
+            </div>
+            {startPreview.totalConflicts > 0 && (
+              <p className="bg-red-50 border border-red-300 p-3 rounded text-red-800">
+                Resolve these conflicts by editing or deleting the existing class Term, then preview again. Nothing can be created yet.
+              </p>
+            )}
+            <label className="block font-medium">
+              Type <span className="font-bold">{startPreview.confirmation}</span> to confirm
+              <input
+                className="border p-2 w-full mt-1"
+                value={startConfirmation}
+                onChange={(event) => setStartConfirmation(event.target.value)}
+                disabled={startPreview.totalConflicts > 0}
+                autoComplete="off"
+              />
+            </label>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setStartPreview(null); setStartConfirmation(""); }}
+                disabled={startBusy}
+                className="border px-4 py-2 rounded"
+              >Cancel</button>
+              <button
+                onClick={startNewTerm}
+                disabled={startBusy || startPreview.totalConflicts > 0 || startConfirmation !== startPreview.confirmation}
+                className="bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2 rounded"
+              >{startBusy ? "Starting..." : `Start ${startPreview.proposal.name}`}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {deletePreview && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">

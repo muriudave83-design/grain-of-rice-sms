@@ -1,6 +1,39 @@
 import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
 import { deleteTermData, getTermDeletePreview } from "../services/termDeletion.service";
+import { getStartNewTermPreview, startNewTermForActiveClasses } from "../services/startNewTerm.service";
+
+export async function previewStartNewTerm(req: Request, res: Response) {
+  try {
+    return res.json(await getStartNewTermPreview(prisma, req.body));
+  } catch (error: any) {
+    return res.status(error?.status ?? 500).json({
+      message: error?.message ?? "Failed to preview new Term",
+      ...(error?.conflicts ? { conflicts: error.conflicts } : {}),
+    });
+  }
+}
+
+export async function startNewTerm(req: Request, res: Response) {
+  try {
+    const result = await startNewTermForActiveClasses(prisma, req.body, req.body?.confirmation);
+    return res.status(201).json({
+      message: `${result.totalCreated} class-specific Terms created successfully`,
+      created: result.created,
+      skipped: result.skipped,
+      totalCreated: result.totalCreated,
+      totalSkipped: result.totalSkip,
+    });
+  } catch (error: any) {
+    if (error?.code === "P2002") {
+      return res.status(409).json({ message: "A matching Term was created concurrently. Preview again." });
+    }
+    return res.status(error?.status ?? 500).json({
+      message: error?.message ?? "Start New Term rolled back",
+      ...(error?.conflicts ? { conflicts: error.conflicts } : {}),
+    });
+  }
+}
 
 // GET /api/admin/terms
 export async function getTerms(
