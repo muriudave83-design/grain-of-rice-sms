@@ -134,8 +134,16 @@ export default function AdminDashboard() {
       </h1>
 
       {/* 🔥 TERM SELECTOR + LOCK BUTTON */}
-      <div className="mb-6 flex items-center">
+      <div className="mb-6">
+        <label className="block text-sm font-medium mb-1" htmlFor="dashboard-term-filter">
+          Dashboard filter — class-specific term
+        </label>
+        <p className="text-sm text-gray-500 mb-2">
+          This filters dashboard data only. It does not assign a term to other classes.
+        </p>
+        <div className="flex items-center">
         <select
+          id="dashboard-term-filter"
           value={currentTermId}
           onChange={(e) => {
             const id = e.target.value;
@@ -187,6 +195,7 @@ export default function AdminDashboard() {
             ? "Unlock Term"
             : "Lock Term"}
         </button>
+        </div>
       </div>
 
       {/* 🔥 FINANCIAL + DISCIPLINE STATS */}

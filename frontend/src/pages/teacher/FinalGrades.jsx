@@ -1,73 +1,114 @@
 import { useEffect, useState } from "react";
 import apiClient from "../../services/apiClient";
-import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import BackButton from "../../components/BackButton";
 import { formatGrade } from "../../utils/grading";
 
 export default function FinalGrades() {
   const { classId } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-
   const termIdRaw = searchParams.get("termId");
   const termId = termIdRaw ? Number(termIdRaw) : null;
 
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [terms, setTerms] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!classId || !termId) return;
+    const fetchTerms = async () => {
+      try {
+        setError("");
+        const res = await apiClient.get(`/teacher/terms/${classId}`);
+        const classTerms = res.data || [];
+        setTerms(classTerms);
+
+        if (classTerms.some((term) => term.id === termId)) return;
+
+        if (classTerms.length === 0) {
+          setError("No term is configured for this class. Contact an administrator.");
+        } else if (classTerms.length === 1) {
+          setSearchParams({ termId: String(classTerms[0].id) }, { replace: true });
+        } else {
+          setSearchParams({}, { replace: true });
+        }
+      } catch (err) {
+        setError(
+          err?.response?.data?.error ||
+            err?.response?.data?.message ||
+            err?.message ||
+            "Failed to load terms"
+        );
+      }
+    };
+
+    if (classId) fetchTerms();
+  }, [classId, termId, setSearchParams]);
+
+  useEffect(() => {
+    if (!classId || !termId) {
+      setData([]);
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError("");
+        const res = await apiClient.get(
+          `/teacher/final-grades/${classId}?termId=${termId}`
+        );
+        setData(res.data || []);
+      } catch (err) {
+        console.error("Final Grades fetch error:", err);
+        setData([]);
+        setError(
+          err?.response?.data?.error ||
+            err?.response?.data?.message ||
+            err?.message ||
+            "Failed to load final grades"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchData();
   }, [classId, termId]);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-
-      const res = await apiClient.get(
-        `/teacher/final-grades/${classId}?termId=${termId}`
-      );
-
-      setData(res.data || []);
-    } catch (err) {
-      console.error("Final Grades fetch error:", err);
-      setData([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (!termId) {
-    return (
-      <div className="p-6 text-red-500">
-        <BackButton />
-        Missing term. Please go back and select a term.
-      </div>
-    );
-  }
-
-  if (loading) return <div className="p-6">Loading...</div>;
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <BackButton />
 
-      {/* 🧱 PAGE STRUCTURE */}
       <h1 className="text-2xl font-bold mb-1">Final Grades</h1>
-      <p className="text-sm text-gray-500 mb-4">
-        Class: {classId} — Term {termId}
-      </p>
+      <p className="text-sm text-gray-500 mb-4">Class: {classId}</p>
 
-      {/* 🔘 ACTIONS */}
+      <select
+        value={termId ?? ""}
+        onChange={(event) => setSearchParams({ termId: event.target.value })}
+        className="border px-3 py-2 mb-4"
+      >
+        <option value="" disabled>
+          {terms.length > 1 ? "Select a term" : "Select term"}
+        </option>
+        {terms.map((term) => (
+          <option key={term.id} value={term.id}>
+            {term.name} — {term.academicYear}
+          </option>
+        ))}
+      </select>
+
+      {error && <p className="text-red-500 mb-4">{error}</p>}
+      {loading && <p className="mb-4">Loading...</p>}
+
       <div className="mb-4 flex gap-2">
         <button className="bg-blue-600 text-white px-4 py-2 rounded">
           Publish Final Grades
         </button>
-
         <button className="bg-gray-200 px-4 py-2 rounded">
           Export (Coming Soon)
         </button>
-
         <button
           onClick={() => navigate("/teacher/classes")}
           className="bg-gray-100 px-4 py-2 rounded"
@@ -76,15 +117,12 @@ export default function FinalGrades() {
         </button>
       </div>
 
-      {data.length === 0 ? (
+      {!termId ? (
+        <p>Select a term to view final grades.</p>
+      ) : !loading && data.length === 0 ? (
         <p>No students found.</p>
       ) : (
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-          }}
-        >
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr>
               <th style={thStyle}>#</th>
@@ -95,45 +133,20 @@ export default function FinalGrades() {
               <th style={thStyle}>Remarks</th>
             </tr>
           </thead>
-
           <tbody>
             {data.map((student, index) => {
               const grade = student.letter;
               const avg = student.average;
-
               return (
-                <tr
-                  key={student.studentId}
-                  style={{
-                    background: index === 0 ? "#f9f9f9" : "transparent",
-                  }}
-                >
+                <tr key={student.studentId} style={{ background: index === 0 ? "#f9f9f9" : "transparent" }}>
                   <td style={tdStyle}>{index + 1}</td>
-
                   <td style={tdStyle}>{student.name}</td>
-
-                  <td style={{ ...tdStyle, textAlign: "center" }}>
-                    {avg.toFixed(1)}%
-                  </td>
-
-                  <td
-                    style={{
-                      ...tdStyle,
-                      fontWeight: "bold",
-                      color: grade === "F" ? "red" : "black",
-                      textAlign: "center",
-                    }}
-                  >
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{avg.toFixed(1)}%</td>
+                  <td style={{ ...tdStyle, fontWeight: "bold", color: grade === "F" ? "red" : "black", textAlign: "center" }}>
                     {formatGrade(grade, "-")}
                   </td>
-
-                  <td style={{ ...tdStyle, textAlign: "center" }}>
-                    {student.position ?? "-"}
-                  </td>
-
-                  <td style={tdStyle}>
-                    {student.remarks ?? "-"}
-                  </td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{student.position ?? "-"}</td>
+                  <td style={tdStyle}>{student.remarks ?? "-"}</td>
                 </tr>
               );
             })}
@@ -143,8 +156,6 @@ export default function FinalGrades() {
     </div>
   );
 }
-
-/* 🎨 SIMPLE STYLES (INLINE, CLEAN) */
 
 const thStyle = {
   background: "#f5f5f5",

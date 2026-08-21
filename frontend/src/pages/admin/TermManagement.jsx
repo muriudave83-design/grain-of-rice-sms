@@ -240,9 +240,15 @@ async function deleteTerm(id) {
         Academic Terms
       </h1>
 
+      <p className="text-sm text-gray-600 mb-4">
+        Terms are class-specific. Creating a term for one class does not configure it for any other class.
+      </p>
+
       <div className="grid grid-cols-5 gap-4 mb-4">
+        <label className="text-sm font-medium">
+          Term
         <select
-          className="border p-2"
+          className="border p-2 w-full mt-1"
           value={form.name}
           onChange={(e) =>
             setForm({
@@ -264,9 +270,12 @@ async function deleteTerm(id) {
             </option>
           ))}
         </select>
+        </label>
 
+        <label className="text-sm font-medium">
+          Academic Year
         <input
-          className="border p-2"
+          className="border p-2 w-full mt-1"
           placeholder="Academic Year"
           value={form.academicYear}
           onChange={(e) =>
@@ -276,10 +285,13 @@ async function deleteTerm(id) {
             })
           }
         />
+        </label>
 
+        <label className="text-sm font-medium">
+          Start Date
         <input
           type="date"
-          className="border p-2"
+          className="border p-2 w-full mt-1"
           value={form.startDate}
           onChange={(e) =>
             setForm({
@@ -288,10 +300,13 @@ async function deleteTerm(id) {
             })
           }
         />
+        </label>
 
+        <label className="text-sm font-medium">
+          End Date
         <input
           type="date"
-          className="border p-2"
+          className="border p-2 w-full mt-1"
           value={form.endDate}
           onChange={(e) =>
             setForm({
@@ -300,9 +315,12 @@ async function deleteTerm(id) {
             })
           }
         />
+        </label>
 
+        <label className="text-sm font-medium">
+          Class
         <select
-          className="border p-2"
+          className="border p-2 w-full mt-1"
           value={form.classId}
           onChange={(e) =>
             setForm({
@@ -324,6 +342,7 @@ async function deleteTerm(id) {
             </option>
           ))}
         </select>
+        </label>
       </div>
 
       <button

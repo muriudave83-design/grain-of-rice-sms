@@ -42,7 +42,7 @@ export default function TeacherClasses() {
     }
 
     navigate(
-      `/teacher/final-grades/${teacherSubject.classId}?termId=1`
+      `/teacher/final-grades/${teacherSubject.classId}`
     );
   };
 

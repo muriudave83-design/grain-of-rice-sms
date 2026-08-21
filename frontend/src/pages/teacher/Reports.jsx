@@ -91,18 +91,31 @@ export default function Reports() {
     const fetchTerms = async () => {
       if (!classId) return;
 
+      setTerms([]);
+      setTermId(null);
+      setError("");
+
       try {
         const res = await apiClient.get(
           `/teacher/terms/${classId}`
         );
 
-        setTerms(res.data || []);
+        const classTerms = res.data || [];
+        setTerms(classTerms);
 
-        if (res.data.length > 0) {
-          setTermId(res.data[0].id);
+        if (classTerms.length === 0) {
+          setError("No term is configured for this class. Contact an administrator.");
+        } else if (classTerms.length === 1) {
+          setTermId(classTerms[0].id);
         }
       } catch (err) {
         console.error(err);
+        setError(
+          err?.response?.data?.error ||
+            err?.response?.data?.message ||
+            err?.message ||
+            "Failed to load terms"
+        );
       }
     };
 
@@ -222,6 +235,10 @@ export default function Reports() {
           }
           className="border px-3 py-2"
         >
+          <option value="" disabled>
+            {terms.length > 1 ? "Select a term" : "Select term"}
+          </option>
+
           {terms.map((t) => (
             <option key={t.id} value={t.id}>
               {t.name} (

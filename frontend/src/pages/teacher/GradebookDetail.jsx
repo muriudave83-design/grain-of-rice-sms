@@ -50,9 +50,6 @@ export default function GradebookDetail() {
   const [terms, setTerms] = useState([]);
   const [selectedTerm, setSelectedTerm] = useState(null);
 
-  // 🆕 FULL TERM OBJECT
-  const [_selectedTermData, setSelectedTermData] = useState(null);
-
   // 🆕 ATTENDANCE STATE
   const [attendanceMap, setAttendanceMap] = useState({});
 
@@ -121,56 +118,6 @@ export default function GradebookDetail() {
         console.error("❌ Failed to fetch attendance", err);
       }
   };
-    // 🧱 LOAD TERMS
-  useEffect(() => {
-    async function loadTerms() {
-      try {
-        const res = await apiClient.get(`/teacher/terms/${classId}`);
-
-        console.log("📦 TERMS RESPONSE:", res.data);
-
-      // ✅ Always show all 3 terms
-
-      const normalizedTerms = res.data || [];   
-
-      setTerms(normalizedTerms);
-
-      const forcedTerm = normalizedTerms.find(
-        (t) => t.name === "Term 2"
-      );
-
-      if (forcedTerm) {
-      console.log("✅ Forced Term:", forcedTerm);
-
-      setSelectedTerm(forcedTerm.id);
-
-      // ✅ SAVE FULL TERM
-      setSelectedTermData(forcedTerm);
-      } else {
-      console.warn("⚠️ Term 2 not found");
-
-      setSelectedTerm(null);
-      }
-      } catch (err) {
-        console.error("❌ Failed to load terms", err);
-        setTerms([]);
-        setSelectedTerm(null);
-        setSelectedTermData(null);
-        setError(
-          err?.response?.data?.error ||
-            err?.response?.data?.message ||
-            err?.message ||
-            "Failed to load terms"
-        );
-        setLoading(false);
-      }
-    }
-
-    if (classId) {
-      loadTerms();
-    }
-  }, [classId]);
-
   // 🧱 FETCH GRADEBOOK (DETERMINISTIC — NO RACE CONDITIONS)
   useEffect(() => {
     const init = async () => {
@@ -208,60 +155,27 @@ export default function GradebookDetail() {
         const normalizedTerms = backendTerms;
 
         setTerms(normalizedTerms);
+        setData(baseRes.data);
 
-        const firstTerm = normalizedTerms.find(
-          (t) => t.name === "Term 2"
-        );
-
-        if (!firstTerm) {
-          throw new Error("Term 2 not found");
+        if (normalizedTerms.length === 0) {
+          setError("No term is configured for this class. Contact an administrator.");
+          return;
         }
 
-        const termId = firstTerm.id;
-
-       // 🔒 VALIDATE TERM LOCK
-      const validationRes = await apiClient.get(
-        `/terms/validate`,
-        {
-          params: {
-            classId,
-            term: firstTerm.name,
-          },
-        }
-      );
-
-      if (validationRes.data.status === "locked") {
-        setTermLocked(true);
-        setLockMessage(validationRes.data.message);
-      } else {
-        setTermLocked(false);
-        setLockMessage("");
-      }
-
-        console.log("✅ termId:", termId);
-
-        // ✅ SAVE FULL TERM
-        setSelectedTermData(firstTerm);
-
-        // ✅ STEP 3: fetch gradebook with term
-        const finalRes = await apiClient.get(
-          `/teacher/gradebook/${id}`,
-          {
-            params: { termId },
-          }
+        // A single class term is unambiguous. With multiple terms, require the
+        // teacher to choose because the current isActive data is not reliable.
+        setSelectedTerm(
+          normalizedTerms.length === 1 ? normalizedTerms[0].id : null
         );
-
-        setSelectedTerm(termId);
-        setData(finalRes.data);
-
-        // 🆕 FETCH ATTENDANCE (RIGHT PLACE)
-        await fetchAttendance(classId, firstTerm);
-
-        console.log("✅ Gradebook loaded");
 
       } catch (err) {
         console.error("💥 INIT FAILED", err);
-        setError(err.message || "Failed to load gradebook");
+        setError(
+          err?.response?.data?.error ||
+            err?.response?.data?.message ||
+            err?.message ||
+            "Failed to load gradebook"
+        );
       } finally {
         setLoading(false);
       }
@@ -282,20 +196,11 @@ useEffect(() => {
         (t) => Number(t.id) === Number(selectedTerm)
       );
 
-      // 🔒 validate lock
-      const validationRes = await apiClient.get(
-        `/terms/validate`,
-        {
-          params: {
-            classId,
-            term: selected?.name,
-          },
-        }
-      );
-
-      if (validationRes.data.status === "locked") {
+      // The selected object came from this class's term endpoint, so use its
+      // exact lock state instead of looking up another term by name.
+      if (selected?.isLocked) {
         setTermLocked(true);
-        setLockMessage(validationRes.data.message);
+        setLockMessage("This term is locked.");
       } else {
         setTermLocked(false);
         setLockMessage("");
@@ -312,9 +217,6 @@ useEffect(() => {
       );
 
       setData(res.data);
-
-      // 🆕 keep selected term object updated
-      setSelectedTermData(selected);
 
       // 📊 reload attendance
       await fetchAttendance(classId, selected);
@@ -918,9 +820,6 @@ useEffect(() => {
   };
     console.log("RENDER STATE:", { loading, error, data });
 
-  if (!selectedTerm && terms.length === 0)
-    return <div className="p-6">Setting up gradebook...</div>;
-
   if (loading)
     return <div className="p-6">Loading gradebook...</div>;
 
@@ -946,13 +845,13 @@ useEffect(() => {
           }
           className="border p-2"
         >
-          {terms.length === 0 && (
-            <option value="">Setting up term...</option>
-          )}
+          <option value="" disabled>
+            {terms.length > 1 ? "Select a term" : "Select term"}
+          </option>
 
           {terms.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.name}
+              {t.name} — {t.academicYear}
             </option>
           ))}
         </select>
