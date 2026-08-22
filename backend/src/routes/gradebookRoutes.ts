@@ -47,6 +47,24 @@ router.post(
         });
       }
 
+      const assessment = await prisma.assessment.findUnique({
+        where: { id: Number(assessmentId) },
+        select: { id: true, classId: true, subjectId: true },
+      });
+      if (!assessment) return res.status(404).json({ message: "Assessment not found" });
+      const [assigned, student] = await Promise.all([
+        prisma.teacherSubject.findFirst({
+          where: { teacherId: req.user!.id, classId: assessment.classId, subjectId: assessment.subjectId, isActive: true },
+          select: { id: true },
+        }),
+        prisma.student.findFirst({
+          where: { id: Number(studentId), classId: assessment.classId, isArchived: false },
+          select: { id: true },
+        }),
+      ]);
+      if (!assigned) return res.status(403).json({ message: "Active teacher assignment required" });
+      if (!student) return res.status(400).json({ message: "Student is not active in this class" });
+
       const saved = await prisma.assessmentScore.upsert({
         where: {
           assessmentId_studentId: {

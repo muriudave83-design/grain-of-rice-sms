@@ -34,7 +34,7 @@ export const saveReportComment = async (
     }
 
     const teacherSubject = await prisma.teacherSubject.findFirst({
-      where: { id: Number(teacherSubjectId), teacherId: req.user!.id },
+      where: { id: Number(teacherSubjectId), teacherId: req.user!.id, isActive: true },
       select: { classId: true },
     });
     if (!teacherSubject) {
@@ -115,7 +115,7 @@ export const getStudentReport = async (
     }
     if (user.role === "TEACHER") {
       const assigned = await prisma.teacherSubject.findFirst({
-        where: { teacherId: user.id, classId: student.classId },
+        where: { teacherId: user.id, classId: student.classId, isActive: true },
         select: { id: true },
       });
       if (!assigned) return res.status(403).json({ message: "Not assigned to this class" });

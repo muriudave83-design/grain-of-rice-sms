@@ -28,7 +28,8 @@ export const requireTeacherAssignment = async (
       where: {
         teacherId: user.id,
         classId,
-        subjectId
+        subjectId,
+        isActive: true,
       }
     });
 

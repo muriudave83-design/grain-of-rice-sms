@@ -7,7 +7,8 @@ export const getTeacherAssignments = async (req: Request, res: Response) => {
 
     const assignments = await prisma.teacherSubject.findMany({
       where: {
-        teacherId: teacherId
+        teacherId: teacherId,
+        isActive: true,
       },
       include: {
         subject: true,

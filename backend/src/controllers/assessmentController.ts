@@ -76,7 +76,8 @@ export const createAssessment = async (req: Request, res: Response) => {
         where: {
           teacherId,
           subjectId,
-          classId
+          classId,
+          isActive: true,
         }
       });
 
@@ -181,7 +182,8 @@ export const setStudentScore = async (req: Request, res: Response) => {
         where: {
           teacherId,
           subjectId: assessment.subjectId,
-          classId: assessment.classId
+          classId: assessment.classId,
+          isActive: true,
         }
       });
 
@@ -279,7 +281,8 @@ export const submitAssessment = async (req: Request, res: Response) => {
       where: {
         teacherId,
         subjectId: assessment.subjectId,
-        classId: assessment.classId
+        classId: assessment.classId,
+        isActive: true,
       }
     });
 

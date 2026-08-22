@@ -41,7 +41,7 @@ router.get(
     const teacherId = req.user!.id;
 
     const assignments = await prisma.teacherSubject.findMany({
-      where: { teacherId },
+      where: { teacherId, isActive: true },
       select: { subjectId: true, classId: true }
     });
 
@@ -82,7 +82,7 @@ router.get(
     }
 
     const assignments = await prisma.teacherSubject.findMany({
-      where: { teacherId, classId },
+      where: { teacherId, classId, isActive: true },
       include: { subject: true },
       orderBy: { subject: { name: "asc" } }
     });
@@ -111,7 +111,7 @@ router.get(
      */
     if (user.role === Role.TEACHER) {
       const assignments = await prisma.teacherSubject.findMany({
-        where: { teacherId: user.id },
+        where: { teacherId: user.id, isActive: true },
         select: { subjectId: true, classId: true }
       });
 
@@ -174,7 +174,8 @@ router.get(
         where: {
           teacherId: req.user!.id,
           subjectId: assessment.subjectId,
-          classId: assessment.classId
+          classId: assessment.classId,
+          isActive: true,
         }
       });
 
@@ -213,7 +214,8 @@ router.get(
       where: {
         teacherId: req.user!.id,
         subjectId: assessment.subjectId,
-        classId: assessment.classId
+        classId: assessment.classId,
+        isActive: true,
       }
     });
 
@@ -259,7 +261,8 @@ router.post(
       where: {
         teacherId: req.user!.id,
         subjectId: assessment.subjectId,
-        classId: assessment.classId
+        classId: assessment.classId,
+        isActive: true,
       }
     });
 
@@ -425,7 +428,8 @@ router.delete(
         where: {
           teacherId: req.user!.id,
           subjectId: assessment.subjectId,
-          classId: assessment.classId
+          classId: assessment.classId,
+          isActive: true,
         }
       });
 

@@ -38,6 +38,12 @@ export class AttendanceSessionService {
           throw { status: 404, message: "Class not found" };
         }
 
+        const activeAssignment = await tx.teacherSubject.findFirst({
+          where: { teacherId, classId, isActive: true },
+          select: { id: true },
+        });
+        if (!activeAssignment) throw { status: 403, message: "Active teacher assignment required" };
+
         /* ---------------------------------------------------- */
         /* Prevent duplicate attendance sessions                 */
         /* ---------------------------------------------------- */
@@ -108,6 +114,12 @@ export class AttendanceSessionService {
         throw { status: 403, message: "Unauthorized" };
       }
 
+      const activeAssignment = await tx.teacherSubject.findFirst({
+        where: { teacherId, classId: session.classId, isActive: true },
+        select: { id: true },
+      });
+      if (!activeAssignment) throw { status: 403, message: "Active teacher assignment required" };
+
       if (session.status === AttendanceSessionStatus.SUBMITTED) {
         throw { status: 409, message: "Attendance already submitted" };
       }
@@ -157,11 +169,9 @@ export class AttendanceSessionService {
     requester: { role: string; teacherId?: number };
   }) {
     if (requester.role === "TEACHER") {
-      const owns = await prisma.attendanceSession.findFirst({
-        where: {
-          classId,
-          teacherId: requester.teacherId,
-        },
+      const owns = await prisma.teacherSubject.findFirst({
+        where: { classId, teacherId: requester.teacherId, isActive: true },
+        select: { id: true },
       });
 
       if (!owns) {

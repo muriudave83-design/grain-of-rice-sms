@@ -71,7 +71,7 @@ export const getTeacherClasses = async (req: Request, res: Response) => {
     const teacherId = (req as any).user.id;
 
     const teacherSubjects = await prisma.teacherSubject.findMany({
-      where: { teacherId },
+      where: { teacherId, isActive: true },
       include: { class: true },
     });
 
@@ -95,7 +95,7 @@ export const getTeacherSubjects = async (req: Request, res: Response) => {
     const teacherId = (req as any).user.id;
 
     const subjects = await prisma.teacherSubject.findMany({
-      where: { teacherId },
+      where: { teacherId, isActive: true },
       include: {
         class: true,
         subject: true,
@@ -116,7 +116,7 @@ export const getGradebook = async (req: Request, res: Response) => {
 
   try {
     const gradebook = await prisma.teacherSubject.findFirst({
-      where: { id: Number(id), teacherId: (req as any).user.id },
+      where: { id: Number(id), teacherId: (req as any).user.id, isActive: true },
       include: {
         class: {
           include: { students: true },
@@ -173,7 +173,7 @@ export const getClassStudents = async (req: Request, res: Response) => {
 
   try {
     const permitted = await prisma.teacherSubject.findFirst({
-      where: { classId: Number(classId), teacherId: (req as any).user.id },
+      where: { classId: Number(classId), teacherId: (req as any).user.id, isActive: true },
       select: { id: true },
     });
     if (!permitted) {
@@ -211,7 +211,7 @@ export const upsertScore = async (req: Request, res: Response) => {
   try {
     const assignment = await prisma.assignment.findUnique({
       where: { id: assignmentId },
-      include: { teacherSubject: { select: { teacherId: true, classId: true } } },
+      include: { teacherSubject: { select: { teacherId: true, classId: true, isActive: true } } },
     });
 
     if (!assignment) {
@@ -228,6 +228,9 @@ export const upsertScore = async (req: Request, res: Response) => {
 
     if (assignment.teacherSubject.teacherId !== (req as any).user.id) {
       return res.status(403).json({ message: "Not authorized for this assignment" });
+    }
+    if (!assignment.teacherSubject.isActive) {
+      return res.status(403).json({ message: "This teacher assignment is inactive" });
     }
 
     const student = await prisma.student.findFirst({
@@ -328,7 +331,7 @@ export const createAssignment = async (req: Request, res: Response) => {
     const tsId = Number(teacherSubjectId);
     const numericTermId = Number(termId);
     const teacherSubject = await prisma.teacherSubject.findFirst({
-      where: { id: tsId, teacherId: (req as any).user.id },
+      where: { id: tsId, teacherId: (req as any).user.id, isActive: true },
       select: { classId: true, subjectId: true },
     });
     if (!teacherSubject) {
@@ -433,7 +436,7 @@ export const updateAssignment = async (req: Request, res: Response) => {
     const assignment = await prisma.assignment.findFirst({
       where: {
         id: Number(req.params.id),
-        teacherSubject: { teacherId: (req as any).user.id },
+        teacherSubject: { teacherId: (req as any).user.id, isActive: true },
       },
       select: {
         id: true,
@@ -502,7 +505,7 @@ export const reorderAssignments = async (req: Request, res: Response) => {
     const ownedCount = await prisma.assignment.count({
       where: {
         id: { in: ids },
-        teacherSubject: { teacherId: (req as any).user.id },
+        teacherSubject: { teacherId: (req as any).user.id, isActive: true },
       },
     });
     if (ownedCount !== ids.length) {
@@ -560,7 +563,7 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
     const assignments = await prisma.assignment.findMany({
       where: {
         id: { in: assignmentIds },
-        teacherSubject: { teacherId: (req as any).user.id },
+        teacherSubject: { teacherId: (req as any).user.id, isActive: true },
       },
       select: {
         id: true,
@@ -694,7 +697,7 @@ export const getReportData = async (req: Request, res: Response) => {
 
     const [assigned, term] = await Promise.all([
       prisma.teacherSubject.findFirst({
-        where: { classId, teacherId },
+        where: { classId, teacherId, isActive: true },
         select: { id: true },
       }),
       prisma.term.findFirst({
@@ -725,6 +728,7 @@ export const getReportData = async (req: Request, res: Response) => {
       where: {
         classId,
         teacherId,
+        isActive: true,
       },
       include: {
         subject: true,
@@ -863,6 +867,7 @@ export const saveReportComment = async (req: Request, res: Response) => {
       where: {
         id: Number(teacherSubjectId),
         teacherId: (req as any).user.id,
+        isActive: true,
       },
       select: { classId: true },
     });
@@ -929,7 +934,7 @@ export const publishFinalGrades = async (req: Request, res: Response) => {
         select: { id: true, firstName: true, lastName: true },
       }),
       prisma.teacherSubject.findMany({
-        where: { teacherId, classId },
+        where: { teacherId, classId, isActive: true },
         include: {
           subject: { select: { id: true, name: true } },
           assignments: { where: { termId }, include: { scores: true } },
@@ -1058,7 +1063,7 @@ export const generateTranscripts = async (req: Request, res: Response) => {
 
     const [assigned, term, students, classSubjects] = await Promise.all([
       prisma.teacherSubject.findFirst({
-        where: { teacherId, classId },
+        where: { teacherId, classId, isActive: true },
         select: { id: true },
       }),
       prisma.term.findFirst({

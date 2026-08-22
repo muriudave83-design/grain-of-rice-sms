@@ -14,6 +14,12 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
       });
     }
 
+    const assigned = await prisma.teacherSubject.findFirst({
+      where: { teacherId: req.user!.id, classId, subjectId, isActive: true },
+      select: { id: true },
+    });
+    if (!assigned) return res.status(403).json({ message: "Active teacher assignment required" });
+
     // 1️⃣ Assessments for class + subject + term
     const assessments = await prisma.assessment.findMany({
       where: { classId, subjectId, termId },

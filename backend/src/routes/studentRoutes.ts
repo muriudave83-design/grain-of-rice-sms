@@ -17,6 +17,7 @@ router.get("/test", (_req, res) => {
 router.get(
   "/:id/transcript",
   authenticate,
+  authorizeStudentAccess,
   getStudentTranscript
 );
 
@@ -81,6 +82,16 @@ router.post(
         });
       }
 
+      if (req.user!.role === "TEACHER") {
+        const assigned = await prisma.teacherSubject.findFirst({
+          where: { teacherId: req.user!.id, classId, isActive: true },
+          select: { id: true },
+        });
+        if (!assigned) {
+          return res.status(403).json({ message: "Active teacher assignment required for this class" });
+        }
+      }
+
       const existingUser = await prisma.user.findUnique({
         where: { id: userId },
       });
@@ -130,6 +141,15 @@ router.get(
       const students = await prisma.student.findMany({
         where: {
           isArchived: false,
+          ...(req.user!.role === "TEACHER"
+            ? {
+                class: {
+                  teacherSubjects: {
+                    some: { teacherId: req.user!.id, isActive: true },
+                  },
+                },
+              }
+            : {}),
         },
         orderBy: { id: "asc" },
         include: {
@@ -259,6 +279,7 @@ router.get(
   "/:id/details",
   authenticate,
   requireRole(["ADMIN", "TEACHER"]),
+  authorizeStudentAccess,
   async (req, res) => {
     try {
       const studentId = Number(req.params.id);
@@ -366,6 +387,7 @@ router.put(
   "/:id/health",
   authenticate,
   requireRole(["ADMIN", "TEACHER"]),
+  authorizeStudentAccess,
   updateHealth
 );
 
@@ -374,6 +396,7 @@ router.post(
   "/:id/contact-log",
   authenticate,
   requireRole(["ADMIN", "TEACHER"]),
+  authorizeStudentAccess,
   async (req, res) => {
     try {
       const studentId = Number(req.params.id);

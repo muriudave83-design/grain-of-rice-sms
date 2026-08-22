@@ -17,7 +17,7 @@ async function canManageClass(user: Request["user"], classId: number) {
   if (user.role === Role.ADMIN || user.role === Role.ATTENDANCE_OFFICER) return true;
   if (user.role !== Role.TEACHER) return false;
   return Boolean(await prisma.teacherSubject.findFirst({
-    where: { teacherId: user.id, classId },
+    where: { teacherId: user.id, classId, isActive: true },
     select: { id: true },
   }));
 }

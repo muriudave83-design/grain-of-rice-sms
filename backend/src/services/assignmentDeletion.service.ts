@@ -17,7 +17,7 @@ export async function deleteOwnedAssignment(
 ): Promise<AssignmentDeletionResult> {
   return client.$transaction(async (tx: any) => {
     const assignment = await tx.assignment.findFirst({
-      where: { id: assignmentId, teacherSubject: { teacherId } },
+      where: { id: assignmentId, teacherSubject: { teacherId, isActive: true } },
       select: {
         id: true,
         title: true,

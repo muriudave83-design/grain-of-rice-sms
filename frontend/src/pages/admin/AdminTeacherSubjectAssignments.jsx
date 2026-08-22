@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import apiClient from "../../services/apiClient";
 
 export default function AdminTeacherSubjectAssignments() {
@@ -7,16 +7,13 @@ export default function AdminTeacherSubjectAssignments() {
   const [assignments, setAssignments] = useState([]);
   const [classSubjects, setClassSubjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showInactive, setShowInactive] = useState(false);
 
   const [form, setForm] = useState({
     teacherId: "",
     subjectId: "",
     classId: "",
   });
-
-  useEffect(() => {
-    fetchData();
-  }, []);
 
   useEffect(() => {
     if (!form.classId) {
@@ -30,7 +27,7 @@ export default function AdminTeacherSubjectAssignments() {
       .catch(() => setClassSubjects([]));
   }, [form.classId]);
 
-  async function fetchData() {
+  const fetchData = useCallback(async (includeInactive = showInactive) => {
     setLoading(true);
 
     try {
@@ -38,7 +35,7 @@ export default function AdminTeacherSubjectAssignments() {
         await Promise.all([
           apiClient.get("/admin/users?role=TEACHER"),
           apiClient.get("/admin/classes"),
-          apiClient.get("/admin/teacher-subjects"),
+          apiClient.get(`/admin/teacher-subjects${includeInactive ? "?includeInactive=true" : ""}`),
         ]);
 
       setTeachers(teachersRes.data || []);
@@ -49,7 +46,11 @@ export default function AdminTeacherSubjectAssignments() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [showInactive]);
+
+  useEffect(() => {
+    fetchData(showInactive);
+  }, [fetchData, showInactive]);
 
   /**
    * Prevent duplicate assignment
@@ -59,6 +60,7 @@ export default function AdminTeacherSubjectAssignments() {
 
     return assignments.find(
       (a) =>
+        a.isActive &&
         String(a?.teacher?.id) === form.teacherId &&
         String(a?.subject?.id) === form.subjectId &&
         String(a?.class?.id) === form.classId
@@ -89,20 +91,27 @@ export default function AdminTeacherSubjectAssignments() {
     }
   }
 
-  /**
-   * Remove assignment
-   */
-  async function removeAssignment(id) {
-    if (!confirm("Remove this assignment?")) return;
+  async function endAssignment(assignment) {
+    if (!confirm("End this teacher assignment?\n\nThe teacher will no longer have current access to this class/subject.\n\nHistorical assignments, scores, comments and reports will remain unchanged.")) return;
 
     try {
-      await apiClient.delete(`/admin/teacher-subjects/${id}`);
-
-      // ✅ Safe local update
-      setAssignments((prev) => prev.filter((a) => a.id !== id));
+      const response = await apiClient.patch(`/admin/teacher-subjects/${assignment.id}/deactivate`);
+      alert(response.data?.message || "Teacher assignment ended successfully.");
+      await fetchData();
     } catch (err) {
-      console.error("Failed to remove assignment", err);
-      alert(err?.response?.data?.message || err?.message || "Failed to remove assignment");
+      console.error("Failed to end assignment", err);
+      alert(err?.response?.data?.message || err?.message || "Failed to end teacher assignment");
+    }
+  }
+
+  async function reactivateAssignment(assignment) {
+    try {
+      const response = await apiClient.patch(`/admin/teacher-subjects/${assignment.id}/reactivate`);
+      alert(response.data?.message || "Teacher assignment reactivated.");
+      await fetchData();
+    } catch (err) {
+      console.error("Failed to reactivate assignment", err);
+      alert(err?.response?.data?.message || err?.message || "Failed to reactivate teacher assignment");
     }
   }
 
@@ -201,6 +210,13 @@ export default function AdminTeacherSubjectAssignments() {
         </div>
       </form>
 
+      <div className="flex justify-end">
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" checked={showInactive} onChange={(event) => setShowInactive(event.target.checked)} />
+          Show inactive assignments
+        </label>
+      </div>
+
       <div className="bg-white border rounded overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-gray-50">
@@ -208,6 +224,7 @@ export default function AdminTeacherSubjectAssignments() {
               <th className="p-3 text-left">Teacher</th>
               <th className="p-3 text-left">Subject</th>
               <th className="p-3 text-left">Grade</th>
+              <th className="p-3 text-left">Status</th>
               <th className="p-3 w-24"></th>
             </tr>
           </thead>
@@ -215,13 +232,13 @@ export default function AdminTeacherSubjectAssignments() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="4" className="p-4 text-center">
+                <td colSpan="5" className="p-4 text-center">
                   Loading…
                 </td>
               </tr>
             ) : assignments.length === 0 ? (
               <tr>
-                <td colSpan="4" className="p-4 text-center text-gray-500">
+                <td colSpan="5" className="p-4 text-center text-gray-500">
                   No assignments yet
                 </td>
               </tr>
@@ -240,13 +257,18 @@ export default function AdminTeacherSubjectAssignments() {
                     {a?.class?.name || "—"}
                   </td>
 
+                  <td className="p-3">
+                    <span className={`rounded-full px-2 py-1 text-xs font-medium ${a.isActive ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-700"}`}>
+                      {a.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+
                   <td className="p-3 text-right">
-                    <button
-                      onClick={() => removeAssignment(a.id)}
-                      className="text-red-600 text-xs"
-                    >
-                      Remove
-                    </button>
+                    {a.isActive ? (
+                      <button onClick={() => endAssignment(a)} className="text-red-600 text-xs">End Assignment</button>
+                    ) : (
+                      <button onClick={() => reactivateAssignment(a)} className="text-blue-600 text-xs">Reactivate</button>
+                    )}
                   </td>
                 </tr>
               ))

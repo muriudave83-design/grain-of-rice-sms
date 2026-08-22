@@ -185,7 +185,7 @@ router.put("/assignment/:id/lock", async (req, res) => {
     const owned = await prisma.assignment.findFirst({
       where: {
         id: Number(id),
-        teacherSubject: { teacherId: req.user!.id },
+        teacherSubject: { teacherId: req.user!.id, isActive: true },
       },
       select: {
         id: true,
@@ -238,7 +238,7 @@ router.get("/terms/:classId", async (req, res) => {
 
     // ✅ STEP 1 — VERIFY CLASS EXISTS
     const assigned = await prisma.teacherSubject.findFirst({
-      where: { classId, teacherId: req.user!.id },
+      where: { classId, teacherId: req.user!.id, isActive: true },
       select: { id: true },
     });
 

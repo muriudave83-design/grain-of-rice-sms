@@ -30,7 +30,7 @@ export async function getReportCardPdf(
 
     if (user.role === Role.TEACHER) {
       allowed = Boolean(await prisma.teacherSubject.findFirst({
-        where: { teacherId: user.id, classId: reportCard.classId },
+        where: { teacherId: user.id, classId: reportCard.classId, isActive: true },
         select: { id: true },
       }));
     } else if (user.role === Role.STUDENT) {

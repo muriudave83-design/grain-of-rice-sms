@@ -334,6 +334,14 @@ router.get(
         });
       }
 
+      if (req.user!.role === Role.TEACHER) {
+        const assigned = await prisma.teacherSubject.findFirst({
+          where: { teacherId: req.user!.id, classId: student.classId, isActive: true },
+          select: { id: true },
+        });
+        if (!assigned) return res.status(403).json({ message: "Active teacher assignment required" });
+      }
+
       const classSubjects =
         await prisma.classSubject.findMany({
           where: {
@@ -556,6 +564,14 @@ router.get(
             message:
               "Valid classId is required",
           });
+        }
+
+        if (role === Role.TEACHER) {
+          const assigned = await prisma.teacherSubject.findFirst({
+            where: { teacherId: userId, classId, isActive: true },
+            select: { id: true },
+          });
+          if (!assigned) return res.status(403).json({ message: "Active teacher assignment required" });
         }
 
         students = await prisma.student.findMany({

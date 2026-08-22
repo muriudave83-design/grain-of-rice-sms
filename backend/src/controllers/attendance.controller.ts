@@ -86,7 +86,7 @@ export const getAttendanceReport = async (
 
     if (req.user?.role === Role.TEACHER) {
       const assignment = await prisma.teacherSubject.findFirst({
-        where: { teacherId: req.user.id, classId: requestedClassId },
+        where: { teacherId: req.user.id, classId: requestedClassId, isActive: true },
         select: { id: true },
       });
       if (!assignment) return res.status(403).json({ message: "You are not assigned to this class" });

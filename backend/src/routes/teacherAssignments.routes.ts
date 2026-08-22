@@ -20,6 +20,7 @@ router.get(
       const assignments = await prisma.teacherSubject.findMany({
         where: {
           teacherId: teacherId,
+          isActive: true,
         },
         include: {
           subject: true,
@@ -52,6 +53,7 @@ router.get(
       const teacherSubjects = await prisma.teacherSubject.findMany({
         where: {
           teacherId: teacherId,
+          isActive: true,
         },
         include: {
           class: true,
@@ -159,6 +161,7 @@ router.post(
         where: {
           teacherId,
           classId,
+          isActive: true,
         },
       });
 
@@ -248,6 +251,8 @@ router.post(
       const teacherSubject = await prisma.teacherSubject.findFirst({
         where: {
           classId: student.classId,
+          teacherId: req.user!.id,
+          isActive: true,
         },
       });
 
@@ -255,7 +260,10 @@ router.post(
         return res.status(200).json({ message: "No subject found" });
       }
 
-      const term = await prisma.term.findFirst();
+      const term = await prisma.term.findFirst({
+        where: { classId: student.classId },
+        orderBy: [{ startDate: "desc" }, { id: "desc" }],
+      });
 
       if (!term) {
         return res.status(200).json({ message: "No term found" });

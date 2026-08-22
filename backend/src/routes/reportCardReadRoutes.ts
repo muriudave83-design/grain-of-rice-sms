@@ -50,7 +50,7 @@ router.get(
         .trim();
 
       const assigned = await prisma.teacherSubject.findFirst({
-        where: { teacherId: req.user!.id, classId },
+        where: { teacherId: req.user!.id, classId, isActive: true },
         select: { id: true },
       });
       if (!assigned) {
@@ -239,8 +239,17 @@ router.post(
         .replace("term", "term ")
         .trim();
 
+      const assigned = await prisma.teacherSubject.findFirst({
+        where: { teacherId: req.user!.id, classId, isActive: true },
+        select: { id: true },
+      });
+      if (!assigned) {
+        return res.status(403).json({ message: "Active teacher assignment required" });
+      }
+
       const term = await prisma.term.findFirst({
         where: {
+          classId,
           name: {
             equals: normalizedTermName,
             mode: "insensitive",

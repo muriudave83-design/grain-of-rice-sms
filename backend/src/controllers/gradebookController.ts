@@ -16,10 +16,11 @@ export const getTeacherGradebook = async (req: Request, res: Response) => {
     const teacher = (req as any).user;
     const subjectId = Number(req.params.subjectId);
 
-    // ✅ Safe subject fetch
-    const subject = await prisma.subject.findUnique({
-      where: { id: subjectId },
+    const teacherSubjects = await prisma.teacherSubject.findMany({
+      where: { teacherId: teacher.id, subjectId, isActive: true },
+      include: { subject: true },
     });
+    const subject = teacherSubjects[0]?.subject;
 
     if (!subject) {
       return res.status(200).json({
@@ -29,18 +30,15 @@ export const getTeacherGradebook = async (req: Request, res: Response) => {
       });
     }
 
-    // ✅ Ownership check ONLY (RBAC handled in middleware)
-    if (subject.teacherId !== teacher.id) {
-      return res.status(200).json({
-        message: "You are not assigned to this subject",
-        subject: { id: subject.id, name: subject.name },
-        students: [],
-      });
-    }
-
     // ✅ Safe enrollments
     const enrollments = await prisma.enrollment.findMany({
-      where: { subjectId },
+      where: {
+        subjectId,
+        student: {
+          classId: { in: teacherSubjects.map((item) => item.classId) },
+          isArchived: false,
+        },
+      },
       include: { student: true },
     });
 

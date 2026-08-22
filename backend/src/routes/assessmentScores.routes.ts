@@ -11,6 +11,12 @@ import { computeGradesForSubject } from "../services/grade.service";
 
 const router = Router();
 
+const hasActiveAssessmentAssignment = (teacherId: number, assessment: { classId: number; subjectId: number }) =>
+  prisma.teacherSubject.findFirst({
+    where: { teacherId, classId: assessment.classId, subjectId: assessment.subjectId, isActive: true },
+    select: { id: true },
+  });
+
 /**
  * ============================================================
  * GET students + existing scores for an assessment
@@ -50,7 +56,7 @@ router.get(
       /**
        * OWNERSHIP CHECK
        */
-      if (assessment.subject.teacherId !== user.id) {
+      if (!(await hasActiveAssessmentAssignment(user.id, assessment))) {
         return res.status(403).json({
           message: "You are not allowed to access this assessment.",
         });
@@ -78,6 +84,7 @@ router.get(
       const enrollments = await prisma.enrollment.findMany({
         where: {
           subjectId: assessment.subjectId,
+          student: { classId: assessment.classId, isArchived: false },
         },
         include: {
           student: {
@@ -145,7 +152,7 @@ router.post(
         return res.status(404).json({ message: "Not found" });
       }
 
-      if (assessment.subject.teacherId !== user.id) {
+      if (!(await hasActiveAssessmentAssignment(user.id, assessment))) {
         return res.status(403).json({
           message: "You are not allowed to access this assessment.",
         });
@@ -225,7 +232,7 @@ router.post(
         return res.status(404).json({ message: "Not found" });
       }
 
-      if (assessment.subject.teacherId !== user.id) {
+      if (!(await hasActiveAssessmentAssignment(user.id, assessment))) {
         return res.status(403).json({
           message: "You are not allowed to access this assessment.",
         });

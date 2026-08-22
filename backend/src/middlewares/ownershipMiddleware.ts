@@ -58,14 +58,19 @@ export const authorizeStudentAccess = async (
   }
 
   // ============================================================
-  // TEACHER — must have enrollment relationship
+  // TEACHER — must have a current assignment in the student's class
   // ============================================================
   if (user.role === Role.TEACHER) {
-    const teaches = await prisma.enrollment.findFirst({
+    const teaches = await prisma.student.findFirst({
       where: {
-        studentId,
-        subject: {
-          teacherId: user.id,
+        id: studentId,
+        class: {
+          teacherSubjects: {
+            some: {
+              teacherId: user.id,
+              isActive: true,
+            },
+          },
         },
       },
       select: { id: true },
