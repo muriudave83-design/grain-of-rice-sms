@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 type DisciplineClient = Pick<PrismaClient, "student" | "term" | "discipline">;
 
 const assignedStudentWhere = (teacherId: number) => ({
-  class: { teacherSubjects: { some: { teacherId, isActive: true } } },
+  class: { isArchived: false, teacherSubjects: { some: { teacherId, isActive: true } } },
 });
 
 export async function listTeacherDisciplineStudents(client: DisciplineClient, teacherId: number) {
@@ -46,7 +46,7 @@ export async function listTeacherTerms(
   }
 
   return client.term.findMany({
-    where: { class: { teacherSubjects: { some: { teacherId, isActive: true } } } },
+    where: { class: { isArchived: false, teacherSubjects: { some: { teacherId, isActive: true } } } },
     include: { class: { select: { id: true, name: true } } },
     orderBy: [{ startDate: "desc" }, { id: "desc" }],
   });

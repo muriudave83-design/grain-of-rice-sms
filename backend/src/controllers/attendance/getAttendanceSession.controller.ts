@@ -41,7 +41,7 @@ export async function getAttendanceSession(req: Request, res: Response) {
 
     if (req.user?.role === Role.TEACHER) {
       const assignment = await prisma.teacherSubject.findFirst({
-        where: { teacherId: req.user.id, classId: session.classId, isActive: true },
+        where: { teacherId: req.user.id, classId: session.classId, isActive: true, class: { isArchived: false } },
         select: { id: true },
       });
       if (!assignment) return res.status(403).json({ message: "Forbidden" });

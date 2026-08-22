@@ -9,6 +9,7 @@ export const getTeacherAssignments = async (req: Request, res: Response) => {
       where: {
         teacherId: teacherId,
         isActive: true,
+        class: { isArchived: false },
       },
       include: {
         subject: true,

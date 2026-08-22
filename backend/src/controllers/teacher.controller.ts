@@ -71,7 +71,7 @@ export const getTeacherClasses = async (req: Request, res: Response) => {
     const teacherId = (req as any).user.id;
 
     const teacherSubjects = await prisma.teacherSubject.findMany({
-      where: { teacherId, isActive: true },
+      where: { teacherId, isActive: true, class: { isArchived: false } },
       include: { class: true },
     });
 
@@ -95,7 +95,7 @@ export const getTeacherSubjects = async (req: Request, res: Response) => {
     const teacherId = (req as any).user.id;
 
     const subjects = await prisma.teacherSubject.findMany({
-      where: { teacherId, isActive: true },
+      where: { teacherId, isActive: true, class: { isArchived: false } },
       include: {
         class: true,
         subject: true,
@@ -116,7 +116,7 @@ export const getGradebook = async (req: Request, res: Response) => {
 
   try {
     const gradebook = await prisma.teacherSubject.findFirst({
-      where: { id: Number(id), teacherId: (req as any).user.id, isActive: true },
+      where: { id: Number(id), teacherId: (req as any).user.id, isActive: true, class: { isArchived: false } },
       include: {
         class: {
           include: { students: true },
@@ -173,7 +173,7 @@ export const getClassStudents = async (req: Request, res: Response) => {
 
   try {
     const permitted = await prisma.teacherSubject.findFirst({
-      where: { classId: Number(classId), teacherId: (req as any).user.id, isActive: true },
+      where: { classId: Number(classId), teacherId: (req as any).user.id, isActive: true, class: { isArchived: false } },
       select: { id: true },
     });
     if (!permitted) {
@@ -331,7 +331,7 @@ export const createAssignment = async (req: Request, res: Response) => {
     const tsId = Number(teacherSubjectId);
     const numericTermId = Number(termId);
     const teacherSubject = await prisma.teacherSubject.findFirst({
-      where: { id: tsId, teacherId: (req as any).user.id, isActive: true },
+      where: { id: tsId, teacherId: (req as any).user.id, isActive: true, class: { isArchived: false } },
       select: { classId: true, subjectId: true },
     });
     if (!teacherSubject) {
@@ -697,7 +697,7 @@ export const getReportData = async (req: Request, res: Response) => {
 
     const [assigned, term] = await Promise.all([
       prisma.teacherSubject.findFirst({
-        where: { classId, teacherId, isActive: true },
+        where: { classId, teacherId, isActive: true, class: { isArchived: false } },
         select: { id: true },
       }),
       prisma.term.findFirst({
@@ -934,7 +934,7 @@ export const publishFinalGrades = async (req: Request, res: Response) => {
         select: { id: true, firstName: true, lastName: true },
       }),
       prisma.teacherSubject.findMany({
-        where: { teacherId, classId, isActive: true },
+        where: { teacherId, classId, isActive: true, class: { isArchived: false } },
         include: {
           subject: { select: { id: true, name: true } },
           assignments: { where: { termId }, include: { scores: true } },
@@ -1063,7 +1063,7 @@ export const generateTranscripts = async (req: Request, res: Response) => {
 
     const [assigned, term, students, classSubjects] = await Promise.all([
       prisma.teacherSubject.findFirst({
-        where: { teacherId, classId, isActive: true },
+        where: { teacherId, classId, isActive: true, class: { isArchived: false } },
         select: { id: true },
       }),
       prisma.term.findFirst({

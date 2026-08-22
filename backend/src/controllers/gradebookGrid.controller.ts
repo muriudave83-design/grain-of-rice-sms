@@ -15,7 +15,7 @@ export const getGradebookGrid = async (req: Request, res: Response) => {
     }
 
     const assigned = await prisma.teacherSubject.findFirst({
-      where: { teacherId: req.user!.id, classId, subjectId, isActive: true },
+      where: { teacherId: req.user!.id, classId, subjectId, isActive: true, class: { isArchived: false } },
       select: { id: true },
     });
     if (!assigned) return res.status(403).json({ message: "Active teacher assignment required" });

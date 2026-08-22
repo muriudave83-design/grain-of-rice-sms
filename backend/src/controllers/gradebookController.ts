@@ -17,7 +17,7 @@ export const getTeacherGradebook = async (req: Request, res: Response) => {
     const subjectId = Number(req.params.subjectId);
 
     const teacherSubjects = await prisma.teacherSubject.findMany({
-      where: { teacherId: teacher.id, subjectId, isActive: true },
+      where: { teacherId: teacher.id, subjectId, isActive: true, class: { isArchived: false } },
       include: { subject: true },
     });
     const subject = teacherSubjects[0]?.subject;

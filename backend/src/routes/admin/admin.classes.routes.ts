@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../../prisma/client";
 import { authenticate } from "../../middlewares/authMiddleware";
 import { requireRole } from "../../middlewares/rolesMiddleware";
+import { deleteClassWithData, getClassDeletePreview } from "../../services/classDeletion.service";
 
 const router = Router();
 
@@ -197,45 +198,39 @@ router.get(
 /**
  * ❌ DELETE /api/admin/classes/:id
  */
-router.delete(
-  "/classes/:id",
+router.get(
+  "/classes/:id/delete-preview",
   authenticate,
   requireRole(["ADMIN"]),
   async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Invalid class ID" });
     try {
-      const classId = Number(req.params.id);
+      return res.json(await getClassDeletePreview(prisma, id));
+    } catch (error: any) {
+      return res.status(error?.status || 500).json({ message: error?.message || "Failed to preview class deletion" });
+    }
+  },
+);
 
-      if (isNaN(classId)) {
-        return res.status(400).json({
-          message: "Invalid class ID",
-        });
-      }
-
-      const existing = await prisma.class.findUnique({
-        where: { id: classId },
-      });
-
-      if (!existing) {
-        return res.status(404).json({
-          message: "Class not found",
-        });
-      }
-
-      await prisma.class.delete({
-        where: { id: classId },
-      });
-
-      return res.json({
-        message: "Class deleted successfully",
-      });
-    } catch (error) {
+router.delete(
+  "/classes/:id/with-data",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    const classId = Number(req.params.id);
+    if (!Number.isInteger(classId) || classId <= 0) return res.status(400).json({ message: "Invalid class ID" });
+    try {
+      const preview = await deleteClassWithData(prisma, classId, req.body?.confirmation);
+      return res.json({ message: "Class data permanently deleted", preview });
+    } catch (error: any) {
       console.error("DELETE CLASS ERROR:", error);
-
-      return res.status(500).json({
-        message: "Failed to delete class",
+      return res.status(error?.status || 500).json({
+        message: error?.message || "Failed to delete class",
+        ...(error?.preview ? { preview: error.preview } : {}),
       });
     }
-  }
+  },
 );
 
 /**
@@ -262,17 +257,6 @@ router.patch(
       if (!existing) {
         return res.status(404).json({
           message: "Class not found",
-        });
-      }
-
-      const studentCount = await prisma.student.count({
-        where: { classId: id },
-      });
-
-      if (studentCount > 0) {
-        return res.status(400).json({
-          message:
-            "Cannot archive class with assigned students",
         });
       }
 

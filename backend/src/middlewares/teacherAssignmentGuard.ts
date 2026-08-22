@@ -30,6 +30,7 @@ export const requireTeacherAssignment = async (
         classId,
         subjectId,
         isActive: true,
+        class: { isArchived: false },
       }
     });
 

@@ -39,7 +39,7 @@ export class AttendanceSessionService {
         }
 
         const activeAssignment = await tx.teacherSubject.findFirst({
-          where: { teacherId, classId, isActive: true },
+          where: { teacherId, classId, isActive: true, class: { isArchived: false } },
           select: { id: true },
         });
         if (!activeAssignment) throw { status: 403, message: "Active teacher assignment required" };
@@ -115,7 +115,7 @@ export class AttendanceSessionService {
       }
 
       const activeAssignment = await tx.teacherSubject.findFirst({
-        where: { teacherId, classId: session.classId, isActive: true },
+        where: { teacherId, classId: session.classId, isActive: true, class: { isArchived: false } },
         select: { id: true },
       });
       if (!activeAssignment) throw { status: 403, message: "Active teacher assignment required" };
@@ -170,7 +170,7 @@ export class AttendanceSessionService {
   }) {
     if (requester.role === "TEACHER") {
       const owns = await prisma.teacherSubject.findFirst({
-        where: { classId, teacherId: requester.teacherId, isActive: true },
+        where: { classId, teacherId: requester.teacherId, isActive: true, class: { isArchived: false } },
         select: { id: true },
       });
 

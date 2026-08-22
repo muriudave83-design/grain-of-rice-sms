@@ -21,6 +21,7 @@ router.get(
         where: {
           teacherId: teacherId,
           isActive: true,
+          class: { isArchived: false },
         },
         include: {
           subject: true,
@@ -54,6 +55,7 @@ router.get(
         where: {
           teacherId: teacherId,
           isActive: true,
+          class: { isArchived: false },
         },
         include: {
           class: true,
@@ -162,6 +164,7 @@ router.post(
           teacherId,
           classId,
           isActive: true,
+          class: { isArchived: false },
         },
       });
 
@@ -253,6 +256,7 @@ router.post(
           classId: student.classId,
           teacherId: req.user!.id,
           isActive: true,
+          class: { isArchived: false },
         },
       });
 

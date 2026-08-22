@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 
@@ -18,11 +18,16 @@ export default function Classes() {
     useState(null);
 
   const [editName, setEditName] = useState("");
+  const [deleteClass, setDeleteClass] = useState(null);
+  const [deletePreview, setDeletePreview] = useState(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   // -----------------------------
   // Fetch classes
   // -----------------------------
-  async function fetchClasses() {
+  const fetchClasses = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -45,7 +50,7 @@ export default function Classes() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [showArchived]);
 
   // -----------------------------
   // Create class
@@ -115,23 +120,35 @@ export default function Classes() {
   // -----------------------------
   // Delete class
   // -----------------------------
-  const handleDelete = async (cls) => {
-    if (!window.confirm(`Delete "${cls.name}"?`))
-      return;
-
+  const openDeleteModal = async (cls) => {
+    setDeleteClass(cls);
+    setDeletePreview(null);
+    setDeleteConfirmation("");
+    setDeleteError("");
+    setDeleteLoading(true);
     try {
-      await apiClient.delete(
-        `/admin/classes/${cls.id}`
-      );
-
-      setClasses((prev) =>
-        prev.filter((c) => c.id !== cls.id)
-      );
+      const response = await apiClient.get(`/admin/classes/${cls.id}/delete-preview`);
+      setDeletePreview(response.data);
     } catch (err) {
-      alert(
-        err?.response?.data?.message ||
-          "Delete failed"
-      );
+      setDeleteError(err?.message || "Unable to preview class deletion");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handlePermanentDelete = async () => {
+    if (!deleteClass || !deletePreview?.allowDelete) return;
+    setDeleteLoading(true);
+    setDeleteError("");
+    try {
+      await apiClient.delete(`/admin/classes/${deleteClass.id}/with-data`, { data: { confirmation: deleteConfirmation } });
+      setClasses((prev) => prev.filter((item) => item.id !== deleteClass.id));
+      setDeleteClass(null);
+    } catch (err) {
+      setDeleteError(err?.message || "Permanent deletion failed");
+      if (err?.response?.data?.preview) setDeletePreview(err.response.data.preview);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -139,7 +156,7 @@ export default function Classes() {
   // Archive class
   // -----------------------------
   const handleArchive = async (cls) => {
-    if (!window.confirm(`Archive "${cls.name}"?`))
+    if (!window.confirm("Archive this class?\n\nThe class will be removed from active school workflows, but students and historical academic records will be preserved."))
       return;
         try {
       await apiClient.patch(
@@ -160,7 +177,7 @@ export default function Classes() {
   // ✅ Refresh when toggle changes
   useEffect(() => {
     fetchClasses();
-  }, [showArchived]);
+  }, [fetchClasses]);
 
   // -----------------------------
   // UI
@@ -311,11 +328,11 @@ export default function Classes() {
 
                     <button
                       onClick={() =>
-                        handleDelete(cls)
+                        openDeleteModal(cls)
                       }
                       className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded"
                     >
-                      Delete
+                      Delete Class Data
                     </button>
                   </td>
                 </tr>
@@ -324,6 +341,36 @@ export default function Classes() {
           </table>
         )}
       </div>
+
+      {deleteClass && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-class-title">
+          <div className="mx-auto my-8 w-full max-w-2xl rounded-lg bg-white p-5 shadow-xl sm:p-6">
+            <h2 id="delete-class-title" className="text-xl font-semibold text-red-700">Permanently Delete Class</h2>
+            <p className="mt-1 font-medium">{deleteClass.name}</p>
+            {deleteLoading && !deletePreview ? <p className="py-8 text-center text-sm">Loading dependency preview…</p> : deletePreview && (
+              <div className="mt-5 space-y-4 text-sm">
+                <section><h3 className="font-semibold">BLOCKERS</h3><ul className="mt-1 list-disc pl-5">
+                  {deletePreview.blockers.activeStudents > 0 && <li>This class still has {deletePreview.blockers.activeStudents} active student{deletePreview.blockers.activeStudents === 1 ? "" : "s"}. Move {deletePreview.blockers.activeStudents === 1 ? "the student" : "them"} to another class before deleting this class.</li>}
+                  {deletePreview.blockers.archivedStudents > 0 && <li>{deletePreview.blockers.archivedStudents} archived student record{deletePreview.blockers.archivedStudents === 1 ? " remains" : "s remain"} attached and must be reassigned.</li>}
+                  {deletePreview.blockers.activeTeacherAssignments > 0 && <li>End active teacher assignments before deleting this class.</li>}
+                  {deletePreview.blockers.historicalTeacherAssignments > 0 && <li>Historical teacher assignment ownership remains; permanent deletion is unsafe.</li>}
+                  {deletePreview.allowDelete && <li>None</li>}
+                </ul></section>
+                <section><h3 className="font-semibold">WILL DELETE</h3><ul className="mt-1 grid grid-cols-2 gap-x-4">
+                  {Object.entries(deletePreview.willDelete).map(([label, count]) => <li key={label}>{label}: {count}</li>)}
+                </ul></section>
+                <section><h3 className="font-semibold">WILL PRESERVE</h3><ul className="mt-1 list-disc pl-5">{deletePreview.preserved.map((item) => <li key={item}>{item}</li>)}</ul></section>
+                {deletePreview.allowDelete && <div><label htmlFor="delete-class-confirmation" className="mb-1 block font-medium">Type {deletePreview.confirmationPhrase} to confirm</label><input id="delete-class-confirmation" value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} className="w-full rounded border p-2" /></div>}
+              </div>
+            )}
+            {deleteError && <p role="alert" className="mt-4 rounded bg-red-50 p-3 text-sm text-red-700">{deleteError}</p>}
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <button type="button" disabled={deleteLoading} onClick={() => setDeleteClass(null)} className="rounded border px-4 py-2">Cancel</button>
+              <button type="button" disabled={!deletePreview?.allowDelete || deleteConfirmation !== deletePreview?.confirmationPhrase || deleteLoading} onClick={handlePermanentDelete} className="rounded bg-red-700 px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-gray-400">{deleteLoading ? "Deleting…" : "Permanently Delete"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* EDIT MODAL */}
       {editingClass && (

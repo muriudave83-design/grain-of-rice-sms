@@ -54,7 +54,7 @@ router.post(
       if (!assessment) return res.status(404).json({ message: "Assessment not found" });
       const [assigned, student] = await Promise.all([
         prisma.teacherSubject.findFirst({
-          where: { teacherId: req.user!.id, classId: assessment.classId, subjectId: assessment.subjectId, isActive: true },
+          where: { teacherId: req.user!.id, classId: assessment.classId, subjectId: assessment.subjectId, isActive: true, class: { isArchived: false } },
           select: { id: true },
         }),
         prisma.student.findFirst({
