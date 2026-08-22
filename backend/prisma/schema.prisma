@@ -52,8 +52,9 @@ model Student {
   admissionNo       String             @unique
   dob               DateTime?
   userId            Int?               @unique
-  classId           Int
+  classId           Int?
   isArchived        Boolean            @default(false)
+  archivedAt        DateTime?
   healthNotes       String?
   assessmentScores  AssessmentScore[]
   attendanceEntries AttendanceEntry[]
@@ -69,7 +70,8 @@ model Student {
   reportComments    ReportComment[]
   scores            Score[]
   sponsorships      Sponsorship[]
-  class             Class              @relation(fields: [classId], references: [id])
+  classEnrollments  StudentClassEnrollment[]
+  class             Class?             @relation(fields: [classId], references: [id])
   user              User?              @relation(fields: [userId], references: [id])
   transcripts       Transcript[]
 }
@@ -85,8 +87,27 @@ model Class {
   classSubjects      ClassSubject[]
   reportCards        ReportCard[]
   students           Student[]
+  studentClassEnrollments StudentClassEnrollment[]
   teacherSubjects    TeacherSubject[]
   terms              Term[]
+}
+
+model StudentClassEnrollment {
+  id                Int                          @id @default(autoincrement())
+  studentId         Int
+  classId           Int?
+  classNameSnapshot String
+  startedAt         DateTime?
+  endedAt           DateTime?
+  status            StudentClassEnrollmentStatus
+  source            String?
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  student           Student                      @relation(fields: [studentId], references: [id])
+  class             Class?                       @relation(fields: [classId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, status])
+  @@index([classId])
 }
 
 model Guardian {
@@ -470,6 +491,11 @@ enum Role {
   SPONSOR
   STUDENT
   ATTENDANCE_OFFICER
+}
+
+enum StudentClassEnrollmentStatus {
+  CURRENT
+  HISTORICAL
 }
 
 enum AssessmentStatus {

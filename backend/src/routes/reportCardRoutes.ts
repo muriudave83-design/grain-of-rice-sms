@@ -104,6 +104,9 @@ router.get(
       if (!student) {
         return res.status(404).json({ message: "Student not found" });
       }
+      if (student.classId === null) {
+        return res.status(409).json({ message: "Student has no current class" });
+      }
 
       const classId = student.classId;
 
@@ -333,10 +336,14 @@ router.get(
           error: "Student not found",
         });
       }
+      if (student.classId === null) {
+        return res.status(409).json({ message: "Student has no current class" });
+      }
+      const studentClassId = student.classId;
 
       if (req.user!.role === Role.TEACHER) {
         const assigned = await prisma.teacherSubject.findFirst({
-          where: { teacherId: req.user!.id, classId: student.classId, isActive: true },
+          where: { teacherId: req.user!.id, classId: studentClassId, isActive: true },
           select: { id: true },
         });
         if (!assigned) return res.status(403).json({ message: "Active teacher assignment required" });
@@ -345,7 +352,7 @@ router.get(
       const classSubjects =
         await prisma.classSubject.findMany({
           where: {
-            classId: student.classId,
+            classId: studentClassId,
           },
           include: {
             subject: true,
@@ -365,7 +372,7 @@ router.get(
           await prisma.assessment.findMany({
             where: {
               subjectId: cs.subjectId,
-              classId: student.classId,
+              classId: studentClassId,
             },
             select: {
               id: true,
@@ -547,6 +554,9 @@ router.get(
             message:
               "No student profile linked",
           });
+        }
+        if (student.classId === null) {
+          return res.status(409).json({ message: "Student has no current class" });
         }
 
         classId = student.classId;

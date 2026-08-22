@@ -108,6 +108,10 @@ export const getStudentReport = async (
         message: "Student not found",
       });
     }
+    if (student.classId === null || !student.class) {
+      return res.status(409).json({ message: "Student has no current class" });
+    }
+    const classId = student.classId;
 
     const user = req.user!;
     if (user.role === "STUDENT" && student.userId !== user.id) {
@@ -115,7 +119,7 @@ export const getStudentReport = async (
     }
     if (user.role === "TEACHER") {
       const assigned = await prisma.teacherSubject.findFirst({
-        where: { teacherId: user.id, classId: student.classId, isActive: true },
+        where: { teacherId: user.id, classId, isActive: true },
         select: { id: true },
       });
       if (!assigned) return res.status(403).json({ message: "Not assigned to this class" });
@@ -131,14 +135,14 @@ export const getStudentReport = async (
     const studentsInClass =
       await prisma.student.findMany({
         where: {
-          classId: student.classId,
+          classId,
         },
       });
 
     const subjects: TeacherSubjectWithRelations[] =
       await prisma.teacherSubject.findMany({
         where: {
-          classId: student.classId,
+          classId,
         },
 
         include: {

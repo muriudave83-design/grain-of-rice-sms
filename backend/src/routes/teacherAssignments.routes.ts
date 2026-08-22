@@ -250,10 +250,14 @@ router.post(
       if (!student) {
         return res.status(200).json({ message: "Student not found" });
       }
+      if (student.classId === null) {
+        return res.status(409).json({ message: "Student has no current class" });
+      }
+      const classId = student.classId;
 
       const teacherSubject = await prisma.teacherSubject.findFirst({
         where: {
-          classId: student.classId,
+          classId,
           teacherId: req.user!.id,
           isActive: true,
           class: { isArchived: false },
@@ -265,7 +269,7 @@ router.post(
       }
 
       const term = await prisma.term.findFirst({
-        where: { classId: student.classId },
+        where: { classId },
         orderBy: [{ startDate: "desc" }, { id: "desc" }],
       });
 
@@ -278,7 +282,7 @@ router.post(
           title,
           type: AssessmentType[type as keyof typeof AssessmentType],
           maxScore: Number(maxScore),
-          classId: student.classId,
+          classId,
           subjectId: teacherSubject.subjectId,
           termId: term.id,
           date: new Date(),

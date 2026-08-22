@@ -54,6 +54,9 @@ export const addDiscipline = async (req: Request, res: Response) => {
     select: { id: true, classId: true },
   });
   if (!student) return res.status(404).json({ message: "Student not found" });
+  if (student.classId === null) {
+    return res.status(409).json({ message: "Student has no current class" });
+  }
   const term = await prisma.term.findFirst({
     where: { id: parsedTermId, classId: student.classId },
     select: { id: true },

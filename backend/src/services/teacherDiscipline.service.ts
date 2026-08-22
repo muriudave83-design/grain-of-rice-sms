@@ -38,6 +38,7 @@ export async function listTeacherTerms(
   if (studentId !== undefined) {
     const student = await findTeacherStudent(client, teacherId, studentId, true);
     if (!student) return null;
+    if (student.classId === null) return [];
     return client.term.findMany({
       where: { classId: student.classId },
       include: { class: { select: { id: true, name: true } } },
@@ -71,6 +72,7 @@ export async function createTeacherDisciplineRecord(
 ) {
   const student = await findTeacherStudent(client, teacherId, input.studentId, true);
   if (!student) return { error: "STUDENT_FORBIDDEN" as const };
+  if (student.classId === null) return { error: "STUDENT_FORBIDDEN" as const };
 
   const term = await client.term.findFirst({
     where: { id: input.termId, classId: student.classId },
