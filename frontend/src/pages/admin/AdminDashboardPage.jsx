@@ -1,338 +1,124 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 import { formatTermLabel } from "../../utils/formatTermLabel";
+import { calculateDashboardFinance, reconcileDashboardTerm } from "../../utils/adminDashboardMetrics";
+
+const Metric = ({ label, value }) => (
+  <div className="rounded border p-4"><p className="text-gray-500">{label}</p><p className="text-xl font-bold">{value}</p></div>
+);
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-
-  const [students, setStudents] = useState([]);
-  const [teachers, setTeachers] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [fees, setFees] = useState([]);
-  const [discipline, setDiscipline] = useState([]);
-
-  // 🔥 TERMS STATE
+  const [students, setStudents] = useState(null);
+  const [teachers, setTeachers] = useState(null);
+  const [classes, setClasses] = useState(null);
+  const [fees, setFees] = useState(null);
+  const [discipline, setDiscipline] = useState(null);
   const [terms, setTerms] = useState([]);
   const [currentTermId, setCurrentTermId] = useState("");
-  const [currentTerm, setCurrentTerm] = useState(null);
+  const [globalErrors, setGlobalErrors] = useState({});
+  const [disciplineError, setDisciplineError] = useState("");
 
-  // 🔥 LOAD TERMS FIRST
-  useEffect(() => {
-    fetchTerms();
+  const fetchTerms = useCallback(async () => {
+    try {
+      const response = await apiClient.get("/terms", { silent: true });
+      const validTerms = Array.isArray(response.data) ? response.data : [];
+      setTerms(validTerms);
+      setCurrentTermId((previous) => reconcileDashboardTerm(previous, validTerms));
+    } catch (error) {
+      console.error("Failed to fetch terms", error);
+      setTerms([]);
+      setCurrentTermId("");
+    }
   }, []);
 
-  // 🔥 RELOAD DASHBOARD WHEN TERM CHANGES
+  const fetchGlobalData = useCallback(async () => {
+    const requests = [
+      ["students", "/students", setStudents],
+      ["teachers", "/admin/users", (data) => setTeachers(data.filter((user) => user.role === "TEACHER" && user.isActive !== false && !user.isArchived))],
+      ["classes", "/admin/classes", setClasses],
+      ["fees", "/fees", setFees],
+    ];
+    const results = await Promise.allSettled(requests.map(([, url]) => apiClient.get(url, { silent: true })));
+    const errors = {};
+    results.forEach((result, index) => {
+      const [key, , setter] = requests[index];
+      if (result.status === "fulfilled" && Array.isArray(result.value.data)) setter(result.value.data);
+      else errors[key] = "Not available";
+    });
+    setGlobalErrors(errors);
+  }, []);
+
+  useEffect(() => { fetchTerms(); fetchGlobalData(); }, [fetchGlobalData, fetchTerms]);
+
   useEffect(() => {
-    if (currentTermId) {
-      fetchDashboardData();
+    if (!currentTermId) {
+      setDiscipline(null);
+      setDisciplineError("");
+      return;
     }
+    let cancelled = false;
+    setDiscipline(null);
+    setDisciplineError("");
+    apiClient.get(`/discipline?termId=${currentTermId}`, { silent: true })
+      .then((response) => { if (!cancelled) setDiscipline(Array.isArray(response.data) ? response.data : []); })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("Failed to load discipline metric", error);
+          setDisciplineError("Not available");
+        }
+      });
+    return () => { cancelled = true; };
   }, [currentTermId]);
 
-  const fetchTerms = async () => {
-    try {
-      const termsRes = await apiClient
-        .get("/terms", { silent: true })
-        .catch(() => ({ data: [] }));
-
-      const termsData = termsRes.data || [];
-
-      // 🔥 FILTER ONLY THESE TERMS
-      const filteredTerms = termsData;
-
-      // 🔥 STORE FILTERED TERMS ONLY
-      setTerms(filteredTerms);
-
-      // 🔥 DEFAULT TERM
-      if (filteredTerms.length > 0) {
-        setCurrentTermId(String(filteredTerms[0].id));
-        setCurrentTerm(filteredTerms[0]);
-      }
-    } catch (err) {
-      console.error("Failed to fetch terms:", err);
-    }
-  };
-
-  const fetchDashboardData = async () => {
-    try {
-      const query = `?termId=${currentTermId}`;
-
-      // 🔥 GLOBAL DATA
-      const studentsRes = await apiClient
-        .get("/students", { silent: true })
-        .catch(() => ({ data: [] }));
-
-      const teachersRes = await apiClient
-        .get("/admin/users", { silent: true })
-        .catch(() => ({ data: [] }));
-
-      // 🔥 TERM-BASED DATA
-      const classesRes = await apiClient
-        .get(`/admin/classes${query}`, {
-          silent: true,
-        })
-        .catch(() => ({ data: [] }));
-
-      const feesRes = await apiClient
-        .get(`/fees${query}`, { silent: true })
-        .catch(() => ({ data: [] }));
-
-      const disciplineRes = await apiClient
-        .get(`/discipline${query}`, {
-          silent: true,
-        })
-        .catch(() => ({ data: [] }));
-
-      setStudents(studentsRes.data || []);
-
-      // ✅ FILTER ONLY TEACHERS
-      const allUsers = teachersRes.data || [];
-
-      const teacherList = allUsers.filter(
-        (u) => u.role === "TEACHER"
-      );
-
-      setTeachers(teacherList);
-
-      setClasses(classesRes.data || []);
-      setFees(feesRes.data || []);
-      setDiscipline(disciplineRes.data || []);
-
-      // 🔥 UPDATE CURRENT TERM OBJECT
-      const selected = terms.find(
-        (t) => String(t.id) === String(currentTermId)
-      );
-
-      setCurrentTerm(selected || null);
-    } catch (err) {
-      console.error("Dashboard fetch failed:", err);
-    }
-  };
-
-  // 📊 CALCULATIONS
-  const totalFees = fees.reduce(
-    (sum, f) => sum + (f.amount || 0),
-    0
-  );
-
-  const totalPaid = fees.reduce(
-    (sum, f) => sum + (f.paid || 0),
-    0
-  );
-
-  const totalOutstanding =
-    totalFees - totalPaid;
-
-  // 🔥 TERM FILTERED
-  const disciplineThisTerm =
-    discipline.length;
+  const currentTerm = terms.find((term) => String(term.id) === currentTermId) || null;
+  const finance = useMemo(() => calculateDashboardFinance(fees || []), [fees]);
+  const globalValue = (key, records) => globalErrors[key] || (records === null ? "Loading…" : records.length);
+  const financeValue = (key) => globalErrors.fees || (fees === null ? "Loading…" : finance[key]);
+  const termMetric = !currentTermId ? "Select a term" : disciplineError || (discipline === null ? "Loading…" : discipline.length);
+  const attendanceMetric = currentTermId ? "Not available" : "Select a term";
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">
-        Dashboard
-      </h1>
-
-      {/* 🔥 TERM SELECTOR + LOCK BUTTON */}
+      <h1 className="mb-6 text-2xl font-bold">Dashboard</h1>
       <div className="mb-6">
-        <label className="block text-sm font-medium mb-1" htmlFor="dashboard-term-filter">
-          Dashboard filter — class-specific term
-        </label>
-        <p className="text-sm text-gray-500 mb-2">
-          This filters dashboard data only. It does not assign a term to other classes.
-        </p>
-        <div className="flex items-center">
-        <select
-          id="dashboard-term-filter"
-          value={currentTermId}
-          onChange={(e) => {
-            const id = e.target.value;
-
-            setCurrentTermId(id);
-
-            const selected = terms.find(
-              (t) => String(t.id) === String(id)
-            );
-
-            setCurrentTerm(selected || null);
-          }}
-          className="border p-2"
-        >
-        {terms.map((t) => (
-          <option key={t.id} value={t.id}>
-            {formatTermLabel(t)}
-          </option>
-        ))}
-        </select>
-
-        {/* 🔒 LOCK BUTTON */}
-        <button
-          onClick={async () => {
-            if (!currentTermId) return;
-
-            try {
-              await apiClient.put(
-                `/terms/${currentTermId}/lock`
-              );
-
-              // 🔥 REFRESH TERMS + DASHBOARD
-              await fetchTerms();
-              await fetchDashboardData();
-
-              alert("Term status updated");
-            } catch (err) {
-              console.error(err);
-              alert("Failed to update term");
-            }
-          }}
-          className={`px-3 py-1 ml-2 ${
-            currentTerm?.isLocked
-              ? "bg-red-500"
-              : "bg-green-500"
-          } text-white`}
-        >
-          {currentTerm?.isLocked
-            ? "Unlock Term"
-            : "Lock Term"}
-        </button>
+        <label className="mb-1 block text-sm font-medium" htmlFor="dashboard-term-filter">Dashboard filter — class-specific term</label>
+        <p className="mb-2 text-sm text-gray-500">This filters term-specific dashboard data only. Global school totals are unaffected.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <select id="dashboard-term-filter" value={currentTermId} onChange={(event) => setCurrentTermId(event.target.value)} className="max-w-full border p-2">
+            <option value="">{terms.length === 0 ? "No terms configured" : "Select a term"}</option>
+            {terms.map((term) => <option key={term.id} value={term.id}>{formatTermLabel(term)}</option>)}
+          </select>
+          <button type="button" disabled={!currentTermId} onClick={async () => {
+            try { await apiClient.put(`/terms/${currentTermId}/lock`); await fetchTerms(); }
+            catch (error) { console.error("Failed to update term", error); }
+          }} className={`px-3 py-2 text-white disabled:cursor-not-allowed disabled:bg-gray-400 ${currentTerm?.isLocked ? "bg-red-500" : "bg-green-500"}`}>
+            {currentTerm?.isLocked ? "Unlock Term" : "Lock Term"}
+          </button>
         </div>
       </div>
 
-      {/* 🔥 FINANCIAL + DISCIPLINE STATS */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="border p-4 rounded">
-          <p className="text-gray-500">
-            Students
-          </p>
-
-          <p className="text-xl font-bold">
-            {students.length}
-          </p>
-        </div>
-
-        <div className="border p-4 rounded">
-          <p className="text-gray-500">
-            Total Fees
-          </p>
-
-          <p className="text-xl font-bold">
-            {totalFees}
-          </p>
-        </div>
-
-        <div className="border p-4 rounded">
-          <p className="text-gray-500">
-            Total Paid
-          </p>
-
-          <p className="text-xl font-bold">
-            {totalPaid}
-          </p>
-        </div>
-
-        <div className="border p-4 rounded">
-          <p className="text-gray-500">
-            Outstanding
-          </p>
-
-          <p className="text-xl font-bold">
-            {totalOutstanding}
-          </p>
-        </div>
-
-        <div className="border p-4 rounded col-span-2">
-          <p className="text-gray-500">
-            Discipline (This Term)
-          </p>
-
-          <p className="text-xl font-bold">
-            {disciplineThisTerm}
-          </p>
-        </div>
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+        <Metric label="Students" value={globalValue("students", students)} />
+        <Metric label="Total Fees" value={financeValue("totalFees")} />
+        <Metric label="Total Paid" value={financeValue("totalPaid")} />
+        <Metric label="Outstanding" value={financeValue("totalOutstanding")} />
+        <Metric label="Discipline (Selected Term)" value={termMetric} />
+      </div>
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+        <Metric label="Total Students" value={globalValue("students", students)} />
+        <Metric label="Total Teachers" value={globalValue("teachers", teachers)} />
+        <Metric label="Active Classes" value={globalValue("classes", classes)} />
+        <Metric label="Avg Attendance" value={attendanceMetric} />
       </div>
 
-      {/* 🔥 ORIGINAL DASHBOARD */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <div className="border p-4 rounded">
-          <p className="text-gray-500">
-            Total Students
-          </p>
-
-          <p className="text-xl font-bold">
-            {students.length}
-          </p>
-        </div>
-
-        <div className="border p-4 rounded">
-          <p className="text-gray-500">
-            Total Teachers
-          </p>
-
-          <p className="text-xl font-bold">
-            {teachers.length}
-          </p>
-        </div>
-
-        <div className="border p-4 rounded">
-          <p className="text-gray-500">
-            Active Classes
-          </p>
-
-          <p className="text-xl font-bold">
-            {classes.length}
-          </p>
-        </div>
-
-        <div className="border p-4 rounded">
-          <p className="text-gray-500">
-            Avg Attendance
-          </p>
-
-          <p className="text-xl font-bold">
-            —
-          </p>
-        </div>
-      </div>
-
-      {/* 🔥 QUICK ACTIONS */}
-      <div className="border p-4 rounded">
-        <h2 className="mb-3 font-semibold">
-          Quick Actions
-        </h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <button
-            onClick={() =>
-              navigate(
-                "/dashboard/admin/students"
-              )
-            }
-            className="bg-yellow-500 text-white p-2 rounded"
-          >
-            Add Student
-          </button>
-
-          <button
-            onClick={() =>
-              navigate(
-                "/dashboard/admin/teachers"
-              )
-            }
-            className="bg-pink-500 text-white p-2 rounded"
-          >
-            Add Teacher
-          </button>
-
-          <button
-            onClick={() =>
-              navigate(
-                "/dashboard/admin/parents"
-              )
-            }
-            className="bg-green-500 text-white p-2 rounded"
-          >
-            Add Parent
-          </button>
+      <div className="rounded border p-4">
+        <h2 className="mb-3 font-semibold">Quick Actions</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <button onClick={() => navigate("/dashboard/admin/students")} className="rounded bg-yellow-500 p-2 text-white">Add Student</button>
+          <button onClick={() => navigate("/dashboard/admin/teachers")} className="rounded bg-pink-500 p-2 text-white">Add Teacher</button>
+          <button onClick={() => navigate("/dashboard/admin/parents")} className="rounded bg-green-500 p-2 text-white">Add Parent</button>
         </div>
       </div>
     </div>
