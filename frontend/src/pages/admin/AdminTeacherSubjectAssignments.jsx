@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import apiClient from "../../services/apiClient";
+import { getAssignableClassSubjects } from "../../utils/adminTeacherSubjectOptions";
 
 export default function AdminTeacherSubjectAssignments() {
   const [teachers, setTeachers] = useState([]);
   const [classes, setClasses] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [classSubjects, setClassSubjects] = useState([]);
+  const [subjectsLoading, setSubjectsLoading] = useState(false);
+  const [subjectsError, setSubjectsError] = useState("");
   const [loading, setLoading] = useState(true);
   const [showInactive, setShowInactive] = useState(false);
 
@@ -18,13 +21,34 @@ export default function AdminTeacherSubjectAssignments() {
   useEffect(() => {
     if (!form.classId) {
       setClassSubjects([]);
+      setSubjectsError("");
+      setSubjectsLoading(false);
       return;
     }
 
-    apiClient
-      .get(`/admin/class-subjects/${form.classId}`)
-      .then((res) => setClassSubjects(res.data || []))
-      .catch(() => setClassSubjects([]));
+    let cancelled = false;
+    setClassSubjects([]);
+    setSubjectsError("");
+    setSubjectsLoading(true);
+
+    apiClient.get(`/admin/class-subjects/${form.classId}`)
+      .then((res) => {
+        if (cancelled) return;
+        setClassSubjects(getAssignableClassSubjects(res.data));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Failed to load subjects configured for class", err);
+        setClassSubjects([]);
+        setSubjectsError(err?.message || "Failed to load subjects for this class");
+      })
+      .finally(() => {
+        if (!cancelled) setSubjectsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [form.classId]);
 
   const fetchData = useCallback(async (includeInactive = showInactive) => {
@@ -151,24 +175,6 @@ export default function AdminTeacherSubjectAssignments() {
             ))}
           </select>
 
-          {/* Subject */}
-          <select
-            required
-            className="p-2 border rounded"
-            value={form.subjectId}
-            onChange={(e) =>
-              setForm({ ...form, subjectId: e.target.value })
-            }
-          >
-            <option value="">Select subject</option>
-
-            {classSubjects.map((entry) => entry.subject).filter(Boolean).map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-
           {/* Class */}
           <select
             required
@@ -186,7 +192,45 @@ export default function AdminTeacherSubjectAssignments() {
               </option>
             ))}
           </select>
+
+          {/* Subject */}
+          <select
+            required
+            className="p-2 border rounded"
+            value={form.subjectId}
+            disabled={!form.classId || subjectsLoading || classSubjects.length === 0}
+            onChange={(e) =>
+              setForm({ ...form, subjectId: e.target.value })
+            }
+          >
+            <option value="">
+              {!form.classId
+                ? "Select class first"
+                : subjectsLoading
+                  ? "Loading subjects…"
+                  : subjectsError
+                    ? "Unable to load subjects"
+                    : classSubjects.length === 0
+                      ? "No subjects configured for this class"
+                      : "Select subject"}
+            </option>
+
+            {classSubjects.map((entry) => entry.subject).map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </div>
+
+        {subjectsError && (
+          <p role="alert" className="text-sm text-red-600">{subjectsError}</p>
+        )}
+        {form.classId && !subjectsLoading && !subjectsError && classSubjects.length === 0 && (
+          <p className="text-sm text-amber-700">
+            No subjects are configured for this class. Configure them in Class Subject Assignment first.
+          </p>
+        )}
 
         {/* Duplicate warning */}
         {duplicateAssignment && (

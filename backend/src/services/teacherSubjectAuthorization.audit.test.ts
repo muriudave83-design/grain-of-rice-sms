@@ -68,3 +68,11 @@ test("historical report resolution deliberately retains inactive TeacherSubjects
   const source = read("controllers/reports.controller.ts");
   assert.match(source, /teacherSubject\.findMany\(\{[\s\S]*classId:\s*student\.classId[\s\S]*include:\s*\{[\s\S]*subject:\s*true/);
 });
+
+test("Admin subject options come only from active ClassSubject structure, not TeacherSubject history", () => {
+  const source = read("routes/admin/admin.classSubjects.routes.ts");
+  assert.match(source, /classSubject\.findMany/);
+  assert.match(source, /where:\s*\{ classId, subject:\s*\{ isArchived:\s*false \} \}/);
+  assert.doesNotMatch(source, /teacherSubject\.find/);
+  assert.match(source, /requireRole\(\[Role\.ADMIN\]\)/);
+});

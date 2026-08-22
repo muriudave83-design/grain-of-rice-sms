@@ -18,12 +18,25 @@ router.get(
     try {
       const classId = Number(req.params.classId);
 
+      if (!Number.isInteger(classId) || classId <= 0) {
+        return res.status(400).json({ message: "Invalid class id" });
+      }
+
+      const schoolClass = await prisma.class.findFirst({
+        where: { id: classId, isArchived: false },
+        select: { id: true },
+      });
+      if (!schoolClass) {
+        return res.status(404).json({ message: "Active class not found" });
+      }
+
       const data = await prisma.classSubject.findMany({
-        where: { classId },
+        where: { classId, subject: { isArchived: false } },
         include: {
           subject: true,
           class: true,
         },
+        orderBy: { subject: { name: "asc" } },
       });
 
       res.json(data);
