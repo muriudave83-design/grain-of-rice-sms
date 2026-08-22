@@ -17,6 +17,7 @@ const mockClient = (overrides: any = {}) => ({
   discipline: { findMany: async () => [], create: async () => ({}) },
   ...overrides,
 });
+const incidentAt = new Date("2026-08-22T07:35:00.000Z");
 
 test("assigned class students are listed once, alphabetically, and archived students are excluded", async () => {
   let query: any;
@@ -48,10 +49,10 @@ test("authorized teacher creates in the shared Discipline table with creator and
     term: { findFirst: async () => ({ id: 9, isLocked: false }) },
     discipline: { create: async (args: any) => { createArgs = args; return { id: 44, ...args.data }; } },
   });
-  const result = await createTeacherDisciplineRecord(client as any, 30, { studentId: 24, termId: 9, type: " Late ", note: "" });
+  const result = await createTeacherDisciplineRecord(client as any, 30, { studentId: 24, termId: 9, type: " Late ", note: "", incidentAt });
   if (!("record" in result) || !result.record) assert.fail("record should be created");
   assert.equal(result.record.id, 44);
-  assert.deepEqual(createArgs.data, { studentId: 24, termId: 9, type: "Late", notes: "", recordedById: 30 });
+  assert.deepEqual(createArgs.data, { studentId: 24, termId: 9, type: "Late", notes: "", recordedById: 30, date: incidentAt });
 });
 
 test("unauthorized or archived studentId is rejected before Term lookup or create", async () => {
@@ -62,7 +63,7 @@ test("unauthorized or archived studentId is rejected before Term lookup or creat
     term: { findFirst: async () => { termCalled = true; } },
     discipline: { create: async () => { createCalled = true; } },
   });
-  assert.deepEqual(await createTeacherDisciplineRecord(client as any, 30, { studentId: 99, termId: 9, type: "Late" }), { error: "STUDENT_FORBIDDEN" });
+  assert.deepEqual(await createTeacherDisciplineRecord(client as any, 30, { studentId: 99, termId: 9, type: "Late", incidentAt }), { error: "STUDENT_FORBIDDEN" });
   assert.equal(termCalled, false); assert.equal(createCalled, false);
 });
 
@@ -71,7 +72,7 @@ test("Term from another class is rejected", async () => {
     student: { findFirst: async () => ({ id: 24, classId: 6, isArchived: false }) },
     term: { findFirst: async () => null },
   });
-  assert.deepEqual(await createTeacherDisciplineRecord(client as any, 30, { studentId: 24, termId: 99, type: "Late" }), { error: "TERM_FORBIDDEN" });
+  assert.deepEqual(await createTeacherDisciplineRecord(client as any, 30, { studentId: 24, termId: 99, type: "Late", incidentAt }), { error: "TERM_FORBIDDEN" });
 });
 
 test("locked Term is rejected", async () => {
@@ -79,7 +80,7 @@ test("locked Term is rejected", async () => {
     student: { findFirst: async () => ({ id: 24, classId: 6, isArchived: false }) },
     term: { findFirst: async () => ({ id: 9, isLocked: true }) },
   });
-  assert.deepEqual(await createTeacherDisciplineRecord(client as any, 30, { studentId: 24, termId: 9, type: "Late" }), { error: "TERM_LOCKED" });
+  assert.deepEqual(await createTeacherDisciplineRecord(client as any, 30, { studentId: 24, termId: 9, type: "Late", incidentAt }), { error: "TERM_LOCKED" });
 });
 
 test("student-specific Term list is class-scoped and naturally includes Term 3", async () => {

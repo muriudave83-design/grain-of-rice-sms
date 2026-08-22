@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import apiClient from "../../services/apiClient";
 import StudentSearchSelect from "../../components/StudentSearchSelect";
+import { formatDisciplineDate, formatDisciplineTime } from "../../utils/disciplineDateTime";
 
 export default function Discipline() {
   const [records, setRecords] = useState([]);
@@ -184,6 +185,7 @@ export default function Discipline() {
             <thead className="bg-gray-100">
               <tr>
                 <th className="p-2 text-left">Date</th>
+                <th className="p-2 text-left">Time</th>
                 <th className="p-2 text-left">Student</th>
                 <th className="p-2 text-left">Class</th>
                 <th className="p-2 text-left">Type</th>
@@ -198,8 +200,9 @@ export default function Discipline() {
               {filtered.map((r) => (
                 <tr key={r.id} className="border-t">
                   <td className="p-2">
-                    {new Date(r.date).toLocaleDateString()}
+                    {formatDisciplineDate(r.date)}
                   </td>
+                  <td className="p-2">{formatDisciplineTime(r.date)}</td>
 
                   <td className="p-2">
                     {r.student?.firstName} ({r.student?.admissionNo})

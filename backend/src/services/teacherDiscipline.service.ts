@@ -67,7 +67,7 @@ export async function listTeacherDisciplineRecords(client: DisciplineClient, tea
 export async function createTeacherDisciplineRecord(
   client: DisciplineClient,
   teacherId: number,
-  input: { studentId: number; termId: number; type: string; note?: string },
+  input: { studentId: number; termId: number; type: string; note?: string; incidentAt: Date },
 ) {
   const student = await findTeacherStudent(client, teacherId, input.studentId, true);
   if (!student) return { error: "STUDENT_FORBIDDEN" as const };
@@ -86,6 +86,7 @@ export async function createTeacherDisciplineRecord(
       type: input.type.trim(),
       notes: input.note?.trim() || "",
       recordedById: teacherId,
+      date: input.incidentAt,
     },
     include: {
       student: { include: { class: { select: { id: true, name: true } } } },

@@ -6,6 +6,7 @@ import {
   listTeacherDisciplineStudents,
   listTeacherTerms,
 } from "../services/teacherDiscipline.service";
+import { parseIncidentDateTime } from "../utils/disciplineDateTime";
 
 const positiveId = (value: unknown) => {
   const id = Number(value);
@@ -42,8 +43,19 @@ export async function addTeacherDiscipline(req: Request, res: Response) {
     return res.status(400).json({ message: "Student, Term, and incident/type are required" });
   }
 
+  const incidentAt = parseIncidentDateTime(req.body.incidentDate, req.body.incidentTime);
+  if ("error" in incidentAt) {
+    const messages = {
+      INVALID_DATE: "Incident date is invalid",
+      INVALID_TIME: "Incident time is invalid",
+      INVALID_TIMESTAMP: "Incident timestamp is invalid",
+      FUTURE_TIMESTAMP: "Incident date/time cannot be in the future",
+    };
+    return res.status(400).json({ message: messages[incidentAt.error] });
+  }
+
   const result = await createTeacherDisciplineRecord(prisma, req.user!.id, {
-    studentId, termId, type, note,
+    studentId, termId, type, note, incidentAt: incidentAt.value,
   });
   if ("error" in result) {
     if (result.error === "TERM_LOCKED") return res.status(409).json({ message: "Term is locked" });

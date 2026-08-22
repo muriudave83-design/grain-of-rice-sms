@@ -13,6 +13,7 @@ export default function StudentSearchSelect({
   onChange,
   placeholder = "Search by name or student number",
   disabled = false,
+  inputId,
 }) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -69,7 +70,7 @@ export default function StudentSearchSelect({
   return (
     <div ref={containerRef} className="relative w-full min-w-0 sm:w-72">
       {selectedStudent ? (
-        <div className="flex min-h-10 items-center gap-2 rounded border bg-white px-3 py-2">
+        <div id={inputId} className="flex min-h-10 items-center gap-2 rounded border bg-white px-3 py-2">
           <span className="min-w-0 flex-1 truncate text-sm">
             {studentLabel(selectedStudent)}
           </span>
@@ -85,6 +86,7 @@ export default function StudentSearchSelect({
       ) : (
         <>
           <input
+            id={inputId}
             type="search"
             value={query}
             onChange={(event) => {
