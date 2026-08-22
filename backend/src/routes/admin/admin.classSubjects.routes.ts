@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Prisma, PrismaClient, Role } from "@prisma/client";
 import { authenticate } from "../../middlewares/authMiddleware";
 import { requireRole } from "../../middlewares/rolesMiddleware";
+import { removeClassSubjectConfiguration } from "../../services/classSubjectLifecycle.service";
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -150,28 +151,16 @@ router.delete(
         return res.status(400).json({ message: "Invalid class-subject assignment id" });
       }
 
-      const outcome = await prisma.$transaction(async (tx) => {
-        const classSubject = await tx.classSubject.findUnique({ where: { id } });
-        if (!classSubject) return "already-removed" as const;
+      const outcome = await removeClassSubjectConfiguration(prisma, id);
 
-        const teacherAssignmentCount = await tx.teacherSubject.count({
-          where: {
-            classId: classSubject.classId,
-            subjectId: classSubject.subjectId,
-          },
-        });
-        if (teacherAssignmentCount > 0) return "in-use" as const;
-
-        await tx.classSubject.delete({ where: { id } });
-        return "removed" as const;
-      }, { isolationLevel: "Serializable" });
-
-      if (outcome === "already-removed") {
+      if (outcome.status === "NOT_FOUND") {
         return res.json({ message: "Class-subject assignment was already removed" });
       }
-      if (outcome === "in-use") {
+      if (outcome.status === "ACTIVE_ASSIGNMENTS") {
         return res.status(409).json({
-          message: "Remove the teacher assignment before removing this subject from the class",
+          message: outcome.activeTeacherAssignmentCount === 1
+            ? "End the active teacher assignment before removing this subject from the class."
+            : "This subject still has active teacher assignments. End them before removing it from the class.",
         });
       }
 
