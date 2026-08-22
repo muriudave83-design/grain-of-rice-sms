@@ -35,6 +35,7 @@ import AdminAttendanceClass from "../pages/admin/attendance/AdminAttendanceClass
 import AdminAuditLogs from "../pages/admin/audit/AdminAuditLogs";
 import AttendanceAnalytics from "../pages/admin/AttendanceAnalytics";
 import AdminArchived from "../pages/admin/AdminArchived";
+import ArchivedStudentProfile from "../pages/admin/ArchivedStudentProfile";
 import EditStudent from "../pages/admin/EditStudent";
 import AttendancePage from "../pages/admin/AttendancePage";
 import AdminReportsPage from "../pages/admin/AdminReportsPage";
@@ -273,10 +274,10 @@ export default function AppRoutes() {
             element={<AdminAuditLogs />}
           />
 
-          <Route
-            path="/dashboard/admin/archived"
-            element={<AdminArchived />}
-          />
+          <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
+            <Route path="/dashboard/admin/archived" element={<AdminArchived />} />
+            <Route path="/dashboard/admin/archived/students/:studentId" element={<ArchivedStudentProfile />} />
+          </Route>
 
           <Route
             path="/dashboard/admin/students/:id/edit"
