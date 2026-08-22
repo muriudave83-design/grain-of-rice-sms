@@ -76,3 +76,13 @@ test("Admin subject options come only from active ClassSubject structure, not Te
   assert.doesNotMatch(source, /teacherSubject\.find/);
   assert.match(source, /requireRole\(\[Role\.ADMIN\]\)/);
 });
+
+test("subject-first assignment class lookup is Admin-only and excludes archived classes", () => {
+  const source = read("routes/admin/admin.classSubjects.routes.ts");
+  const subjectRoute = source.indexOf('"/class-subjects/by-subject/:subjectId"');
+  const classRoute = source.indexOf('"/class-subjects/:classId"');
+  assert.ok(subjectRoute >= 0 && subjectRoute < classRoute, "specific by-subject route must precede dynamic class route");
+  assert.match(source.slice(subjectRoute, classRoute), /requireRole\(\[Role\.ADMIN\]\)/);
+  assert.match(source.slice(subjectRoute, classRoute), /class:\s*\{ isArchived:\s*false \}/);
+  assert.doesNotMatch(read("routes/admin/admin.subjects.routes.ts"), /subjects\/:id\/assign-teacher/);
+});

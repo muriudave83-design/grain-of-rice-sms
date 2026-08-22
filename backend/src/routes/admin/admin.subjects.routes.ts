@@ -166,44 +166,4 @@ router.patch(
   }
 );
 
-/**
- * ============================================================
- * ADMIN — ASSIGN TEACHER TO SUBJECT
- * PUT /api/admin/subjects/:id/assign-teacher
- * ============================================================
- */
-router.put(
-  "/subjects/:id/assign-teacher",
-  authenticate,
-  requireRole([Role.ADMIN]),
-  async (req, res) => {
-    try {
-      const subjectId = Number(req.params.id);
-      const { teacherId } = req.body;
-
-      if (!teacherId) {
-        return res.status(400).json({ message: "teacherId required" });
-      }
-
-      const teacher = await prisma.user.findUnique({
-        where: { id: teacherId },
-      });
-
-      if (!teacher || teacher.role !== Role.TEACHER) {
-        return res.status(400).json({ message: "Invalid teacher" });
-      }
-
-      const updated = await prisma.subject.update({
-        where: { id: subjectId },
-        data: { teacherId },
-      });
-
-      res.json(updated);
-    } catch (error) {
-      console.error("ASSIGN TEACHER ERROR:", error);
-      res.status(500).json({ error: "Failed to assign teacher" });
-    }
-  }
-);
-
 export default router;

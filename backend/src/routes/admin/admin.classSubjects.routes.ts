@@ -11,6 +11,41 @@ const router = Router();
 // GET ALL SUBJECTS ASSIGNED TO A CLASS
 // ======================================
 router.get(
+  "/class-subjects/by-subject/:subjectId",
+  authenticate,
+  requireRole([Role.ADMIN]),
+  async (req, res) => {
+    try {
+      const subjectId = Number(req.params.subjectId);
+      if (!Number.isInteger(subjectId) || subjectId <= 0) {
+        return res.status(400).json({ message: "Invalid subject id" });
+      }
+
+      const subject = await prisma.subject.findFirst({
+        where: { id: subjectId, isArchived: false },
+        select: { id: true },
+      });
+      if (!subject) return res.status(404).json({ message: "Active subject not found" });
+
+      const associations = await prisma.classSubject.findMany({
+        where: { subjectId, class: { isArchived: false } },
+        select: {
+          id: true,
+          classId: true,
+          subjectId: true,
+          class: { select: { id: true, name: true } },
+        },
+        orderBy: { class: { name: "asc" } },
+      });
+      return res.json(associations);
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ message: "Failed to load classes configured for subject" });
+    }
+  },
+);
+
+router.get(
   "/class-subjects/:classId",
   authenticate,
   requireRole([Role.ADMIN]),
