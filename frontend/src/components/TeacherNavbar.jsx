@@ -46,6 +46,13 @@ export default function TeacherNavbar() {
         >
           Attendance
         </Link>
+
+        <Link
+          to="/teacher/discipline"
+          className={linkClass("/teacher/discipline")}
+        >
+          Discipline
+        </Link>
       </div>
 
       {/* RIGHT: USER + LOGOUT */}

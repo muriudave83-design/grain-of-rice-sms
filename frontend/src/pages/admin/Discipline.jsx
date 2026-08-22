@@ -9,7 +9,8 @@ export default function Discipline() {
 
   const [filterStudentId, setFilterStudentId] = useState("");
   const [addStudentId, setAddStudentId] = useState("");
-  const [termId, setTermId] = useState("");
+  const [filterTermId, setFilterTermId] = useState("");
+  const [addTermId, setAddTermId] = useState("");
 
   const [type, setType] = useState("");
   const [note, setNote] = useState("");
@@ -59,14 +60,14 @@ export default function Discipline() {
       return;
     }
 
-    if (!addStudentId || !type) {
-      return alert("Student and type required");
+    if (!addStudentId || !addTermId || !type.trim()) {
+      return alert("Student, Term, and type required");
     }
 
     try {
       await apiClient.post("/discipline", {
         studentId: Number(addStudentId),
-        termId: termId ? Number(termId) : null,
+        termId: Number(addTermId),
         type,
         note,
       });
@@ -85,7 +86,7 @@ export default function Discipline() {
   // FILTER
   const filtered = records.filter((r) => {
     if (filterStudentId && r.studentId !== Number(filterStudentId)) return false;
-    if (termId && r.termId !== Number(termId)) return false;
+    if (filterTermId && r.termId !== Number(filterTermId)) return false;
     return true;
   });
 
@@ -104,15 +105,15 @@ export default function Discipline() {
         />
 
         <select
-          value={termId}
-          onChange={(e) => setTermId(e.target.value)}
+          value={filterTermId}
+          onChange={(e) => setFilterTermId(e.target.value)}
           className="border p-2 rounded"
           disabled={isLocked}
         >
           <option value="">All Terms</option>
           {terms.map((t) => (
             <option key={t.id} value={t.id}>
-              {t.name}
+              {t.name} — {t.class?.name || `Class ${t.classId}`}
             </option>
           ))}
         </select>
@@ -122,19 +123,25 @@ export default function Discipline() {
         <StudentSearchSelect
           students={students}
           value={addStudentId}
-          onChange={setAddStudentId}
+          onChange={(value) => {
+            setAddStudentId(value);
+            setAddTermId("");
+          }}
           placeholder="Select student by name or number"
           disabled={isLocked}
         />
 
         <select
-          value={termId}
-          onChange={(e) => setTermId(e.target.value)}
+          value={addTermId}
+          onChange={(e) => setAddTermId(e.target.value)}
           className="border p-2 rounded"
           disabled={isLocked}
         >
-          <option value="">Select Term (optional)</option>
-          {terms.map((t) => (
+          <option value="">Select Term</option>
+          {terms.filter((t) => {
+            const student = students.find((item) => String(item.id) === String(addStudentId));
+            return student && Number(t.classId) === Number(student.classId);
+          }).map((t) => (
             <option key={t.id} value={t.id}>
               {t.name}
             </option>
@@ -178,9 +185,11 @@ export default function Discipline() {
               <tr>
                 <th className="p-2 text-left">Date</th>
                 <th className="p-2 text-left">Student</th>
+                <th className="p-2 text-left">Class</th>
                 <th className="p-2 text-left">Type</th>
                 <th className="p-2 text-left">Note</th>
                 <th className="p-2 text-left">Term</th>
+                <th className="p-2 text-left">Recorded By</th>
                 <th className="p-2 text-left">Actions</th>
               </tr>
             </thead>
@@ -195,6 +204,7 @@ export default function Discipline() {
                   <td className="p-2">
                     {r.student?.firstName} ({r.student?.admissionNo})
                   </td>
+                  <td className="p-2">{r.student?.class?.name || "-"}</td>
                                     {/* EDIT TYPE */}
                   <td className="p-2">
                     {editingId === r.id ? (
@@ -224,6 +234,9 @@ export default function Discipline() {
                   </td>
 
                   <td className="p-2">{r.term?.name || "-"}</td>
+                  <td className="p-2">
+                    {r.recordedBy ? `${r.recordedBy.name} — ${r.recordedBy.role === "TEACHER" ? "Teacher" : "Administrator"}` : "Not recorded"}
+                  </td>
 
                   <td className="p-2 flex gap-2 flex-wrap">
                     {/* EDIT */}

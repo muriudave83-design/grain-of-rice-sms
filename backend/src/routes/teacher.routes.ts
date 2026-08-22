@@ -4,6 +4,12 @@ import { requireRole } from "../middlewares/rolesMiddleware";
 import prisma from "../prisma";
 import { generateTranscripts } from "../controllers/teacher.controller";
 import { getGradeDescription, getLetterGrade } from "../utils/gradeDescriptions";
+import {
+  addTeacherDiscipline,
+  getTeacherDiscipline,
+  getTeacherDisciplineStudents,
+  getTeacherDisciplineTerms,
+} from "../controllers/teacherDiscipline.controller";
 
 import {
   getTeacherSubjects,
@@ -33,6 +39,11 @@ router.get("/classes", getTeacherClasses);
 router.get("/subjects", getTeacherSubjects);
 router.get("/gradebook/:id", getGradebook);
 router.get("/class/:classId/students", getClassStudents);
+
+router.get("/discipline/students", getTeacherDisciplineStudents);
+router.get("/discipline/terms", getTeacherDisciplineTerms);
+router.get("/discipline", getTeacherDiscipline);
+router.post("/discipline", addTeacherDiscipline);
 
 //
 // 🧾 REPORTS

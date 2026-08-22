@@ -5,8 +5,13 @@ import {
   deleteDiscipline,
   updateDiscipline, // ✅ ADD THIS
 } from "../controllers/discipline.controller";
+import { authenticate } from "../middlewares/authMiddleware";
+import { requireRole } from "../middlewares/rolesMiddleware";
+import { Role } from "@prisma/client";
 
 const router = Router();
+
+router.use(authenticate, requireRole([Role.ADMIN]));
 
 router.get("/", getDiscipline);
 router.post("/", addDiscipline);

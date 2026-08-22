@@ -69,6 +69,7 @@ import TeacherAttendance from "../pages/teacher/attendance/TeacherAttendance";
 import GradebookPage from "../pages/teacher/GradebookPage";
 import GradebookDetail from "../pages/teacher/GradebookDetail";
 import FinalGrades from "../pages/teacher/FinalGrades";
+import TeacherDiscipline from "../pages/teacher/TeacherDiscipline";
 
 // =======================
 // PARENT PAGES
@@ -134,7 +135,7 @@ function PublicRoute({ children }) {
     if (user.role === "PARENT") return <Navigate to="/parent" replace />;
     if (user.role === "STUDENT") return <Navigate to="/student" replace />;
 
-  } catch (err) {
+  } catch {
     console.warn("⚠️ Corrupt auth data — clearing");
 
     localStorage.clear();
@@ -161,7 +162,7 @@ export default function AppRoutes() {
         localStorage.removeItem("user");
         localStorage.removeItem("role");
       }
-    } catch (err) {
+    } catch {
       console.warn("⚠️ Token parse failed — NOT clearing storage");
     }
   })();
@@ -346,6 +347,9 @@ export default function AppRoutes() {
           <Route path="attendance" element={<TeacherAttendance />} />
           <Route path="attendance/class/:classId" element={<TeacherAttendanceClass />} />
           <Route path="attendance/session/:sessionId" element={<TeacherAttendanceSession />} />
+
+          {/* DISCIPLINE */}
+          <Route path="discipline" element={<TeacherDiscipline />} />
 
           {/* HOMEWORK */}
           <Route path="homework/create" element={<CreateHomework />} />

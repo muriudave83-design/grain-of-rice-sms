@@ -16,16 +16,18 @@ const checkSystemLock = async (res: Response) => {
 };
 
 export const getDiscipline = async (req: Request, res: Response) => {
-  const termId = Number(req.query.termId);
+  const termId = req.query.termId === undefined ? undefined : Number(req.query.termId);
+  if (termId !== undefined && (!Number.isInteger(termId) || termId <= 0)) {
+    return res.status(400).json({ message: "Valid termId required" });
+  }
 
   const data = await prisma.discipline.findMany({
-    where: {
-      termId,
-    },
+    where: termId === undefined ? {} : { termId },
 
     include: {
-      student: true,
+      student: { include: { class: { select: { id: true, name: true } } } },
       term: true,
+      recordedBy: { select: { id: true, name: true, role: true } },
     },
 
     orderBy: { date: "desc" },
@@ -40,16 +42,36 @@ export const addDiscipline = async (req: Request, res: Response) => {
   // 🔒 LOCK CHECK
   if (await checkSystemLock(res)) return;
 
-  if (!studentId || !type || !termId) {
+  const parsedStudentId = Number(studentId);
+  const parsedTermId = Number(termId);
+  const normalizedType = typeof type === "string" ? type.trim() : "";
+  if (!Number.isInteger(parsedStudentId) || parsedStudentId <= 0 || !normalizedType || !Number.isInteger(parsedTermId) || parsedTermId <= 0) {
     return res.status(400).json({ error: "Missing fields" });
   }
 
+  const student = await prisma.student.findUnique({
+    where: { id: parsedStudentId },
+    select: { id: true, classId: true },
+  });
+  if (!student) return res.status(404).json({ message: "Student not found" });
+  const term = await prisma.term.findFirst({
+    where: { id: parsedTermId, classId: student.classId },
+    select: { id: true },
+  });
+  if (!term) return res.status(400).json({ message: "Term does not belong to the student's class" });
+
   const record = await prisma.discipline.create({
     data: {
-      studentId: Number(studentId),
-      type,
+      studentId: student.id,
+      type: normalizedType,
       notes: note || "",
-      termId: Number(termId),
+      termId: term.id,
+      recordedById: req.user!.id,
+    },
+    include: {
+      student: { include: { class: { select: { id: true, name: true } } } },
+      term: true,
+      recordedBy: { select: { id: true, name: true, role: true } },
     },
   });
 
