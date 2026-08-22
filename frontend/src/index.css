@@ -18,6 +18,16 @@
   animation: fadeIn 0.15s ease-out;
 }
 
+.report-subject-grid {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1.2fr) minmax(4rem, 0.55fr) minmax(4rem, 0.5fr) minmax(14rem, 2.75fr);
+  gap: 0.75rem;
+}
+
+.print-only {
+  display: none;
+}
+
 /* 🧾 PRINT STYLES — FIXED (GLOBAL, CORRECT) */
 @media print {
 
@@ -61,6 +71,11 @@
     border: none;
   }
 
+  .print-card:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
   /* ✅ Hide non-print UI */
   button, select, input {
     display: none !important;
@@ -75,5 +90,20 @@
   /* ✅ Optional: hide top header */
   .print-hidden {
     display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .report-subject-grid {
+    grid-template-columns: 22% 11% 11% 1fr;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 700px) {
+  .report-subject-grid {
+    grid-template-columns: 1fr;
   }
 }

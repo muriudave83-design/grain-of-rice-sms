@@ -1,19 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import apiClient from "../../services/apiClient";
 import BackButton from "../../components/BackButton";
 import { formatGrade } from "../../utils/grading";
+import {
+  displaySubjectComment,
+  PRINT_MODE,
+  reportsForMode,
+} from "../../utils/reportCardPresentation";
 
 export default function Reports() {
   const [classId, setClassId] = useState("");
   const [classes, setClasses] = useState([]);
 
   const [reports, setReports] = useState([]);
-  const [filteredReports, setFilteredReports] =
-    useState([]);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState("");
+  const [printMode, setPrintMode] = useState(null);
 
   const [terms, setTerms] = useState([]);
   const [termId, setTermId] = useState(null);
@@ -40,7 +45,7 @@ export default function Reports() {
 
       setComments((prev) => ({
         ...prev,
-        [studentId + "-" + teacherSubjectId]:
+        [`${termId}-${studentId}-${teacherSubjectId}`]:
           value,
       }));
     } catch (err) {
@@ -57,10 +62,29 @@ export default function Reports() {
     }
   };
 
-  const handlePrint = () => {
-    setTimeout(() => {
-      window.print();
-    }, 300);
+  useEffect(() => {
+    if (!printMode) return undefined;
+
+    let secondFrame;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => window.print());
+    });
+    const finishPrinting = () => setPrintMode(null);
+    window.addEventListener("afterprint", finishPrinting, { once: true });
+
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      if (secondFrame) cancelAnimationFrame(secondFrame);
+      window.removeEventListener("afterprint", finishPrinting);
+    };
+  }, [printMode]);
+
+  const handlePrintSelected = () => {
+    if (selectedStudentId) setPrintMode(PRINT_MODE.SELECTED);
+  };
+
+  const handlePrintAll = () => {
+    if (reports.length) setPrintMode(PRINT_MODE.ALL);
   };
 
   useEffect(() => {
@@ -93,6 +117,9 @@ export default function Reports() {
 
       setTerms([]);
       setTermId(null);
+      setReports([]);
+      setSelectedStudentId("");
+      setComments({});
       setError("");
 
       try {
@@ -147,7 +174,8 @@ export default function Reports() {
       );
 
       setReports(res.data);
-      setFilteredReports(res.data);
+      setSelectedStudentId("");
+      setComments({});
     } catch (err) {
       console.error(
         "❌ GENERATE REPORT ERROR:",
@@ -160,19 +188,20 @@ export default function Reports() {
     }
   };
 
-  useEffect(() => {
-    if (!search) {
-      setFilteredReports(reports);
-    } else {
-      const lower = search.toLowerCase();
+  const studentOptions = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    if (!normalizedSearch) return reports;
+    return reports.filter((report) =>
+      `${report.name} ${report.admissionNo || ""}`.toLowerCase().includes(normalizedSearch)
+    );
+  }, [reports, search]);
 
-      setFilteredReports(
-        reports.filter((r) =>
-          r.name.toLowerCase().includes(lower)
-        )
-      );
-    }
-  }, [search, reports]);
+  const previewReports = selectedStudentId
+    ? reportsForMode(reports, selectedStudentId, PRINT_MODE.SELECTED)
+    : reports;
+  const renderedReports = printMode
+    ? reportsForMode(reports, selectedStudentId, printMode)
+    : previewReports;
 
   const selectedClassName =
     classes.find((c) => c.id == classId)
@@ -202,14 +231,14 @@ export default function Reports() {
         </div>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 print-hidden">
         <strong>Grade:</strong>{" "}
         {selectedClassName} <br />
         <strong>Term:</strong>{" "}
         {selectedTermName}
       </div>
 
-      <div className="mb-6 flex gap-3 flex-wrap">
+      <div className="mb-6 flex gap-3 flex-wrap print-hidden">
         <select
           value={classId}
           onChange={(e) =>
@@ -230,9 +259,12 @@ export default function Reports() {
 
         <select
           value={termId ?? ""}
-          onChange={(e) =>
-            setTermId(Number(e.target.value))
-          }
+          onChange={(e) => {
+            setTermId(Number(e.target.value));
+            setReports([]);
+            setSelectedStudentId("");
+            setComments({});
+          }}
           className="border px-3 py-2"
         >
           <option value="" disabled>
@@ -259,7 +291,7 @@ export default function Reports() {
         </select>
 
         <input
-          placeholder="Search student..."
+          placeholder="Filter students by name or admission no..."
           value={search}
           onChange={(e) =>
             setSearch(e.target.value)
@@ -267,22 +299,42 @@ export default function Reports() {
           className="border px-3 py-2"
         />
 
+        <select
+          aria-label="Selected student"
+          value={selectedStudentId}
+          onChange={(e) => setSelectedStudentId(e.target.value)}
+          className="border px-3 py-2 min-w-56"
+          disabled={reports.length === 0}
+        >
+          <option value="">Class batch mode — all students</option>
+          {studentOptions.map((student) => (
+            <option key={student.studentId} value={student.studentId}>
+              {student.name}{student.admissionNo ? ` — ${student.admissionNo}` : ""}
+            </option>
+          ))}
+        </select>
+
         <button
           onClick={handleGenerate}
           className="bg-blue-600 text-white px-4 py-2"
         >
-          Generate
+          Generate Class Reports
         </button>
 
         <button
-          onClick={handlePrint}
-          disabled={
-            filteredReports.length === 0 ||
-            loading
-          }
+          onClick={handlePrintSelected}
+          disabled={!selectedStudentId || loading || Boolean(printMode)}
           className="bg-green-600 text-white px-4 py-2"
         >
-          Print
+          Print Selected Student
+        </button>
+
+        <button
+          onClick={handlePrintAll}
+          disabled={reports.length === 0 || loading || Boolean(printMode)}
+          className="bg-emerald-700 text-white px-4 py-2"
+        >
+          Print All Report Cards
         </button>
       </div>
 
@@ -297,11 +349,11 @@ export default function Reports() {
       )}
 
       {!loading &&
-      filteredReports.length === 0 ? (
+      renderedReports.length === 0 ? (
         <p>No reports found.</p>
       ) : (
         <div>
-          {filteredReports.map((student) => {
+          {renderedReports.map((student) => {
 
             console.log("🧠 FULL STUDENT:", student);
 
@@ -337,6 +389,11 @@ export default function Reports() {
                   </p>
 
                   <p>
+                    <strong>Admission Number:</strong>{" "}
+                    {student.admissionNo || "—"}
+                  </p>
+
+                  <p>
                     <strong>Grade:</strong>{" "}
                     {selectedClassName}
                   </p>
@@ -351,32 +408,52 @@ export default function Reports() {
 
                 {/* SUBJECT TABLE */}
                 <div className="mb-4">
-                  <div className="grid grid-cols-3 font-semibold border-b pb-1">
+                  <div className="report-subject-grid font-semibold border-b pb-2">
                     <span>Subject</span>
                     <span>Score</span>
                     <span>Grade</span>
+                    <span>Teacher Comment</span>
                   </div>
 
                   {student.subjects.map((sub) => {
                     const key =
-                      student.studentId +
-                      "-" +
-                      sub.teacherSubjectId;
+                      `${termId}-${student.studentId}-${sub.teacherSubjectId}`;
 
                     return (
                       <div
                         key={key}
-                        className="grid grid-cols-3 py-1"
+                        className="report-subject-grid py-2 border-b border-gray-100 items-start"
                       >
                         <span>
                           {sub.subjectName}
                         </span>
 
                         <span>
-                          {sub.finalGrade}%
+                          {sub.finalGrade === null ? "Incomplete" : `${sub.finalGrade}%`}
                         </span>
 
-                        <span>{formatGrade(sub.letter)}</span>
+                        <span>{sub.finalGrade === null ? "—" : formatGrade(sub.letter)}</span>
+
+                        <div>
+                          <textarea
+                            aria-label={`${sub.subjectName} teacher comment for ${student.name}`}
+                            className="border w-full p-2 print-hidden"
+                            value={comments[key] ?? sub.comment ?? ""}
+                            placeholder="Add subject comment"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setComments((prev) => ({ ...prev, [key]: val }));
+                            }}
+                            onBlur={(e) => saveComment(
+                              student.studentId,
+                              sub.teacherSubjectId,
+                              e.target.value
+                            )}
+                          />
+                          <p className="print-only whitespace-pre-wrap break-words">
+                            {displaySubjectComment(comments[key] ?? sub.comment)}
+                          </p>
+                        </div>
                       </div>
                     );
                   })}
@@ -410,49 +487,6 @@ export default function Reports() {
                   </p>
                 </div>
 
-                <hr className="my-3" />
-
-                {/* COMMENTS */}
-                <div>
-                  <p className="font-semibold mb-1">
-                    Comment:
-                  </p>
-
-                  {student.subjects.map((sub) => {
-                    const key =
-                      student.studentId +
-                      "-" +
-                      sub.teacherSubjectId;
-
-                    return (
-                      <textarea
-                        key={key}
-                        className="border w-full mt-1 p-1"
-                        value={
-                          comments[key] ||
-                          sub.comment ||
-                          ""
-                        }
-                        onChange={(e) => {
-                          const val =
-                            e.target.value;
-
-                          setComments((prev) => ({
-                            ...prev,
-                            [key]: val,
-                          }));
-                        }}
-                        onBlur={(e) =>
-                          saveComment(
-                            student.studentId,
-                            sub.teacherSubjectId,
-                            e.target.value
-                          )
-                        }
-                      />
-                    );
-                  })}
-                </div>
               </div>
             );
           })}

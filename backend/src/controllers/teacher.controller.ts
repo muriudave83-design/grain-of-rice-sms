@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { getGradeDescription, getLetterGrade } from "../utils/gradeDescriptions";
 import { AssessmentType } from "@prisma/client";
 import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
+import { getSubjectReportComment, indexReportComments } from "../services/reportData.service";
 import { deleteOwnedAssignment } from "../services/assignmentDeletion.service";
 
 const prisma = new PrismaClient();
@@ -746,9 +747,13 @@ export const getReportData = async (req: Request, res: Response) => {
      */
     const comments = await prisma.reportComment.findMany({
       where: {
-        student: { classId },
+        studentId: { in: students.map((student) => student.id) },
+        teacherSubjectId: { in: subjects.map((subject) => subject.id) },
+        termId,
       },
+      select: { studentId: true, teacherSubjectId: true, comment: true },
     });
+    const commentsByStudentAndSubject = indexReportComments(comments);
 
     /**
      * BUILD REPORTS
@@ -769,12 +774,6 @@ export const getReportData = async (req: Request, res: Response) => {
 
           const letter = getLetterGrade(avg);
 
-          const commentObj = comments.find(
-            (c) =>
-              c.studentId === student.id &&
-              c.teacherSubjectId === ts.id
-          );
-
           return {
             teacherSubjectId: ts.id,
             subjectName: ts.subject.name,
@@ -782,7 +781,11 @@ export const getReportData = async (req: Request, res: Response) => {
             letter,
             gradeDescription: getGradeDescription(letter),
             status: avg === null ? "incomplete" : "complete",
-            comment: commentObj?.comment || "",
+            comment: getSubjectReportComment(
+              commentsByStudentAndSubject,
+              student.id,
+              ts.id,
+            ),
           };
         });
 
@@ -794,10 +797,7 @@ export const getReportData = async (req: Request, res: Response) => {
             where: {
               studentId: student.id,
               session: {
-                date: {
-                  gte: new Date(term.startDate),
-                  lte: new Date(term.endDate),
-                },
+                termId,
               },
             },
             include: {
