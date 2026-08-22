@@ -356,6 +356,7 @@ model TeacherSubject {
   subjectId      Int
   classId        Int
   createdAt      DateTime        @default(now()) @db.Timestamp(6)
+  isActive       Boolean         @default(true)
   assignments    Assignment[]
   reportComments ReportComment[]
   class          Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
@@ -363,6 +364,8 @@ model TeacherSubject {
   teacher        User            @relation(fields: [teacherId], references: [id], onDelete: Cascade)
 
   @@unique([teacherId, subjectId, classId], map: "TeacherSubject_unique_assignment")
+  @@index([teacherId, isActive], map: "TeacherSubject_teacherId_isActive_idx")
+  @@index([classId, subjectId, isActive], map: "TeacherSubject_classId_subjectId_isActive_idx")
 }
 
 model Assignment {
