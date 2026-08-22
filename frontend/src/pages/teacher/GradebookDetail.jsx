@@ -44,6 +44,7 @@ export default function GradebookDetail() {
   const [saving, setSaving] = useState(false);
 
   const [contextMenu, setContextMenu] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState(null);
 
   // 🧱 TERMS
   const [terms, setTerms] = useState([]);
@@ -520,27 +521,47 @@ useEffect(() => {
       }
     };
 
-  const handleDeleteAssignment = async (assignmentId) => {
+  const removeDeletedAssignment = (assignmentId) => {
+    setData((prev) => ({
+      ...prev,
+      assignments: prev.assignments.filter((assignment) => assignment.id !== assignmentId),
+    }));
+    setLocalScores((prev) => Object.fromEntries(
+      Object.entries(prev).filter(([key]) => !key.endsWith(`-${assignmentId}`)),
+    ));
+    setContextMenu(null);
+    setDeleteDialog(null);
+  };
+
+  const deleteAssignment = async (assignment, confirmation) => {
+    try {
+      await apiClient.delete(`/teacher/assignment/${assignment.id}`, {
+        data: confirmation ? { confirmation } : {},
+      });
+      removeDeletedAssignment(assignment.id);
+    } catch (err) {
+      console.error("Delete failed", err);
+      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to delete assignment";
+      if (deleteDialog) setDeleteDialog((prev) => ({ ...prev, deleting: false, error: message }));
+      else alert(message);
+    }
+  };
+
+  const handleDeleteAssignment = async (assignment) => {
     if (termLocked) {
       alert("This term has been locked.");
       return;
     }
-
-    try {
-      await apiClient.delete(`/teacher/assignment/${assignmentId}`);
-
-      setData((prev) => ({
-        ...prev,
-        assignments: prev.assignments.filter(
-          (a) => a.id !== assignmentId
-        ),
-      }));
-
-      setContextMenu(null);
-    } catch (err) {
-      console.error("Delete failed", err);
-      alert(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to delete assignment");
+    if (assignment.deletionStatus === "PUBLISHED") {
+      alert("This assignment is part of published final grades and cannot be deleted.");
+      return;
     }
+    if ((assignment.scoreCount ?? assignment.scores?.length ?? 0) > 0) {
+      setDeleteDialog({ assignment, confirmation: "", deleting: false, error: "" });
+      setContextMenu(null);
+      return;
+    }
+    if (window.confirm(`Delete assignment '${assignment.title}'?`)) await deleteAssignment(assignment);
   };
 
     const handleRenameAssignment = async (assignmentId, title) => {
@@ -1157,6 +1178,44 @@ useEffect(() => {
         </div>
       )}
 
+      {deleteDialog && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-assignment-title">
+          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+            <h2 id="delete-assignment-title" className="text-lg font-bold text-gray-900">Delete this assignment?</h2>
+            <p className="mt-3 text-sm text-gray-700">
+              This assignment contains <strong>{deleteDialog.assignment.scoreCount ?? deleteDialog.assignment.scores?.length ?? 0} student scores</strong>.
+              Deleting it will permanently remove the assignment and all of its scores.
+            </p>
+            <p className="mt-2 text-sm font-semibold text-red-700">This cannot be undone.</p>
+            <label htmlFor="delete-assignment-confirmation" className="mt-4 block text-sm font-medium text-gray-700">
+              Type <strong>DELETE ASSIGNMENT</strong> to confirm
+            </label>
+            <input
+              id="delete-assignment-confirmation"
+              value={deleteDialog.confirmation}
+              onChange={(event) => setDeleteDialog((prev) => ({ ...prev, confirmation: event.target.value, error: "" }))}
+              className="mt-1 w-full rounded border p-2 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-100"
+              autoFocus
+            />
+            {deleteDialog.error && <p role="alert" className="mt-2 text-sm text-red-700">{deleteDialog.error}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setDeleteDialog(null)} disabled={deleteDialog.deleting} className="rounded border px-4 py-2 text-sm">Cancel</button>
+              <button
+                type="button"
+                disabled={deleteDialog.confirmation !== "DELETE ASSIGNMENT" || deleteDialog.deleting}
+                onClick={() => {
+                  setDeleteDialog((prev) => ({ ...prev, deleting: true, error: "" }));
+                  deleteAssignment(deleteDialog.assignment, deleteDialog.confirmation);
+                }}
+                className="rounded bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-400"
+              >
+                {deleteDialog.deleting ? "Deleting…" : "Delete Assignment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* CONTEXT MENU */}
       {contextMenu && (
         <div
@@ -1192,16 +1251,15 @@ useEffect(() => {
                 : "🔒 Lock"}
             </div>
 
-            <div
-              onClick={() =>
-                handleDeleteAssignment(
-                  contextMenu.assignment.id
-                )
-              }
-              className="px-3 py-2 hover:bg-red-100 text-red-600 cursor-pointer text-sm"
+            <button
+              type="button"
+              disabled={contextMenu.assignment.deletionStatus === "PUBLISHED"}
+              title={contextMenu.assignment.deletionStatus === "PUBLISHED" ? "Published final grades protect this assignment" : contextMenu.assignment.deletionStatus === "SCORED" ? "Deleting requires typed confirmation and removes all scores" : "Delete assignment"}
+              onClick={() => handleDeleteAssignment(contextMenu.assignment)}
+              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
             >
-              🗑️ Delete
-            </div>
+              {contextMenu.assignment.deletionStatus === "PUBLISHED" ? "🔒 Published — cannot delete" : contextMenu.assignment.deletionStatus === "SCORED" ? "🗑️ Delete scores & assignment…" : "🗑️ Delete"}
+            </button>
           </div>
         </div>
       )}

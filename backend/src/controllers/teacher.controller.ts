@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { getGradeDescription, getLetterGrade } from "../utils/gradeDescriptions";
 import { AssessmentType } from "@prisma/client";
 import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
+import { deleteOwnedAssignment } from "../services/assignmentDeletion.service";
 
 const prisma = new PrismaClient();
 
@@ -135,9 +136,30 @@ export const getGradebook = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Not found" });
     }
 
+    const hasPublishedGrades = termId
+      ? Boolean(await prisma.grade.findFirst({
+          where: {
+            subjectId: gradebook.subjectId,
+            termId,
+            student: { classId: gradebook.classId },
+          },
+          select: { id: true },
+        }))
+      : false;
+
+    const assignments = ((gradebook.assignments || []) as any[]).map((assignment) => ({
+      ...assignment,
+      scoreCount: assignment.scores.length,
+      deletionStatus: hasPublishedGrades
+        ? "PUBLISHED"
+        : assignment.scores.length > 0
+          ? "SCORED"
+          : "EMPTY",
+    }));
+
     return res.json({
       ...gradebook,
-      assignments: gradebook.assignments || [],
+      assignments,
     });
 
   } catch (err) {
@@ -371,23 +393,35 @@ export const createAssignment = async (req: Request, res: Response) => {
   }
 };
 export const deleteAssignment = async (req: Request, res: Response) => {
+  const assignmentId = Number(req.params.id);
+  if (!Number.isInteger(assignmentId) || assignmentId <= 0) {
+    return res.status(400).json({ message: "Valid assignment ID required" });
+  }
   try {
-    const assignment = await prisma.assignment.findFirst({
-      where: {
-        id: Number(req.params.id),
-        teacherSubject: { teacherId: (req as any).user.id },
-      },
-      select: { id: true, isLocked: true, _count: { select: { scores: true } } },
-    });
-
-    if (!assignment) return res.status(404).json({ message: "Assignment not found" });
-    if (assignment.isLocked || assignment._count.scores > 0) {
-      return res.status(409).json({ message: "Cannot delete locked or scored academic work" });
+    const result = await deleteOwnedAssignment(
+      prisma,
+      (req as any).user.id,
+      assignmentId,
+      req.body?.confirmation,
+    );
+    if (result.status === "NOT_FOUND") return res.status(404).json({ message: "Assignment not found" });
+    if (result.status === "TERM_MISMATCH") return res.status(409).json({ message: "Assignment Term does not belong to its class" });
+    if (result.status === "PUBLISHED") {
+      return res.status(409).json({
+        message: "This assignment is part of published final grades and cannot be deleted.",
+        deletionStatus: "PUBLISHED",
+        scoreCount: result.scoreCount,
+      });
     }
-
-    await prisma.assignment.delete({ where: { id: assignment.id } });
-
-    res.json({ message: "Deleted" });
+    if (result.status === "CONFIRMATION_REQUIRED") {
+      return res.status(409).json({
+        message: "This assignment contains scores. Explicit destructive confirmation is required.",
+        deletionStatus: "SCORED",
+        scoreCount: result.scoreCount,
+        requiredConfirmation: "DELETE ASSIGNMENT",
+      });
+    }
+    return res.json({ message: "Assignment and associated scores deleted", scoreCount: result.scoreCount });
   } catch (err) {
     console.error("DELETE ASSIGNMENT ERROR:", err);
     res.status(500).json({ message: "Error deleting assignment" });
@@ -401,9 +435,25 @@ export const updateAssignment = async (req: Request, res: Response) => {
         id: Number(req.params.id),
         teacherSubject: { teacherId: (req as any).user.id },
       },
-      select: { id: true, isLocked: true },
+      select: {
+        id: true,
+        isLocked: true,
+        termId: true,
+        teacherSubject: { select: { subjectId: true, classId: true } },
+      },
     });
     if (!assignment) return res.status(404).json({ message: "Assignment not found" });
+    const publishedGrade = await prisma.grade.findFirst({
+      where: {
+        subjectId: assignment.teacherSubject.subjectId,
+        termId: assignment.termId,
+        student: { classId: assignment.teacherSubject.classId },
+      },
+      select: { id: true },
+    });
+    if (publishedGrade) {
+      return res.status(409).json({ message: "Published final-grade assignments cannot be edited" });
+    }
     if (assignment.isLocked) return res.status(409).json({ message: "Assignment is locked" });
 
     const updated = await prisma.assignment.update({
