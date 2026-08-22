@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 import BackButton from "../../components/BackButton";
@@ -12,8 +12,7 @@ import {
 
 // ✅ NEW IMPORT (CSV)
 import Papa from "papaparse";
-import { rankStudents } from "../../utils/ranking";
-import { formatGrade } from "../../utils/grading";
+import { formatGrade, getLetterGrade } from "../../utils/grading";
 
 export default function GradebookDetail() {
   console.log("🔥 REAL GRADEBOOK DETAIL FILE");
@@ -294,14 +293,14 @@ useEffect(() => {
   const getCategoryAverages = (student) => {
     const categories = {};
 
-    assignments.forEach((a) => {
+    for (const a of assignments) {
       const type = a.type || "HOMEWORK";
 
       const scoreObj = a.scores?.find(
         (s) => String(s.studentId) === String(student.id)
       );
 
-      if (!scoreObj) return;
+      if (!scoreObj) continue;
 
       if (!categories[type]) {
         categories[type] = { total: 0, count: 0 };
@@ -312,7 +311,7 @@ useEffect(() => {
 
       categories[type].total += percentage;
       categories[type].count += 1;
-    });
+    }
 
     const result = {};
 
@@ -400,7 +399,7 @@ useEffect(() => {
     const handleAddAssignment = async () => {
       if (termLocked) {
         alert("This term has been locked.");
-        return;
+        return null;
       }
 
       if (!form.title) return;
@@ -444,7 +443,7 @@ useEffect(() => {
     let total = 0;
     let totalWeight = 0;
 
-    assignments.forEach((a) => {
+    for (const a of assignments) {
       const scoreObj = a.scores?.find(
         (s) => String(s.studentId) === String(student.id)
       );
@@ -456,14 +455,16 @@ useEffect(() => {
         scoreObj.score === undefined ||
         scoreObj.score === ""
       ) {
-        return;
+        return null;
       }
 
-      const weight = a.weight || 1;
+      const weight = a.weight ?? 1;
+      const maxPoints = a.maxPoints ?? 100;
+      if (maxPoints <= 0) return null;
 
-      total += Number(scoreObj.score) * weight;
+      total += (Number(scoreObj.score) / maxPoints) * 100 * weight;
       totalWeight += weight;
-    });
+    }
 
     // No graded assignments
     if (totalWeight === 0) {
@@ -476,27 +477,21 @@ useEffect(() => {
   const getGrade = (avg) => {
     if (avg == null) return "—";
 
-    if (avg >= 80) return "A";
-    if (avg >= 70) return "B";
-    if (avg >= 60) return "C";
-    if (avg >= 50) return "D";
-
-    return "F";
+    return getLetterGrade(avg);
   };
 
   const getGradeColor = (grade) => {
-    if (grade === "A") return "text-green-600";
-    if (grade === "B") return "text-blue-600";
-    if (grade === "C") return "text-yellow-600";
-    if (grade === "D") return "text-orange-600";
+    if (!grade) return "text-gray-500";
+    if (grade.startsWith("A")) return "text-green-600";
+    if (grade.startsWith("B")) return "text-blue-600";
+    if (grade.startsWith("C")) return "text-yellow-600";
+    if (grade.startsWith("D")) return "text-orange-600";
     return "text-red-600";
   };
     // ✅ RANKING
-  const { ranked: rankedStudents, positionMap } = useMemo(() => {
-    return rankStudents(students || [], getFinalGrade);
-  }, [students, assignments, data?.categoryWeights]);
-
-  const getPosition = (studentId) => positionMap[studentId] || "-";
+  const alphabeticalStudents = [...(students || [])].sort((left, right) =>
+    `${left.firstName} ${left.lastName}`.localeCompare(`${right.firstName} ${right.lastName}`),
+  );
 
 // 🔒 LOCK TOGGLE
     const handleToggleLock = async (assignment) => {
@@ -613,7 +608,7 @@ useEffect(() => {
       "Absent", // 🆕 ADDED
     ];
 
-    const rows = students.map((student) => {
+    const rows = alphabeticalStudents.map((student) => {
       const scores = assignments.map((a) => {
         const scoreObj = a.scores?.find(
           (s) => String(s.studentId) === String(student.id)
@@ -987,7 +982,6 @@ useEffect(() => {
 
                     {provided.placeholder}
 
-                    <th className="border p-2">Position</th>
                   </tr>
                 )}
               </Droppable>
@@ -995,11 +989,10 @@ useEffect(() => {
           </thead>
 
           <tbody>
-            {rankedStudents.map((student) => {
+            {alphabeticalStudents.map((student) => {
               const final = getFinalGrade(student);
               const avg = final;
               const grade = getGrade(final);
-              const position = getPosition(student.id);
               const absent = getAbsentDays(student.id);
 
               return (
@@ -1073,7 +1066,6 @@ useEffect(() => {
                     );
                   })}
 
-                  <td className="border p-2">{position}</td>
                 </tr>
               );
             })}

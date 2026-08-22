@@ -6,7 +6,7 @@
 console.log("🔥 reportCardRoutes.ts LOADED");
 
 import { Router } from "express";
-import { getGradeDescription } from "../utils/gradeDescriptions";
+import { getGradeDescription, getLetterGrade, normalizeGradePercentage } from "../utils/gradeDescriptions";
 import { prisma } from "../prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
@@ -26,11 +26,7 @@ const router = Router();
  * ============================================================
  */
 function getGrade(avg: number) {
-  if (avg >= 0.8) return "A";
-  if (avg >= 0.7) return "B";
-  if (avg >= 0.6) return "C";
-  if (avg >= 0.5) return "D";
-  return "F";
+  return getLetterGrade(normalizeGradePercentage(avg)) ?? "F";
 }
 
 /**

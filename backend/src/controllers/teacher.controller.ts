@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import { getGradeDescription } from "../utils/gradeDescriptions";
+import { getGradeDescription, getLetterGrade } from "../utils/gradeDescriptions";
 import { AssessmentType } from "@prisma/client";
 import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
 
@@ -33,37 +33,32 @@ export const calculateFinalGradeForStudent = (
   let total = 0;
   let totalWeight = 0;
 
-  assignments.forEach((assignment) => {
+  if (assignments.length === 0) return null;
+
+  for (const assignment of assignments) {
     const scoreObj = assignment.scores.find(
       (s: any) => s.studentId === studentId
     );
 
-    if (!scoreObj) return;
+    if (!scoreObj || scoreObj.score === null || scoreObj.score === undefined || scoreObj.score === "") return null;
 
     const score = Number(scoreObj.score);
-    if (isNaN(score)) return;
+    if (isNaN(score)) return null;
 
     // 🔥 UPDATED: use maxPoints instead of maxScore
-    const maxPoints = assignment.maxPoints || 100;
+    const maxPoints = assignment.maxPoints ?? 100;
+    if (maxPoints <= 0) return null;
     const weight = assignment.weight ?? 1;
 
     const percentage = (score / maxPoints) * 100;
 
     total += percentage * weight;
     totalWeight += weight;
-  });
+  }
 
-  if (totalWeight === 0) return 0;
+  if (totalWeight <= 0) return null;
 
   return total / totalWeight;
-};
-
-const getLetterGrade = (avg: number) => {
-  if (avg >= 80) return "A";
-  if (avg >= 70) return "B";
-  if (avg >= 60) return "C";
-  if (avg >= 50) return "D";
-  return "F";
 };
 
 //
@@ -670,6 +665,7 @@ export const getReportData = async (req: Request, res: Response) => {
      */
     const students = await prisma.student.findMany({
       where: { classId, isArchived: false },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
     });
 
     /**
@@ -728,9 +724,10 @@ export const getReportData = async (req: Request, res: Response) => {
           return {
             teacherSubjectId: ts.id,
             subjectName: ts.subject.name,
-            finalGrade: Number(avg.toFixed(1)),
+            finalGrade: avg === null ? null : Number(avg.toFixed(1)),
             letter,
             gradeDescription: getGradeDescription(letter),
+            status: avg === null ? "incomplete" : "complete",
             comment: commentObj?.comment || "",
           };
         });
@@ -955,9 +952,9 @@ export const publishFinalGrades = async (req: Request, res: Response) => {
 
       for (const teacherSubject of teacherSubjects) {
         for (const student of students) {
-          const total = Number(
-            calculateFinalGradeForStudent(student.id, teacherSubject.assignments).toFixed(1)
-          );
+          const calculated = calculateFinalGradeForStudent(student.id, teacherSubject.assignments);
+          if (calculated === null) throw new Error("Publication completeness guard failed");
+          const total = Number(calculated.toFixed(1));
 
           await tx.grade.upsert({
             where: {
@@ -1094,7 +1091,7 @@ export const generateTranscripts = async (req: Request, res: Response) => {
               create: studentGrades.map(({ subjectName, grade }) => ({
                 subjectName,
                 finalGrade: Number(grade.total.toFixed(1)),
-                letterGrade: getLetterGrade(grade.total),
+                letterGrade: getLetterGrade(grade.total) ?? "F",
               })),
             },
           },

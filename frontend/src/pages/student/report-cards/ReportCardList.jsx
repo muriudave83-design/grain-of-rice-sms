@@ -65,8 +65,7 @@ export default function StudentReportCardList() {
               {rc.term?.name} — {rc.class?.name}
             </div>
             <div className="text-sm text-gray-600">
-              Average: {rc.average ?? "—"} | Position:{" "}
-              {rc.gradePosition ?? "—"}
+              Average: {rc.average ?? "—"}
             </div>
           </div>
         ))}

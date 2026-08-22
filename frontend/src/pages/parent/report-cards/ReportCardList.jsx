@@ -52,8 +52,7 @@ export default function ParentReportCardList() {
               {rc.student?.name} — {rc.term?.name}
             </div>
             <div className="text-sm text-gray-600">
-              {rc.class?.name} | Avg: {rc.average ?? "—"} | Pos:{" "}
-              {rc.gradePosition ?? "—"}
+              {rc.class?.name} | Avg: {rc.average ?? "—"}
             </div>
           </div>
         ))}

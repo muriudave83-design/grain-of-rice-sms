@@ -51,8 +51,7 @@ export default function ParentReportCardView() {
       </h1>
 
       <div className="mb-4 text-gray-700">
-        {reportCard.class?.name} | Avg: {reportCard.average ?? "—"} | Absent: {reportCard.attendanceAbsent ?? 0} days | Position:{" "}
-        {reportCard.gradePosition ?? "—"}
+        {reportCard.class?.name} | Avg: {reportCard.average ?? "—"} | Absent: {reportCard.attendanceAbsent ?? 0} days
       </div>
 
       <table className="w-full border mb-4">

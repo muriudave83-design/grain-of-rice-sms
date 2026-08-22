@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
 import { Prisma } from "@prisma/client";
-import { getGradeDescription } from "../utils/gradeDescriptions";
+import { getGradeDescription, getLetterGrade } from "../utils/gradeDescriptions";
 
 type TeacherSubjectWithRelations = Prisma.TeacherSubjectGetPayload<{
   include: {
@@ -16,11 +16,7 @@ type TeacherSubjectWithRelations = Prisma.TeacherSubjectGetPayload<{
 
 // ✅ Grade helper
 const getGrade = (avg: number) => {
-  if (avg >= 80) return "A";
-  if (avg >= 70) return "B";
-  if (avg >= 60) return "C";
-  if (avg >= 50) return "D";
-  return "F";
+  return getLetterGrade(avg) ?? "F";
 };
 
 // 🔥 SAVE COMMENT
@@ -198,16 +194,6 @@ export const getStudentReport = async (
             };
           });
 
-        studentAverages.sort(
-          (a, b) => b.avg - a.avg
-        );
-
-        const position =
-          studentAverages.findIndex(
-            (s) =>
-              s.studentId === Number(studentId)
-          ) + 1;
-
         const current = studentAverages.find(
           (s) =>
             s.studentId === Number(studentId)
@@ -234,54 +220,11 @@ export const getStudentReport = async (
           average: Number(avg.toFixed(1)),
           grade,
           gradeDescription: getGradeDescription(grade),
-          position,
-          totalStudents:
-            studentAverages.length,
           comment:
             existingComment?.comment || "",
         };
       })
     );
-
-    const overallAverages =
-      studentsInClass.map((s) => {
-        let total = 0;
-
-        report.forEach((subj) => {
-          const ts = subjects.find(
-            (t) =>
-              t.subject.name === subj.subject
-          );
-
-          const avg =
-            calculateStudentAverage(
-              s.id,
-              ts?.assignments || []
-            );
-
-          total += avg;
-        });
-
-        const overall =
-          subjects.length > 0
-            ? total / subjects.length
-            : 0;
-
-        return {
-          studentId: s.id,
-          avg: overall,
-        };
-      });
-
-    overallAverages.sort(
-      (a, b) => b.avg - a.avg
-    );
-
-    const overallPosition =
-      overallAverages.findIndex(
-        (s) =>
-          s.studentId === Number(studentId)
-      ) + 1;
 
     res.json({
       studentId: student.id,
@@ -294,10 +237,6 @@ export const getStudentReport = async (
 
       subjects: report,
 
-      overallPosition,
-
-      totalStudents:
-        overallAverages.length,
     });
   } catch (err) {
     console.error(err);

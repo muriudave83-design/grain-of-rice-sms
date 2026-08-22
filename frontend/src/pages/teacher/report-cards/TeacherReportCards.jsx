@@ -46,7 +46,6 @@ export default function TeacherReportCards() {
             <th className="text-left py-2">Class</th>
             <th className="text-left py-2">Term</th>
             <th className="text-left py-2">Average</th>
-            <th className="text-left py-2">Position</th>
             <th className="text-left py-2">Status</th>
           </tr>
         </thead>
@@ -61,7 +60,6 @@ export default function TeacherReportCards() {
               <td className="py-2">{rc.class?.name}</td>
               <td className="py-2">{rc.term?.name}</td>
               <td className="py-2">{rc.average ?? "-"}</td>
-              <td className="py-2">{rc.gradePosition ?? "-"}</td>
               <td className="py-2">
                 <span
                   className={`px-2 py-1 rounded text-sm ${

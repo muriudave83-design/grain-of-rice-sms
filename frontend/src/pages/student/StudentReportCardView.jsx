@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../services/apiClient";
-import { formatGrade } from "../../utils/grading";
+import { formatGrade, getLetterGrade } from "../../utils/grading";
 
 export default function StudentReportCardView() {
   const { studentId } = useParams();
@@ -18,11 +18,7 @@ export default function StudentReportCardView() {
 
   // ✅ FIXED: Grade system (E → F)
   const getGrade = (avg) => {
-    if (avg >= 80) return "A";
-    if (avg >= 70) return "B";
-    if (avg >= 60) return "C";
-    if (avg >= 50) return "D";
-    return "F";
+    return getLetterGrade(avg);
   };
 
   useEffect(() => {
@@ -134,7 +130,6 @@ export default function StudentReportCardView() {
             <th style={th}>Subject</th>
             <th style={th}>Average</th>
             <th style={th}>Grade</th>
-            <th style={th}>Position</th>
           </tr>
         </thead>
 
@@ -152,11 +147,6 @@ export default function StudentReportCardView() {
               </td>
 
               {/* ✅ SAFE POSITION */}
-              <td style={td}>
-                {subj.position && subj.totalStudents
-                  ? `${subj.position}/${subj.totalStudents}`
-                  : "—"}
-              </td>
             </tr>
           ))}
         </tbody>
@@ -174,13 +164,6 @@ export default function StudentReportCardView() {
       </div>
 
       {/* ✅ SAFE OVERALL POSITION */}
-      <div>
-        <strong>Overall Position:</strong>{" "}
-        {studentData.overallPosition &&
-        studentData.totalStudents
-          ? `${studentData.overallPosition}/${studentData.totalStudents}`
-          : "—"}
-      </div>
     </div>
   );
 }

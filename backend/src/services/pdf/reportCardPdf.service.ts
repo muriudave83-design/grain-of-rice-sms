@@ -1,17 +1,8 @@
 import PDFDocument from "pdfkit";
 import { prisma } from "../../prisma/client";
 import { ReportCardStatus } from "@prisma/client";
-import { formatGrade } from "../../utils/gradeDescriptions";
+import { formatGrade, getLetterGrade, normalizeGradePercentage } from "../../utils/gradeDescriptions";
 import { summarizeAttendanceDays } from "../attendance/attendanceDomain";
-
-const getLetterGrade = (average: number) => {
-  const score = average >= 0 && average <= 1 ? average * 100 : average;
-  if (score >= 80) return "A";
-  if (score >= 70) return "B";
-  if (score >= 60) return "C";
-  if (score >= 50) return "D";
-  return "F";
-};
 
 /**
  * Phase-8 v1.1 — Report Card PDF Generator
@@ -187,7 +178,7 @@ export async function generateReportCardPdf(
     doc.text(entry.subject.name, col.subject, rowY);
     doc.text(entry.total.toFixed(1), col.total, rowY);
     doc.text(entry.average.toFixed(1), col.average, rowY);
-    doc.text(formatGrade(getLetterGrade(entry.average)), col.grade, rowY, {
+    doc.text(formatGrade(getLetterGrade(normalizeGradePercentage(entry.average))), col.grade, rowY, {
       width: 200,
     });
 
@@ -205,7 +196,7 @@ export async function generateReportCardPdf(
 
   doc.text(`Term Total Marks: ${reportCard.total.toFixed(1)}`);
   doc.text(`Term Average: ${reportCard.average.toFixed(1)}`);
-  doc.text(`Overall Grade: ${formatGrade(getLetterGrade(reportCard.average))}`);
+  doc.text(`Overall Grade: ${formatGrade(getLetterGrade(normalizeGradePercentage(reportCard.average)))}`);
 
   // =========================
   // 8️⃣ ATTENDANCE (FORCED NEW PAGE FIX)

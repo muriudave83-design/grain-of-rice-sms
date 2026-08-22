@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import apiClient from "../../services/apiClient";
-import { formatGrade } from "../../utils/grading";
+import { formatGrade, getLetterGrade } from "../../utils/grading";
 
 export default function TeacherStudentDetails() {
   const { id } = useParams();
@@ -53,19 +53,11 @@ export default function TeacherStudentDetails() {
   };
 
   const calculateGrade = (avg) => {
-    if (avg >= 80) return "A";
-    if (avg >= 70) return "B";
-    if (avg >= 60) return "C";
-    if (avg >= 50) return "D";
-    return "F";
+    return getLetterGrade(avg);
   };
 
   const getGrade = (score) => {
-    if (score >= 80) return "A";
-    if (score >= 70) return "B";
-    if (score >= 60) return "C";
-    if (score >= 50) return "D";
-    return "F";
+    return getLetterGrade(score);
   };
 
   const getScoreColor = (score) => {

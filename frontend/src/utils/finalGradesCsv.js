@@ -17,7 +17,6 @@ export function buildFinalGradesCsv({ data, className, term }) {
     "Average (%)",
     "Grade",
     "Grade Description",
-    "Position",
     "Remarks",
   ];
   const rows = data.map((student) => [
@@ -27,10 +26,9 @@ export function buildFinalGradesCsv({ data, className, term }) {
     (student.subjects || []).join(", "),
     student.name,
     student.admissionNo || "",
-    student.average,
-    student.letter,
+    student.average ?? "",
+    student.isComplete === false ? "Incomplete" : student.letter,
     student.gradeDescription || "",
-    student.position ?? "",
     student.remarks || "",
   ]);
 

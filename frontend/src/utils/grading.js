@@ -1,8 +1,8 @@
 export const GRADE_DESCRIPTIONS = Object.freeze({
-  A: "Exceedingly Expectations",
-  B: "Meeting Expectations",
-  C: "Approaching Expectations",
-  D: "Below Expectations",
+  A: "Exceeding Expectations", "A-": "Exceeding Expectations",
+  "B+": "Meeting Expectations", B: "Meeting Expectations", "B-": "Meeting Expectations",
+  "C+": "Approaching Expectations", C: "Approaching Expectations", "C-": "Approaching Expectations",
+  "D+": "Below Expectations", D: "Below Expectations", "D-": "Below Expectations",
   F: "Below Expectations",
 });
 
@@ -11,15 +11,27 @@ export function getGradeDescription(grade) {
   return GRADE_DESCRIPTIONS[grade.trim().toUpperCase()] ?? null;
 }
 
-export function getLetterGrade(score) {
-  if (score === null || score === undefined || Number.isNaN(Number(score))) return null;
-  const numericScore = Number(score);
-  const value = numericScore >= 0 && numericScore <= 1 ? numericScore * 100 : numericScore;
-  if (value >= 80) return "A";
-  if (value >= 70) return "B";
-  if (value >= 60) return "C";
-  if (value >= 50) return "D";
+export function getLetterGrade(percentage) {
+  if (percentage === null || percentage === undefined || percentage === "") return null;
+  const score = Number(percentage);
+  if (!Number.isFinite(score) || score < 0 || score > 100) return null;
+  if (score >= 94) return "A";
+  if (score >= 90) return "A-";
+  if (score >= 88) return "B+";
+  if (score >= 84) return "B";
+  if (score >= 80) return "B-";
+  if (score >= 78) return "C+";
+  if (score >= 74) return "C";
+  if (score >= 70) return "C-";
+  if (score >= 68) return "D+";
+  if (score >= 64) return "D";
+  if (score >= 60) return "D-";
   return "F";
+}
+
+export function normalizeGradePercentage(score) {
+  const numeric = Number(score);
+  return numeric >= 0 && numeric <= 1 ? numeric * 100 : numeric;
 }
 
 export function formatGrade(grade, fallback = "—") {

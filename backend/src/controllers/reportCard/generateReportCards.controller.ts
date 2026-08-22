@@ -231,40 +231,6 @@ export async function generateReportCards(req: Request, res: Response) {
         }
       }
 
-      /* ------------------------------------------------
-         6️⃣ Dense ranking
-      ------------------------------------------------ */
-      const reportCards = await tx.reportCard.findMany({
-        where: {
-          termId: Number(termId),
-          classId: Number(classId),
-          status: ReportCardStatus.GENERATED,
-        },
-        select: {
-          id: true,
-          total: true,
-          average: true,
-          studentId: true,
-        },
-      });
-
-      reportCards.sort((a, b) => {
-        if ((b.total ?? 0) !== (a.total ?? 0)) {
-          return (b.total ?? 0) - (a.total ?? 0);
-        }
-        if ((b.average ?? 0) !== (a.average ?? 0)) {
-          return (b.average ?? 0) - (a.average ?? 0);
-        }
-        return a.studentId - b.studentId;
-      });
-
-      let lastScore: number | null = null;
-
-      for (const rc of reportCards) {
-        if (lastScore === null || rc.total !== lastScore) {
-          lastScore = rc.total;
-        }
-      }
     });
 
     return res.status(201).json({

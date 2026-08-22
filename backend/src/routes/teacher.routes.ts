@@ -3,7 +3,7 @@ import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
 import prisma from "../prisma";
 import { generateTranscripts } from "../controllers/teacher.controller";
-import { getGradeDescription } from "../utils/gradeDescriptions";
+import { getGradeDescription, getLetterGrade } from "../utils/gradeDescriptions";
 
 import {
   getTeacherSubjects,
@@ -87,31 +87,38 @@ router.get("/final-grades/:classId", async (req, res) => {
           studentId: student.studentId,
           name: student.name,
           admissionNo: student.admissionNo,
-          average: 0,
-          letter: "-",
+          average: null,
+          letter: null,
           gradeDescription: null,
           subjects: [],
-          position: null,
+          isComplete: false,
+          remarks: "",
+        };
+      }
+
+      const isComplete = subjects.every((subject: any) => subject.finalGrade !== null && subject.finalGrade !== undefined);
+      if (!isComplete) {
+        return {
+          studentId: student.studentId,
+          name: student.name,
+          admissionNo: student.admissionNo,
+          average: null,
+          letter: null,
+          gradeDescription: null,
+          subjects: subjects.map((subject: any) => subject.subjectName),
+          isComplete: false,
           remarks: "",
         };
       }
 
       const avg =
         subjects.reduce(
-          (sum: number, s: any) => sum + (s.finalGrade || 0),
+          (sum: number, s: any) => sum + s.finalGrade,
           0
         ) / subjects.length;
-              const rounded = Number(avg.toFixed(1));
+      const rounded = Number(avg.toFixed(1));
 
-      const getLetter = (grade: number) => {
-        if (grade >= 80) return "A";
-        if (grade >= 70) return "B";
-        if (grade >= 60) return "C";
-        if (grade >= 50) return "D";
-        return "F";
-      };
-
-      const letter = getLetter(rounded);
+      const letter = getLetterGrade(rounded);
       return {
         studentId: student.studentId,
         name: student.name,
@@ -120,25 +127,12 @@ router.get("/final-grades/:classId", async (req, res) => {
         letter,
         gradeDescription: getGradeDescription(letter),
         subjects: subjects.map((subject: any) => subject.subjectName),
-        position: null,
+        isComplete: true,
         remarks: "",
       };
     });
 
-    const ranked = [...results].sort((a, b) => b.average - a.average);
-    const positions = new Map<number, number>();
-    ranked.forEach((student, index) => {
-      const previous = ranked[index - 1];
-      const position = previous && previous.average === student.average
-        ? positions.get(previous.studentId)!
-        : index + 1;
-      positions.set(student.studentId, position);
-    });
-
-    res.json(results.map((student: any) => ({
-      ...student,
-      position: positions.get(student.studentId) ?? null,
-    })));
+    res.json(results);
 
   } catch (err) {
     console.error("FINAL GRADES ERROR:", err);

@@ -51,8 +51,7 @@ export default function StudentReportCardView() {
       </h1>
 
       <div className="mb-4 text-gray-700">
-        Average: {reportCard.average ?? "—"} | Absent: {reportCard.attendanceAbsent ?? 0} days | Position:{" "}
-        {reportCard.gradePosition ?? "—"}
+        Average: {reportCard.average ?? "—"} | Absent: {reportCard.attendanceAbsent ?? 0} days
       </div>
 
       <table className="w-full border mb-4">

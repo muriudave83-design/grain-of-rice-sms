@@ -1,18 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "@/services/apiClient";
-import { formatGrade } from "@/utils/grading";
+import { formatGrade, getLetterGrade } from "@/utils/grading";
 
 // ✅ Grade function
 function getGrade(avg) {
 if (avg == null) return "—";
 
-if (avg >= 80) return "A";
-if (avg >= 70) return "B";
-if (avg >= 60) return "C";
-if (avg >= 50) return "D";
-
-return "F";
+return getLetterGrade(avg);
 }
 
 export default function ClassReportCards() {
@@ -137,7 +132,7 @@ export default function ClassReportCards() {
         ...prev,
         status: "published",
       }));
-    } catch (err) {
+    } catch {
       alert("Failed to publish report cards.");
     } finally {
       setPublishing(false);

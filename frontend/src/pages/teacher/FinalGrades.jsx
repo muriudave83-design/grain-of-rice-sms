@@ -240,7 +240,6 @@ export default function FinalGrades() {
               <th style={thStyle}>Student Name</th>
               <th style={thStyle}>Average (%)</th>
               <th style={thStyle}>Grade</th>
-              <th style={thStyle}>Position</th>
               <th style={thStyle}>Remarks</th>
             </tr>
           </thead>
@@ -249,14 +248,13 @@ export default function FinalGrades() {
               const grade = student.letter;
               const avg = student.average;
               return (
-                <tr key={student.studentId} style={{ background: index === 0 ? "#f9f9f9" : "transparent" }}>
+                <tr key={student.studentId} style={{ background: index % 2 === 0 ? "#f9f9f9" : "transparent" }}>
                   <td style={tdStyle}>{index + 1}</td>
                   <td style={tdStyle}>{student.name}</td>
-                  <td style={{ ...tdStyle, textAlign: "center" }}>{avg.toFixed(1)}%</td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{avg == null ? "—" : `${avg.toFixed(1)}%`}</td>
                   <td style={{ ...tdStyle, fontWeight: "bold", color: grade === "F" ? "red" : "black", textAlign: "center" }}>
-                    {formatGrade(grade, "-")}
+                    {student.isComplete === false ? "Incomplete" : formatGrade(grade, "-")}
                   </td>
-                  <td style={{ ...tdStyle, textAlign: "center" }}>{student.position ?? "-"}</td>
                   <td style={tdStyle}>{student.remarks ?? "-"}</td>
                 </tr>
               );
