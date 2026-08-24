@@ -66,7 +66,10 @@ test("Admin assignment POST reactivates an inactive exact match and permits repl
 
 test("historical report resolution deliberately retains inactive TeacherSubjects", () => {
   const source = read("controllers/reports.controller.ts");
-  assert.match(source, /teacherSubject\.findMany\(\{[\s\S]*classId:\s*student\.classId[\s\S]*include:\s*\{[\s\S]*subject:\s*true/);
+  const historicalQuery = source.match(/teacherSubject\.findMany\(\{[\s\S]*?\n\s*\}\);/)?.[0] ?? "";
+  assert.match(historicalQuery, /classId/);
+  assert.match(historicalQuery, /subject:\s*true/);
+  assert.doesNotMatch(historicalQuery, /isActive:\s*true/);
 });
 
 test("Admin subject options come only from active ClassSubject structure, not TeacherSubject history", () => {

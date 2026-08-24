@@ -28,6 +28,7 @@ export default function Reports() {
   const saveComment = async (
     studentId,
     teacherSubjectId,
+    subjectId,
     value
   ) => {
     try {
@@ -45,7 +46,7 @@ export default function Reports() {
 
       setComments((prev) => ({
         ...prev,
-        [`${termId}-${studentId}-${teacherSubjectId}`]:
+        [`${termId}-${studentId}-${subjectId}`]:
           value,
       }));
     } catch (err) {
@@ -202,6 +203,9 @@ export default function Reports() {
   const renderedReports = printMode
     ? reportsForMode(reports, selectedStudentId, printMode)
     : previewReports;
+  const completeReportCount = reports.filter((report) =>
+    report.subjects.every((subject) => subject.finalGrade !== null),
+  ).length;
 
   const selectedClassName =
     classes.find((c) => c.id == classId)
@@ -227,7 +231,7 @@ export default function Reports() {
             Grain of Rice Academy
           </h1>
 
-          <p>Official Report Cards</p>
+          <p>Class Report Cards</p>
         </div>
       </div>
 
@@ -236,6 +240,14 @@ export default function Reports() {
         {selectedClassName} <br />
         <strong>Term:</strong>{" "}
         {selectedTermName}
+        <p className="mt-2 text-sm text-gray-600">
+          Reports include all configured subjects for this class, including subjects taught by other teachers.
+        </p>
+        {reports.length > 0 && (
+          <p className="mt-1 text-sm font-medium">
+            {completeReportCount} of {reports.length} students have complete results.
+          </p>
+        )}
       </div>
 
       <div className="mb-6 flex gap-3 flex-wrap print-hidden">
@@ -416,8 +428,7 @@ export default function Reports() {
                   </div>
 
                   {student.subjects.map((sub) => {
-                    const key =
-                      `${termId}-${student.studentId}-${sub.teacherSubjectId}`;
+                    const key = `${termId}-${student.studentId}-${sub.subjectId}`;
 
                     return (
                       <div
@@ -435,21 +446,28 @@ export default function Reports() {
                         <span>{sub.finalGrade === null ? "—" : formatGrade(sub.letter)}</span>
 
                         <div>
-                          <textarea
-                            aria-label={`${sub.subjectName} teacher comment for ${student.name}`}
-                            className="border w-full p-2 print-hidden"
-                            value={comments[key] ?? sub.comment ?? ""}
-                            placeholder="Add subject comment"
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setComments((prev) => ({ ...prev, [key]: val }));
-                            }}
-                            onBlur={(e) => saveComment(
-                              student.studentId,
-                              sub.teacherSubjectId,
-                              e.target.value
-                            )}
-                          />
+                          {sub.canEditComment ? (
+                            <textarea
+                              aria-label={`${sub.subjectName} teacher comment for ${student.name}`}
+                              className="border w-full p-2 print-hidden"
+                              value={comments[key] ?? sub.comment ?? ""}
+                              placeholder="Add subject comment"
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setComments((prev) => ({ ...prev, [key]: val }));
+                              }}
+                              onBlur={(e) => saveComment(
+                                student.studentId,
+                                sub.teacherSubjectId,
+                                sub.subjectId,
+                                e.target.value
+                              )}
+                            />
+                          ) : (
+                            <p className="print-hidden whitespace-pre-wrap break-words text-gray-700">
+                              {displaySubjectComment(sub.comment)}
+                            </p>
+                          )}
                           <p className="print-only whitespace-pre-wrap break-words">
                             {displaySubjectComment(comments[key] ?? sub.comment)}
                           </p>

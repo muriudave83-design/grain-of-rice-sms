@@ -29,4 +29,7 @@ test("print structure has page boundaries and excludes controls", () => {
   assert.match(component, /Subject[\s\S]*Score[\s\S]*Grade[\s\S]*Teacher Comment/);
   assert.match(component, /Print Selected Student/);
   assert.match(component, /Print All Report Cards/);
+  assert.match(component, /sub\.canEditComment/);
+  assert.match(component, /Reports include all configured subjects for this class/);
+  assert.match(component, /students have complete results/);
 });
