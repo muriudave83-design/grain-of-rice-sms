@@ -9,6 +9,7 @@ import {
   updateUser,
 } from "../controllers/admin.users.controller";
 import { normalizeEmail } from "../utils/password";
+import { getTeacherPermanentDeletePreview, permanentlyDeleteTeacher } from "../services/permanentTestDataDeletion.service";
 
 const router = Router();
 
@@ -185,6 +186,33 @@ router.post(
       return res.status(400).json({ message: error.message });
     }
   }
+);
+
+router.get(
+  "/users/:id/permanent-delete-preview",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    try {
+      res.json(await getTeacherPermanentDeletePreview(prisma, Number(req.params.id), req.user!.id));
+    } catch (error) {
+      res.status((error as any).status || 500).json({ message: (error as any).message || "Failed to preview permanent deletion" });
+    }
+  },
+);
+
+router.delete(
+  "/users/:id/permanent",
+  authenticate,
+  requireRole(["ADMIN"]),
+  async (req, res) => {
+    try {
+      const preview = await permanentlyDeleteTeacher(prisma, Number(req.params.id), req.user!.id, req.body?.confirmation);
+      res.json({ message: "Teacher permanently deleted", preview });
+    } catch (error) {
+      res.status((error as any).status || 500).json({ message: (error as any).message || "Failed to permanently delete Teacher", preview: (error as any).preview });
+    }
+  },
 );
 
 /**

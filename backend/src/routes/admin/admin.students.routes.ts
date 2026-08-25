@@ -6,9 +6,27 @@ import bcrypt from "bcryptjs";
 import { authenticate } from "../../middlewares/authMiddleware";
 import { requireRole } from "../../middlewares/rolesMiddleware";
 import { archiveStudent, historyPagination, restoreStudent, transferStudent } from "../../services/studentLifecycle.service";
+import { getStudentPermanentDeletePreview, permanentlyDeleteStudent } from "../../services/permanentTestDataDeletion.service";
 
 const router = Router();
 router.use(authenticate, requireRole(["ADMIN"]));
+
+router.get("/students/:id/permanent-delete-preview", async (req, res) => {
+  try {
+    res.json(await getStudentPermanentDeletePreview(prisma, Number(req.params.id)));
+  } catch (error) {
+    res.status((error as any).status || 500).json({ message: (error as any).message || "Failed to preview permanent deletion" });
+  }
+});
+
+router.delete("/students/:id/permanent", async (req, res) => {
+  try {
+    const preview = await permanentlyDeleteStudent(prisma, Number(req.params.id), req.body?.confirmation);
+    res.json({ message: "Student permanently deleted", preview });
+  } catch (error) {
+    res.status((error as any).status || 500).json({ message: (error as any).message || "Failed to permanently delete Student", preview: (error as any).preview });
+  }
+});
 
 /**
  * ✅ GET ACTIVE STUDENTS
