@@ -50,7 +50,11 @@ export const authorizeStudentAccess = async (
   // STUDENT — only self access
   // ============================================================
   if (user.role === Role.STUDENT) {
-    if (user.id === studentId) return next();
+    const ownsStudent = await prisma.student.findFirst({
+      where: { id: studentId, userId: user.id, isArchived: false },
+      select: { id: true },
+    });
+    if (ownsStudent) return next();
 
     return res.status(403).json({
       message: "Forbidden: Students can only access their own data",

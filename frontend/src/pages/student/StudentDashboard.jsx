@@ -7,7 +7,7 @@ const StudentDashboard = () => {
   const [student, setStudent] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [term, setTerm] = useState("term1");
+  const [termId, setTermId] = useState("");
 
   const navigate = useNavigate();
 
@@ -21,11 +21,13 @@ const StudentDashboard = () => {
       try {
         setError(null);
 
-        const res = await api.get(`/report-cards/me?term=${term}`);
+        const res = await api.get("/students/me");
 
         console.log("DASHBOARD DATA:", res.data);
 
         setStudent(res.data);
+        const initialTerm = res.data.terms?.find((entry) => entry.isActive) || res.data.terms?.[0];
+        setTermId(initialTerm ? String(initialTerm.id) : "");
       } catch (err) {
         console.error("❌ Failed to load dashboard:", err);
         setError("Failed to load dashboard");
@@ -35,7 +37,7 @@ const StudentDashboard = () => {
     };
 
     fetchStudent();
-  }, [term]);
+  }, []);
 
   if (loading)
     return <p style={{ padding: "20px" }}>Loading dashboard...</p>;
@@ -49,8 +51,6 @@ const StudentDashboard = () => {
 
   const studentName =
     student?.name || student?.studentName || "Student";
-
-  const studentId = student?.studentId || student?.id || 1;
 
   return (
     <div
@@ -118,36 +118,32 @@ const StudentDashboard = () => {
 
       {/* TERM SELECTOR */}
       <div style={{ margin: "20px 0" }}>
-        <label style={{ marginRight: "10px" }}>Select Term:</label>
-
-        <select
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-          style={{
-            padding: "8px",
-            background: "#222",
-            color: "#fff",
-            border: "1px solid #555",
-            borderRadius: "4px",
-          }}
-        >
-          <option value="term1" style={{ color: "#000" }}>
-            Term 1
-          </option>
-          <option value="term2" style={{ color: "#000" }}>
-            Term 2
-          </option>
-          <option value="term3" style={{ color: "#000" }}>
-            Term 3
-          </option>
-        </select>
+        <p><strong>Class:</strong> {student?.class?.name || "No current class"}</p>
+        {student?.terms?.length ? (
+          <>
+            <label style={{ marginRight: "10px" }}>Select Term:</label>
+            <select
+              value={termId}
+              onChange={(e) => setTermId(e.target.value)}
+              style={{ padding: "8px", background: "#222", color: "#fff", border: "1px solid #555", borderRadius: "4px" }}
+            >
+              {student.terms.map((entry) => (
+                <option key={entry.id} value={entry.id} style={{ color: "#000" }}>
+                  {entry.name} — {entry.academicYear}
+                </option>
+              ))}
+            </select>
+          </>
+        ) : (
+          <p>No term is currently configured. Academic results will appear when available.</p>
+        )}
       </div>
 
       <h3>Quick Links</h3>
 
       <div style={{ display: "flex", gap: "10px" }}>
         <Link
-          to={`/student/report/${studentId}`}
+          to="/student/report-cards"
           style={{
             padding: "10px",
             background: "#333",

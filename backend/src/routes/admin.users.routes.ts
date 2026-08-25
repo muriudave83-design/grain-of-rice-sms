@@ -406,33 +406,45 @@ router.post(
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      const user = await prisma.user.create({
-        data: {
-          name: `${firstName} ${lastName || ""}`.trim(),
-          email,
-          password: hashedPassword,
-          role: "STUDENT",
-          mustChangePassword: true,
+      const schoolClass = await prisma.class.findFirst({
+        where: { id: Number(classId), isArchived: false },
+        select: { id: true, name: true },
+      });
+      if (!schoolClass) return res.status(400).json({ message: "Active Class not found" });
 
-          student: {
-            create: {
-              firstName,
-              lastName,
-              admissionNo:
-                typeof admissionNo === "string" && admissionNo.trim()
-                  ? admissionNo.trim()
-                  : Math.floor(Math.random() * 100000).toString(),
-              classId: Number(classId), // ✅ REQUIRED FIX
+      const user = await prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
+          data: {
+            name: `${firstName} ${lastName || ""}`.trim(),
+            email,
+            password: hashedPassword,
+            role: "STUDENT",
+            mustChangePassword: true,
+            student: {
+              create: {
+                firstName,
+                lastName,
+                admissionNo:
+                  typeof admissionNo === "string" && admissionNo.trim()
+                    ? admissionNo.trim()
+                    : Math.floor(Math.random() * 100000).toString(),
+                classId: schoolClass.id,
+              },
             },
           },
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          student: true,
-        },
+          select: { id: true, name: true, email: true, role: true, student: true },
+        });
+        await tx.studentClassEnrollment.create({
+          data: {
+            studentId: created.student!.id,
+            classId: schoolClass.id,
+            classNameSnapshot: schoolClass.name,
+            startedAt: new Date(),
+            status: "CURRENT",
+            source: "ADMISSION",
+          },
+        });
+        return created;
       });
 
       return res.status(201).json(user);

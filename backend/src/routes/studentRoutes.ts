@@ -5,6 +5,7 @@ import { requireRole } from "../middlewares/rolesMiddleware";
 import { authorizeStudentAccess } from "../middlewares/ownershipMiddleware";
 import { getStudentTranscript, updateHealth } from "../controllers/student.controller";
 import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
+import { getOperationalStudentForUser } from "../services/studentOperational.service";
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -12,6 +13,21 @@ const router = Router();
 router.get("/test", (_req, res) => {
   res.json({ message: "student routes working ✅" });
 });
+
+router.get(
+  "/me",
+  authenticate,
+  requireRole(["STUDENT"]),
+  async (req, res) => {
+    try {
+      return res.json(await getOperationalStudentForUser(prisma, req.user!.id));
+    } catch (error) {
+      return res.status((error as any).status || 500).json({
+        message: (error as any).message || "Failed to load Student application",
+      });
+    }
+  },
+);
 
 // ✅ Student transcript route (TEMP: no ownership check)
 router.get(
