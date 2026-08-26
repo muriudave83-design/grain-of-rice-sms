@@ -410,11 +410,14 @@ export const deleteAssignment = async (req: Request, res: Response) => {
     );
     if (result.status === "NOT_FOUND") return res.status(404).json({ message: "Assignment not found" });
     if (result.status === "TERM_MISMATCH") return res.status(409).json({ message: "Assignment Term does not belong to its class" });
-    if (result.status === "PUBLISHED") {
+    if (result.status === "PUBLISHED_CONFIRMATION_REQUIRED") {
       return res.status(409).json({
-        message: "This assignment is part of published final grades and cannot be deleted.",
+        message: "This assignment contributes to published final grades. Explicit published-data deletion confirmation is required.",
         deletionStatus: "PUBLISHED",
         scoreCount: result.scoreCount,
+        publishedGradeCount: result.publishedGradeCount,
+        assignmentName: result.title,
+        requiredConfirmation: "DELETE PUBLISHED ASSIGNMENT",
       });
     }
     if (result.status === "CONFIRMATION_REQUIRED") {
@@ -425,7 +428,13 @@ export const deleteAssignment = async (req: Request, res: Response) => {
         requiredConfirmation: "DELETE ASSIGNMENT",
       });
     }
-    return res.json({ message: "Assignment and associated scores deleted", scoreCount: result.scoreCount });
+    return res.json({
+      message: result.invalidatedGradeCount > 0
+        ? "Published assignment data deleted; affected final grades must be republished"
+        : "Assignment and associated scores deleted",
+      scoreCount: result.scoreCount,
+      invalidatedGradeCount: result.invalidatedGradeCount,
+    });
   } catch (err) {
     console.error("DELETE ASSIGNMENT ERROR:", err);
     res.status(500).json({ message: "Error deleting assignment" });

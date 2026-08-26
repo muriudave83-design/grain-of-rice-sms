@@ -1,13 +1,14 @@
 import { Prisma } from "@prisma/client";
 
 export const SCORE_DELETE_CONFIRMATION = "DELETE ASSIGNMENT";
+export const PUBLISHED_DELETE_CONFIRMATION = "DELETE PUBLISHED ASSIGNMENT";
 
 export type AssignmentDeletionResult =
   | { status: "NOT_FOUND" }
   | { status: "TERM_MISMATCH" }
-  | { status: "PUBLISHED"; scoreCount: number }
+  | { status: "PUBLISHED_CONFIRMATION_REQUIRED"; scoreCount: number; publishedGradeCount: number; title: string }
   | { status: "CONFIRMATION_REQUIRED"; scoreCount: number; title: string }
-  | { status: "DELETED"; scoreCount: number; title: string };
+  | { status: "DELETED"; scoreCount: number; title: string; invalidatedGradeCount: number };
 
 export async function deleteOwnedAssignment(
   client: any,
@@ -30,22 +31,32 @@ export async function deleteOwnedAssignment(
     if (!assignment) return { status: "NOT_FOUND" };
     if (assignment.term.classId !== assignment.teacherSubject.classId) return { status: "TERM_MISMATCH" };
 
-    const publishedGrade = await tx.grade.findFirst({
+    const publishedGradeCount = await tx.grade.count({
       where: {
         subjectId: assignment.teacherSubject.subjectId,
         termId: assignment.termId,
         student: { classId: assignment.teacherSubject.classId },
       },
-      select: { id: true },
     });
     const scoreCount = assignment._count.scores;
-    if (publishedGrade) return { status: "PUBLISHED", scoreCount };
-    if (scoreCount > 0 && confirmation !== SCORE_DELETE_CONFIRMATION) {
+    if (publishedGradeCount > 0 && confirmation !== PUBLISHED_DELETE_CONFIRMATION) {
+      return { status: "PUBLISHED_CONFIRMATION_REQUIRED", scoreCount, publishedGradeCount, title: assignment.title };
+    }
+    if (publishedGradeCount === 0 && scoreCount > 0 && confirmation !== SCORE_DELETE_CONFIRMATION) {
       return { status: "CONFIRMATION_REQUIRED", scoreCount, title: assignment.title };
     }
 
     await tx.score.deleteMany({ where: { assignmentId: assignment.id } });
     await tx.assignment.delete({ where: { id: assignment.id } });
-    return { status: "DELETED", scoreCount, title: assignment.title };
+    if (publishedGradeCount > 0) {
+      await tx.grade.deleteMany({
+        where: {
+          subjectId: assignment.teacherSubject.subjectId,
+          termId: assignment.termId,
+          student: { classId: assignment.teacherSubject.classId },
+        },
+      });
+    }
+    return { status: "DELETED", scoreCount, title: assignment.title, invalidatedGradeCount: publishedGradeCount };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 }

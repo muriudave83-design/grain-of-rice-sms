@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import apiClient from "../../services/apiClient";
 import BackButton from "../../components/BackButton";
@@ -13,6 +13,9 @@ import {
 // ✅ NEW IMPORT (CSV)
 import Papa from "papaparse";
 import { formatGrade, getLetterGrade } from "../../utils/grading";
+import { fitAssignmentMenuToViewport } from "../../utils/assignmentMenuPosition";
+
+const PUBLISHED_DELETE_CONFIRMATION = "DELETE PUBLISHED ASSIGNMENT";
 
 export default function GradebookDetail() {
   console.log("🔥 REAL GRADEBOOK DETAIL FILE");
@@ -44,6 +47,7 @@ export default function GradebookDetail() {
   const [saving, setSaving] = useState(false);
 
   const [contextMenu, setContextMenu] = useState(null);
+  const contextMenuRef = useRef(null);
   const [deleteDialog, setDeleteDialog] = useState(null);
 
   // 🧱 TERMS
@@ -235,13 +239,35 @@ useEffect(() => {
   reloadTermData();
 }, [selectedTerm, id, classId, terms]);  
 
+  useEffect(() => {
+    if (!contextMenu) return undefined;
+    const closeOutside = (event) => {
+      if (!contextMenuRef.current?.contains(event.target)) setContextMenu(null);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setContextMenu(null);
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [contextMenu]);
+
   const handleRightClick = (e, assignment) => {
     e.preventDefault();
     e.stopPropagation();
 
+    const triggerRect = e.currentTarget.getBoundingClientRect();
+    const position = fitAssignmentMenuToViewport({
+      clientX: e.clientX || triggerRect.right,
+      clientY: e.clientY || triggerRect.bottom,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    });
     setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
+      ...position,
       assignment,
     });
   };
@@ -553,11 +579,28 @@ useEffect(() => {
       return;
     }
     if (assignment.deletionStatus === "PUBLISHED") {
-      alert("This assignment is part of published final grades and cannot be deleted.");
+      try {
+        await apiClient.delete(`/teacher/assignment/${assignment.id}`, { data: {} });
+      } catch (err) {
+        const details = err?.response?.data;
+        if (details?.deletionStatus === "PUBLISHED") {
+          setDeleteDialog({
+            assignment: { ...assignment, scoreCount: details.scoreCount, publishedGradeCount: details.publishedGradeCount },
+            confirmationPhrase: details.requiredConfirmation || PUBLISHED_DELETE_CONFIRMATION,
+            published: true,
+            confirmation: "",
+            deleting: false,
+            error: "",
+          });
+          setContextMenu(null);
+          return;
+        }
+        alert(details?.message || err?.message || "Failed to prepare assignment deletion");
+      }
       return;
     }
     if ((assignment.scoreCount ?? assignment.scores?.length ?? 0) > 0) {
-      setDeleteDialog({ assignment, confirmation: "", deleting: false, error: "" });
+      setDeleteDialog({ assignment, confirmationPhrase: "DELETE ASSIGNMENT", published: false, confirmation: "", deleting: false, error: "" });
       setContextMenu(null);
       return;
     }
@@ -944,6 +987,10 @@ useEffect(() => {
                                 </span>
 
                                 <button
+                                  type="button"
+                                  aria-haspopup="menu"
+                                  aria-expanded={contextMenu?.assignment.id === a.id}
+                                  aria-label={`Assignment actions for ${a.title}`}
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleRightClick(e, a);
@@ -1181,14 +1228,23 @@ useEffect(() => {
       {deleteDialog && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-assignment-title">
           <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
-            <h2 id="delete-assignment-title" className="text-lg font-bold text-gray-900">Delete this assignment?</h2>
+            <h2 id="delete-assignment-title" className="text-lg font-bold text-gray-900">
+              {deleteDialog.published ? "Delete Published Assignment Data?" : "Delete this assignment?"}
+            </h2>
             <p className="mt-3 text-sm text-gray-700">
               This assignment contains <strong>{deleteDialog.assignment.scoreCount ?? deleteDialog.assignment.scores?.length ?? 0} student scores</strong>.
               Deleting it will permanently remove the assignment and all of its scores.
             </p>
+            {deleteDialog.published && (
+              <div className="mt-3 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+                <p>This assignment contributes to <strong>{deleteDialog.assignment.publishedGradeCount} published final grades</strong>.</p>
+                <p className="mt-1">Those current Grades will be invalidated. Recalculate the remaining assignments and explicitly republish corrected final Grades.</p>
+                <p className="mt-1">Already-issued Report Cards and Transcripts will remain unchanged.</p>
+              </div>
+            )}
             <p className="mt-2 text-sm font-semibold text-red-700">This cannot be undone.</p>
             <label htmlFor="delete-assignment-confirmation" className="mt-4 block text-sm font-medium text-gray-700">
-              Type <strong>DELETE ASSIGNMENT</strong> to confirm
+              Type <strong>{deleteDialog.confirmationPhrase}</strong> to confirm
             </label>
             <input
               id="delete-assignment-confirmation"
@@ -1202,14 +1258,14 @@ useEffect(() => {
               <button type="button" onClick={() => setDeleteDialog(null)} disabled={deleteDialog.deleting} className="rounded border px-4 py-2 text-sm">Cancel</button>
               <button
                 type="button"
-                disabled={deleteDialog.confirmation !== "DELETE ASSIGNMENT" || deleteDialog.deleting}
+                disabled={deleteDialog.confirmation !== deleteDialog.confirmationPhrase || deleteDialog.deleting}
                 onClick={() => {
                   setDeleteDialog((prev) => ({ ...prev, deleting: true, error: "" }));
                   deleteAssignment(deleteDialog.assignment, deleteDialog.confirmation);
                 }}
                 className="rounded bg-red-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-400"
               >
-                {deleteDialog.deleting ? "Deleting…" : "Delete Assignment"}
+                {deleteDialog.deleting ? "Deleting…" : deleteDialog.published ? "Delete Published Assignment Data" : "Delete Assignment"}
               </button>
             </div>
           </div>
@@ -1219,6 +1275,9 @@ useEffect(() => {
       {/* CONTEXT MENU */}
       {contextMenu && (
         <div
+          ref={contextMenuRef}
+          role="menu"
+          aria-label={`Actions for ${contextMenu.assignment.title}`}
           style={{
             position: "fixed",
             top: contextMenu.y,
@@ -1227,7 +1286,9 @@ useEffect(() => {
           }}
         >
           <div className="bg-white shadow-lg rounded-md border w-40 py-1">
-            <div
+            <button
+              type="button"
+              role="menuitem"
               onClick={() => {
                 const input = document.getElementById(
                   `title-${contextMenu.assignment.id}`
@@ -1235,30 +1296,32 @@ useEffect(() => {
                 input?.focus();
                 setContextMenu(null);
               }}
-              className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+              className="w-full px-3 py-2 text-left hover:bg-gray-100 cursor-pointer text-sm"
             >
               ✏️ Rename
-            </div>
+            </button>
 
-            <div
+            <button
+              type="button"
+              role="menuitem"
               onClick={() =>
                 handleToggleLock(contextMenu.assignment)
               }
-              className="px-3 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+              className="w-full px-3 py-2 text-left hover:bg-gray-100 cursor-pointer text-sm"
             >
               {contextMenu.assignment.isLocked
                 ? "🔓 Unlock"
                 : "🔒 Lock"}
-            </div>
+            </button>
 
             <button
               type="button"
-              disabled={contextMenu.assignment.deletionStatus === "PUBLISHED"}
-              title={contextMenu.assignment.deletionStatus === "PUBLISHED" ? "Published final grades protect this assignment" : contextMenu.assignment.deletionStatus === "SCORED" ? "Deleting requires typed confirmation and removes all scores" : "Delete assignment"}
+              role="menuitem"
+              title={contextMenu.assignment.deletionStatus === "PUBLISHED" ? "Delete scores and invalidate current published Grades" : contextMenu.assignment.deletionStatus === "SCORED" ? "Deleting requires typed confirmation and removes all scores" : "Delete assignment"}
               onClick={() => handleDeleteAssignment(contextMenu.assignment)}
-              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-100 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-400"
+              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-100"
             >
-              {contextMenu.assignment.deletionStatus === "PUBLISHED" ? "🔒 Published — cannot delete" : contextMenu.assignment.deletionStatus === "SCORED" ? "🗑️ Delete scores & assignment…" : "🗑️ Delete"}
+              {contextMenu.assignment.deletionStatus === "PUBLISHED" ? "Delete Published Assignment Data…" : contextMenu.assignment.deletionStatus === "SCORED" ? "🗑️ Delete scores & assignment…" : "🗑️ Delete"}
             </button>
           </div>
         </div>
