@@ -1,0 +1,22 @@
+﻿[
+    {
+        "migration_name":  "00000000000000_init",
+        "sha256":  "b661c9cb43012196cd700606f0edd7081db164d9d8aea195e7c16a787d42204e",
+        "bytes":  40448
+    },
+    {
+        "migration_name":  "20260810000000_add_attendance_period",
+        "sha256":  "850c179ce37823ad11098c5d5006d246671db056b7a133bf6ddd0389f8286407",
+        "bytes":  536
+    },
+    {
+        "migration_name":  "20260822000000_add_teacher_subject_lifecycle",
+        "sha256":  "eeb4445b7c2bf4880fdaab460db7684cc7b5f9061cbc9f30a37b5fd0fee28711",
+        "bytes":  539
+    },
+    {
+        "migration_name":  "20260823000000_add_student_class_enrollment_phase_1",
+        "sha256":  "c197bb308a929cd1780510b53e8cb4a6efc5ef6b4efc71085e2f64d1831e194d",
+        "bytes":  2286
+    }
+]

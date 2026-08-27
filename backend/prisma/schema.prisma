@@ -27,6 +27,7 @@ model User {
   student            Student?
   taughtSubjects     Subject[]           @relation("TeacherSubjectsLegacy")
   teacherSubjects    TeacherSubject[]
+  combinedAssignmentsCreated CombinedAssignment[] @relation("CombinedAssignmentCreator")
 }
 
 model Parent {
@@ -71,7 +72,7 @@ model Student {
   scores            Score[]
   sponsorships      Sponsorship[]
   classEnrollments  StudentClassEnrollment[]
-  class             Class?             @relation(fields: [classId], references: [id])
+  class             Class?             @relation(fields: [classId], references: [id], onDelete: Restrict)
   user              User?              @relation(fields: [userId], references: [id])
   transcripts       Transcript[]
 }
@@ -171,6 +172,7 @@ model ClassSubject {
   subjectId Int
   class     Class   @relation(fields: [classId], references: [id])
   subject   Subject @relation(fields: [subjectId], references: [id])
+  teachingGroupClasses TeachingGroupClass[]
 
   @@unique([classId, subjectId])
 }
@@ -287,6 +289,7 @@ model Term {
   reportComments     ReportComment[]
   class              Class               @relation(fields: [classId], references: [id])
   transcripts        Transcript[]
+  teachingGroupTerms TeachingGroupTerm[]
 
   @@unique([name, classId, academicYear])
 }
@@ -343,7 +346,7 @@ model AttendanceEntry {
   id                  Int               @id @default(autoincrement())
   attendanceSessionId Int
   studentId           Int
-  period              AttendancePeriod
+  period              AttendancePeriod @default(LEGACY)
   status              AttendanceStatus
   note                String?
   createdAt           DateTime          @default(now())
@@ -383,6 +386,7 @@ model TeacherSubject {
   class          Class           @relation(fields: [classId], references: [id], onDelete: Cascade)
   subject        Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   teacher        User            @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  teachingGroupMembers TeachingGroupMember[]
 
   @@unique([teacherId, subjectId, classId], map: "TeacherSubject_unique_assignment")
   @@index([teacherId, isActive], map: "TeacherSubject_teacherId_isActive_idx")
@@ -407,6 +411,120 @@ model Assignment {
   teacherSubject   TeacherSubject @relation(fields: [teacherSubjectId], references: [id], onDelete: Cascade)
   term             Term           @relation(fields: [termId], references: [id])
   scores           Score[]
+  combinedAssignmentChild CombinedAssignmentChild?
+}
+
+model TeachingGroup {
+  id        Int                   @id @default(autoincrement())
+  name      String
+  isActive  Boolean               @default(true)
+  startedAt DateTime              @default(now()) @db.Timestamp(6)
+  endedAt   DateTime?             @db.Timestamp(6)
+  createdAt DateTime              @default(now()) @db.Timestamp(6)
+  updatedAt DateTime              @updatedAt @db.Timestamp(6)
+  classes   TeachingGroupClass[]
+  periods   TeachingGroupPeriod[]
+
+  @@index([isActive], map: "TeachingGroup_isActive_idx")
+}
+
+model TeachingGroupClass {
+  id                 Int                       @id @default(autoincrement())
+  teachingGroupId    Int
+  classSubjectId     Int
+  isActive           Boolean                   @default(true)
+  startedAt          DateTime                  @default(now()) @db.Timestamp(6)
+  endedAt            DateTime?                 @db.Timestamp(6)
+  createdAt          DateTime                  @default(now()) @db.Timestamp(6)
+  updatedAt          DateTime                  @updatedAt @db.Timestamp(6)
+  teachingGroup      TeachingGroup             @relation(fields: [teachingGroupId], references: [id], onDelete: Restrict)
+  classSubject       ClassSubject              @relation(fields: [classSubjectId], references: [id], onDelete: Restrict)
+  members            TeachingGroupMember[]
+  termMappings       TeachingGroupTerm[]
+  assignmentChildren CombinedAssignmentChild[]
+
+  @@unique([teachingGroupId, classSubjectId], map: "TeachingGroupClass_group_classSubject_key")
+  @@index([teachingGroupId, isActive], map: "TeachingGroupClass_group_active_idx")
+}
+
+model TeachingGroupMember {
+  id                   Int                @id @default(autoincrement())
+  teachingGroupClassId Int
+  teacherSubjectId     Int
+  isAssignmentOwner    Boolean            @default(false)
+  isActive             Boolean            @default(true)
+  startedAt            DateTime           @default(now()) @db.Timestamp(6)
+  endedAt              DateTime?          @db.Timestamp(6)
+  createdAt            DateTime           @default(now()) @db.Timestamp(6)
+  updatedAt            DateTime           @updatedAt @db.Timestamp(6)
+  teachingGroupClass   TeachingGroupClass @relation(fields: [teachingGroupClassId], references: [id], onDelete: Restrict)
+  teacherSubject       TeacherSubject     @relation(fields: [teacherSubjectId], references: [id], onDelete: Restrict)
+
+  @@unique([teachingGroupClassId, teacherSubjectId], map: "TeachingGroupMember_class_teacherSubject_key")
+  @@index([teacherSubjectId, isActive], map: "TeachingGroupMember_teacherSubject_active_idx")
+}
+
+model TeachingGroupPeriod {
+  id              Int                  @id @default(autoincrement())
+  teachingGroupId Int
+  name            String
+  academicYear    String
+  createdAt       DateTime             @default(now()) @db.Timestamp(6)
+  updatedAt       DateTime             @updatedAt @db.Timestamp(6)
+  teachingGroup   TeachingGroup        @relation(fields: [teachingGroupId], references: [id], onDelete: Restrict)
+  termMappings    TeachingGroupTerm[]
+  assignments     CombinedAssignment[]
+
+  @@unique([teachingGroupId, name, academicYear], map: "TeachingGroupPeriod_group_name_year_key")
+}
+
+model TeachingGroupTerm {
+  id                    Int                 @id @default(autoincrement())
+  teachingGroupPeriodId Int
+  teachingGroupClassId  Int
+  termId                Int
+  period                TeachingGroupPeriod @relation(fields: [teachingGroupPeriodId], references: [id], onDelete: Restrict)
+  teachingGroupClass    TeachingGroupClass  @relation(fields: [teachingGroupClassId], references: [id], onDelete: Restrict)
+  term                  Term                @relation(fields: [termId], references: [id], onDelete: Restrict)
+
+  @@unique([teachingGroupPeriodId, teachingGroupClassId], map: "TeachingGroupTerm_period_class_key")
+  @@unique([teachingGroupPeriodId, termId], map: "TeachingGroupTerm_period_term_key")
+  @@index([termId], map: "TeachingGroupTerm_termId_idx")
+}
+
+model CombinedAssignment {
+  id                    Int                       @id @default(autoincrement())
+  teachingGroupPeriodId Int
+  createdById           Int
+  requestKey            String                    @db.VarChar(64)
+  title                 String
+  type                  AssessmentType            @default(ASSIGNMENT)
+  weight                Float                     @default(1)
+  maxPoints             Float                     @default(100)
+  dateAssigned          DateTime?
+  dueDate               DateTime?
+  position              Int                       @default(0)
+  createdAt             DateTime                  @default(now()) @db.Timestamp(6)
+  updatedAt             DateTime                  @updatedAt @db.Timestamp(6)
+  deletedAt             DateTime?                 @db.Timestamp(6)
+  period                TeachingGroupPeriod       @relation(fields: [teachingGroupPeriodId], references: [id], onDelete: Restrict)
+  createdBy             User                      @relation("CombinedAssignmentCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  children              CombinedAssignmentChild[]
+
+  @@unique([teachingGroupPeriodId, requestKey], map: "CombinedAssignment_period_request_key")
+  @@index([teachingGroupPeriodId, position], map: "CombinedAssignment_period_position_idx")
+}
+
+model CombinedAssignmentChild {
+  id                   Int                @id @default(autoincrement())
+  combinedAssignmentId Int
+  teachingGroupClassId Int
+  assignmentId         Int                @unique(map: "CombinedAssignmentChild_assignmentId_key")
+  combinedAssignment   CombinedAssignment @relation(fields: [combinedAssignmentId], references: [id], onDelete: Cascade)
+  teachingGroupClass   TeachingGroupClass @relation(fields: [teachingGroupClassId], references: [id], onDelete: Restrict)
+  assignment           Assignment         @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@unique([combinedAssignmentId, teachingGroupClassId], map: "CombinedAssignmentChild_assignment_class_key")
 }
 
 model Score {

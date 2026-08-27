@@ -5,11 +5,14 @@ import test from "node:test";
 
 const schema = fs.readFileSync(path.resolve(process.cwd(), "prisma/schema.prisma"), "utf8");
 const migration = fs.readFileSync(
-  path.resolve(process.cwd(), "prisma/migrations/20260822000000_add_teacher_subject_lifecycle/migration.sql"),
+  path.resolve(
+    process.cwd(),
+    "../docs/migration-ledger-archive/legacy-active-migrations/20260822000000_add_teacher_subject_lifecycle/migration.sql",
+  ),
   "utf8",
 );
 
-test("TeacherSubject lifecycle is additive and defaults existing/current rows active", () => {
+test("archived TeacherSubject lifecycle migration is additive and defaults existing/current rows active", () => {
   const model = schema.match(/model TeacherSubject \{[\s\S]*?\n\}/)?.[0] || "";
   assert.match(model, /isActive\s+Boolean\s+@default\(true\)/);
   assert.match(migration, /ADD COLUMN "isActive" BOOLEAN NOT NULL DEFAULT true/);

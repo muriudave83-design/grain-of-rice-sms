@@ -5,7 +5,10 @@ import test from "node:test";
 
 const schema = fs.readFileSync(path.resolve(process.cwd(), "prisma/schema.prisma"), "utf8");
 const migration = fs.readFileSync(
-  path.resolve(process.cwd(), "prisma/migrations/20260823000000_add_student_class_enrollment_phase_1/migration.sql"),
+  path.resolve(
+    process.cwd(),
+    "../docs/migration-ledger-archive/legacy-active-migrations/20260823000000_add_student_class_enrollment_phase_1/migration.sql",
+  ),
   "utf8",
 );
 const audit = fs.readFileSync(
@@ -24,7 +27,7 @@ test("Phase 1 schema keeps subject Enrollment separate from class history", () =
   assert.doesNotMatch(classEnrollment, /academicYear/);
 });
 
-test("Phase 1 migration is staged and non-destructive", () => {
+test("archived Phase 1 migration remains staged and non-destructive", () => {
   assert.doesNotMatch(migration, /(?:^|;)\s*(?:DELETE|TRUNCATE|DROP\s+(?:TABLE|TYPE|COLUMN))\b/im);
   assert.match(migration, /ALTER COLUMN "classId" DROP NOT NULL/);
   assert.doesNotMatch(migration, /UPDATE\s+"Student"/i);

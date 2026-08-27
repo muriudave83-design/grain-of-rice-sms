@@ -1,0 +1,210 @@
+﻿[
+    {
+        "migration_name":  "20251109171039_init",
+        "classification":  "recovered",
+        "sha256":  "e6c346e5f644e2ff6a88a10a383ac0b9967f6343c04e3337cbcae6cb39c87f98",
+        "production_sha256":  "e6c346e5f644e2ff6a88a10a383ac0b9967f6343c04e3337cbcae6cb39c87f98",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "49e143319da3ff27f15adc3ecfc1b2676d950a56"
+    },
+    {
+        "migration_name":  "20251111025243_add_roles_to_user",
+        "classification":  "recovered",
+        "sha256":  "26913a1bb949158906dbc2ddc0427c8ccfc056ad2cce91dca55f9c3fc48f2dd2",
+        "production_sha256":  "26913a1bb949158906dbc2ddc0427c8ccfc056ad2cce91dca55f9c3fc48f2dd2",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "26be5c0fdff26de3efbcbb893303c5db291d6677"
+    },
+    {
+        "migration_name":  "20251114002524_full_schema_setup",
+        "classification":  "recovered",
+        "sha256":  "f8df64541c83892485f67acb3da33d61128ae1af88ed10941509d5f735d55ab7",
+        "production_sha256":  "f8df64541c83892485f67acb3da33d61128ae1af88ed10941509d5f735d55ab7",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "db0fb8136f1fab94b436dcc89e492875b32bfffa"
+    },
+    {
+        "migration_name":  "20251116051529_expand_schema_phase4",
+        "classification":  "recovered",
+        "sha256":  "8490a8f83d216d034b00cb9e946398cdb9a0fd60ebfff2a6eaed24350be0a30c",
+        "production_sha256":  "8490a8f83d216d034b00cb9e946398cdb9a0fd60ebfff2a6eaed24350be0a30c",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "4cda992219af942928bfefaf8563b89c36ee4ac6"
+    },
+    {
+        "migration_name":  "20251119155233_phase5_grading_models",
+        "classification":  "recovered",
+        "sha256":  "091a583052027415957b6a8f92a199f94e9a01b27b0dbdade54c25d038504a31",
+        "production_sha256":  "091a583052027415957b6a8f92a199f94e9a01b27b0dbdade54c25d038504a31",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "cd506502a4a98e033d3b29d9f05a247fec7c8a8f"
+    },
+    {
+        "migration_name":  "20251121224622_add_unique_constraints",
+        "classification":  "recovered",
+        "sha256":  "9b6e5354501bc0e7d1ab2868ce7d360896a5429f41f311d329884e0384e1e713",
+        "production_sha256":  "9b6e5354501bc0e7d1ab2868ce7d360896a5429f41f311d329884e0384e1e713",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "d5ed1ff20552a601827ca1e69f6ba26151a9ce76"
+    },
+    {
+        "migration_name":  "20251226120540_add_audit_log_model",
+        "classification":  "recovered",
+        "sha256":  "977f7c419aa811cca6a12d2caad692ca9073534d246a7c2f8dc715cbc9718869",
+        "production_sha256":  "977f7c419aa811cca6a12d2caad692ca9073534d246a7c2f8dc715cbc9718869",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "438376409ed75f4fb879df21198d4cfbc3d7c9df"
+    },
+    {
+        "migration_name":  "20260101085512_make_auditlog_metadata_optional",
+        "classification":  "recovered",
+        "sha256":  "bd1044a6ab47a78eebd17ee7aea77da9e2126558939a4750886644296675131d",
+        "production_sha256":  "bd1044a6ab47a78eebd17ee7aea77da9e2126558939a4750886644296675131d",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "c765da1e917b6b58dfeab34397ee1734b02515ec"
+    },
+    {
+        "migration_name":  "20260103114421_add_must_change_password",
+        "classification":  "recovered",
+        "sha256":  "075958601977eb693a18d7b65ade8b64944ec35fbe82ed5f635042be5e66d8da",
+        "production_sha256":  "075958601977eb693a18d7b65ade8b64944ec35fbe82ed5f635042be5e66d8da",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "875280db70b383c10ec0ad995d7d7d1be5040e1b"
+    },
+    {
+        "migration_name":  "20260119054652_class_subject",
+        "classification":  "recovered",
+        "sha256":  "355b758ec64bba7b3eca899074555a19261415e7301020014f8b5e9875208f2b",
+        "production_sha256":  "355b758ec64bba7b3eca899074555a19261415e7301020014f8b5e9875208f2b",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "b781a99eef651be322c4d4454c4539b89b6b6e58"
+    },
+    {
+        "migration_name":  "20260127071348_link_student_to_class",
+        "classification":  "recovered",
+        "sha256":  "3aeefa1eda14f06a833d8edf1c5ac68932f308b507d728968ddf3d2ad96eaa24",
+        "production_sha256":  "3aeefa1eda14f06a833d8edf1c5ac68932f308b507d728968ddf3d2ad96eaa24",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "9a898b0c23c8a98dcf0423e18419e2610de4c72f"
+    },
+    {
+        "migration_name":  "20260129043355_student_class_relation",
+        "classification":  "recovered",
+        "sha256":  "d0207adc4243e44bc8bcb9455129c4ed2e1dd3c2cb53b7fee35f0e65ba2d3f1a",
+        "production_sha256":  "d0207adc4243e44bc8bcb9455129c4ed2e1dd3c2cb53b7fee35f0e65ba2d3f1a",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "f40cc0478e0696601d5011c302eb97f76a2b92fc"
+    },
+    {
+        "migration_name":  "20260130012541_add_grade_model",
+        "classification":  "recovered",
+        "sha256":  "2563e039b191630808742d64ee2cf6e16b41f213af5a419f1aa4063e2bb3b775",
+        "production_sha256":  "2563e039b191630808742d64ee2cf6e16b41f213af5a419f1aa4063e2bb3b775",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "ff4790958df35738a5a19232d0cf5ca5c39b65bd"
+    },
+    {
+        "migration_name":  "20260202055323_add_report_cards",
+        "classification":  "recovered",
+        "sha256":  "dfb89c8fd03e8ee0c59f9fb25101bc34cfa040eaa55955b6e43a0eb8ebd2f423",
+        "production_sha256":  "dfb89c8fd03e8ee0c59f9fb25101bc34cfa040eaa55955b6e43a0eb8ebd2f423",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "84503c9e9df01a32107913120f511519bd1e5111"
+    },
+    {
+        "migration_name":  "20260203064102_add_parent_student_relation",
+        "classification":  "recovered",
+        "sha256":  "3b7d1b223fd13428c7600e40e261b114e1796eb99678afac4abb39aa5bec9062",
+        "production_sha256":  "3b7d1b223fd13428c7600e40e261b114e1796eb99678afac4abb39aa5bec9062",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "d5f6f57f16fd61cd3d02abfd8c5c411bf93708ba"
+    },
+    {
+        "migration_name":  "20260214233539_add_assignment_categories",
+        "classification":  "recovered",
+        "sha256":  "3e5461b1ba8e3e036116328748ecf3b4c5ccb89e877f26cb9c1a5f4c56c17d4c",
+        "production_sha256":  "3e5461b1ba8e3e036116328748ecf3b4c5ccb89e877f26cb9c1a5f4c56c17d4c",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "06a0a1ca594eee45fe39a39ff1b3088626898468"
+    },
+    {
+        "migration_name":  "20260216090240_add_term_relation_to_assessment",
+        "classification":  "recovered",
+        "sha256":  "fa19ed6fb239dbb535cd3693046f1c285dd1c525fa7f74f4a53b92c7661eb5e9",
+        "production_sha256":  "fa19ed6fb239dbb535cd3693046f1c285dd1c525fa7f74f4a53b92c7661eb5e9",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "eb6907e6ea20e12bef71a410a71645cd893a0eac"
+    },
+    {
+        "migration_name":  "20260306_add_teacher_subject_table",
+        "classification":  "divergent",
+        "sha256":  "5122bc57ac09b007cf58b80cbd9a10ecb56040c1cf90989f6fd9f25f736488e0",
+        "production_sha256":  "6d7bc3b5ec68726b8f15212703239a36f8b43bbbb098ca3c65e7152191bcde7d",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "7ef38cbb6f62593d4b70bc2d0aba991e5802ddbd"
+    },
+    {
+        "migration_name":  "20260316081241_add_homework_due_date",
+        "classification":  "recovered",
+        "sha256":  "1f4650181402be7ee37fae4c04c7ff70fb6e793433b5b965ffde41f977010cd7",
+        "production_sha256":  "1f4650181402be7ee37fae4c04c7ff70fb6e793433b5b965ffde41f977010cd7",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "acff7e517d88ec94a9df4e9fcba3ec14a58f5be1"
+    },
+    {
+        "migration_name":  "20260316090354_add_assessment_type_enum",
+        "classification":  "recovered",
+        "sha256":  "87e76a955a4993bac9d2f79c73f366bd11b6f148f511b96578dcdba625f6848e",
+        "production_sha256":  "87e76a955a4993bac9d2f79c73f366bd11b6f148f511b96578dcdba625f6848e",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "903e6224e6301015723e84ce0f2a60c3a5cc98ff"
+    },
+    {
+        "migration_name":  "20260324113652_add_is_archived_to_student",
+        "classification":  "recovered",
+        "sha256":  "72f0eb2bbaafd801a736aef7dadfae140347751f6ccc15c9afdaa81c42c60051",
+        "production_sha256":  "72f0eb2bbaafd801a736aef7dadfae140347751f6ccc15c9afdaa81c42c60051",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "82eed32a367617340ef867e2a5708bc802854bbd"
+    },
+    {
+        "migration_name":  "20260324232549_add_class_archive",
+        "classification":  "recovered",
+        "sha256":  "967cca53ce7736ef919c905bd4fd6dd1a727f214ba8e7e593356492ce4105d90",
+        "production_sha256":  "967cca53ce7736ef919c905bd4fd6dd1a727f214ba8e7e593356492ce4105d90",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "2e28d485ed1a24c16c8417125cb7cfcc0b962783"
+    },
+    {
+        "migration_name":  "20260406235522_add_parent_details",
+        "classification":  "recovered",
+        "sha256":  "be1b2e6fd5177d69bcc52e10165e23317b73ee7195153925d68b72e805d7cac2",
+        "production_sha256":  "be1b2e6fd5177d69bcc52e10165e23317b73ee7195153925d68b72e805d7cac2",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "0a4d3f0a7a67c8b8bdaac030cb4a0da746541c32"
+    },
+    {
+        "migration_name":  "20260409080530_add_userid_to_parent",
+        "classification":  "recovered",
+        "sha256":  "cbbb281276ccbf3a0b77ed6adeaa25b57c4780e7c409d8aff7803f3bac4a6f13",
+        "production_sha256":  "cbbb281276ccbf3a0b77ed6adeaa25b57c4780e7c409d8aff7803f3bac4a6f13",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "e01ffd486c6725652523f73ad6a32937dfd00e32"
+    },
+    {
+        "migration_name":  "20260410021114_add_assignment_score",
+        "classification":  "recovered",
+        "sha256":  "a588326fd6244fb29412603c0ebc376c0c9bf203d9e4360954a79621af52de08",
+        "production_sha256":  "a588326fd6244fb29412603c0ebc376c0c9bf203d9e4360954a79621af52de08",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "ffd9eb4c82723e280368a1e2464c6768a4540382"
+    },
+    {
+        "migration_name":  "20260410110711_add_assignment_weight",
+        "classification":  "recovered",
+        "sha256":  "5a41b0a2e56a9891e885bff4c8b706090a9dcf1d383e1af957821b3a9ce65c93",
+        "production_sha256":  "5a41b0a2e56a9891e885bff4c8b706090a9dcf1d383e1af957821b3a9ce65c93",
+        "git_commit":  "f053bf8a7baecb1a7bc78d63a963fb297d05fca8",
+        "git_blob":  "76e828057724406d272d52dc777007d7b6694dcf"
+    }
+]
