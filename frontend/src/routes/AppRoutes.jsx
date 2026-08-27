@@ -41,6 +41,7 @@ import AttendancePage from "../pages/admin/AttendancePage";
 import AdminReportsPage from "../pages/admin/AdminReportsPage";
 import AttendanceReport from "../pages/admin/AttendanceReport";
 import TermManagement from "../pages/admin/TermManagement";
+import AdminTeachingGroups from "../pages/admin/AdminTeachingGroups";
 
 
 // ✅ NEW: PARENTS PAGES
@@ -71,6 +72,7 @@ import GradebookPage from "../pages/teacher/GradebookPage";
 import GradebookDetail from "../pages/teacher/GradebookDetail";
 import FinalGrades from "../pages/teacher/FinalGrades";
 import TeacherDiscipline from "../pages/teacher/TeacherDiscipline";
+import CombinedGradebook from "../pages/teacher/CombinedGradebook";
 
 // =======================
 // PARENT PAGES
@@ -295,6 +297,8 @@ export default function AppRoutes() {
             element={<TermManagement />}
           />
 
+          <Route path="/dashboard/admin/teaching-groups" element={<AdminTeachingGroups />} />
+
           <Route
             path="/dashboard/admin/attendance-reports"
             element={<AttendanceReport />}
@@ -337,6 +341,8 @@ export default function AppRoutes() {
           <Route path="gradebook/:id" element={<GradebookDetail />} />
 
           {/* LEGACY */}
+          <Route path="combined-gradebook/:groupId" element={<CombinedGradebook />} />
+
           <Route path="gradebook-legacy" element={<TeacherGradebook />} />
 
           {/* REPORTS */}

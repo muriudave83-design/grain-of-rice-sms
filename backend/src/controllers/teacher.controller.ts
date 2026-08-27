@@ -5,6 +5,7 @@ import { AssessmentType } from "@prisma/client";
 import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
 import { assembleClassSubjectResults, indexReportComments } from "../services/reportData.service";
 import { deleteOwnedAssignment } from "../services/assignmentDeletion.service";
+import { assertNotCombinedChild, CombinedTeachingGroupError } from "../services/combinedTeachingGroup.service";
 
 const prisma = new PrismaClient();
 
@@ -227,6 +228,8 @@ export const upsertScore = async (req: Request, res: Response) => {
       });
     }
 
+    await assertNotCombinedChild(prisma, [assignment.id]);
+
     if (assignment.teacherSubject.teacherId !== (req as any).user.id) {
       return res.status(403).json({ message: "Not authorized for this assignment" });
     }
@@ -273,6 +276,7 @@ export const upsertScore = async (req: Request, res: Response) => {
 
     res.json(result);
   } catch (err) {
+    if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
     console.error("UPSERT SCORE ERROR:", err);
     res.status(500).json({ message: "Error saving score" });
   }
@@ -402,6 +406,7 @@ export const deleteAssignment = async (req: Request, res: Response) => {
     return res.status(400).json({ message: "Valid assignment ID required" });
   }
   try {
+    await assertNotCombinedChild(prisma, [assignmentId]);
     const result = await deleteOwnedAssignment(
       prisma,
       (req as any).user.id,
@@ -436,6 +441,7 @@ export const deleteAssignment = async (req: Request, res: Response) => {
       invalidatedGradeCount: result.invalidatedGradeCount,
     });
   } catch (err) {
+    if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
     console.error("DELETE ASSIGNMENT ERROR:", err);
     res.status(500).json({ message: "Error deleting assignment" });
   }
@@ -456,6 +462,7 @@ export const updateAssignment = async (req: Request, res: Response) => {
       },
     });
     if (!assignment) return res.status(404).json({ message: "Assignment not found" });
+    await assertNotCombinedChild(prisma, [assignment.id]);
     const publishedGrade = await prisma.grade.findFirst({
       where: {
         subjectId: assignment.teacherSubject.subjectId,
@@ -494,6 +501,7 @@ export const updateAssignment = async (req: Request, res: Response) => {
 
     res.json(updated);
   } catch (err) {
+    if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
     console.error("UPDATE ASSIGNMENT ERROR:", err);
     res.status(500).json({ message: "Error updating assignment" });
   }
@@ -521,6 +529,7 @@ export const reorderAssignments = async (req: Request, res: Response) => {
     if (ownedCount !== ids.length) {
       return res.status(403).json({ error: "Cannot reorder another teacher's assignments" });
     }
+    await assertNotCombinedChild(prisma, ids);
 
     await prisma.$transaction(
       assignments.map((a: { id: number; position: number }) =>
@@ -533,6 +542,7 @@ export const reorderAssignments = async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (err) {
+    if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
     console.error("REORDER ASSIGNMENTS ERROR:", err);
     res.status(500).json({ error: "Failed to reorder" });
   }
@@ -582,6 +592,7 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
         teacherSubject: { select: { classId: true } },
       },
     });
+    await assertNotCombinedChild(prisma, assignmentIds);
 
     const studentIds = [
       ...new Set(uniqueUpdates.map((u: any) => Number(u.studentId))),
@@ -675,6 +686,7 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
       totalReceived: updates.length,
     });
   } catch (err) {
+    if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
     console.error("Bulk update failed:", err);
     res.status(500).json({ error: "Bulk update failed" });
   }

@@ -119,6 +119,10 @@ export default function SidebarNav() {
               📆 Terms
             </NavLink>
 
+            <NavLink to={path("teaching-groups")} className={linkClass}>
+              Teaching Groups
+            </NavLink>
+
             <NavLink to={path("reports")} className={linkClass}>
               📊 Reports
             </NavLink>

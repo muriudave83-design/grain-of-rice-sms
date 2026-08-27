@@ -3,6 +3,7 @@ import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
 import prisma from "../prisma";
 import { generateTranscripts } from "../controllers/teacher.controller";
+import { assertNotCombinedChild, CombinedTeachingGroupError } from "../services/combinedTeachingGroup.service";
 import { getGradeDescription, getLetterGrade } from "../utils/gradeDescriptions";
 import {
   addTeacherDiscipline,
@@ -196,6 +197,7 @@ router.put("/assignment/:id/lock", async (req, res) => {
     if (!owned) {
       return res.status(404).json({ message: "Assignment not found" });
     }
+    await assertNotCombinedChild(prisma, [owned.id]);
 
     if (!isLocked) {
       const publishedGrade = await prisma.grade.findFirst({
@@ -220,6 +222,7 @@ router.put("/assignment/:id/lock", async (req, res) => {
 
     res.json({ isLocked: assignment.isLocked });
   } catch (err) {
+    if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
     console.error("Lock toggle error:", err);
     res.status(500).json({ message: "Failed to toggle lock" });
   }

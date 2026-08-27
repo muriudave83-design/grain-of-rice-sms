@@ -48,6 +48,7 @@ import teacherRoutes from "./routes/teacher.routes";
 import feesRoutes from "./routes/fees.routes";
 import sponsorshipRoutes from "./routes/sponsorship.routes";
 import disciplineRoutes from "./routes/discipline.routes";
+import combinedTeachingGroupRoutes from "./routes/combinedTeachingGroup.routes";
 
 const app = express();
 
@@ -128,6 +129,7 @@ app.use("/api/fees", feesRoutes);
 app.use("/api/sponsorship", sponsorshipRoutes);
 app.use("/api/teacher-assignments", teacherAssignmentsRoutes);
 app.use("/api/discipline", disciplineRoutes);
+app.use("/api", combinedTeachingGroupRoutes);
 
 // ----------------------------------
 // REPORT CARDS

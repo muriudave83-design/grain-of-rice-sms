@@ -6,6 +6,7 @@ import apiClient from "../../services/apiClient";
 export default function TeacherClasses() {
   const navigate = useNavigate();
   const [subjects, setSubjects] = useState([]);
+  const [teachingGroups, setTeachingGroups] = useState([]);
 
   useEffect(() => {
     fetchSubjects();
@@ -13,8 +14,13 @@ export default function TeacherClasses() {
 
   const fetchSubjects = async () => {
     try {
-      const res = await apiClient.get("/teacher/subjects");
-      setSubjects(res.data || []);
+      const [subjectResult, groupResult] = await Promise.allSettled([
+        apiClient.get("/teacher/subjects"),
+        apiClient.get("/teacher/teaching-groups"),
+      ]);
+      setSubjects(subjectResult.status === "fulfilled" ? subjectResult.value.data || [] : []);
+      setTeachingGroups(groupResult.status === "fulfilled" ? groupResult.value.data || [] : []);
+      if (subjectResult.status === "rejected") throw subjectResult.reason;
     } catch (err) {
       console.error(err);
       setSubjects([]);
@@ -60,6 +66,21 @@ export default function TeacherClasses() {
       <p style={{ color: "#9ca3af", marginBottom: "20px" }}>
         Select an action below
       </p>
+
+      {teachingGroups.length > 0 && (
+        <section style={{ marginBottom: "30px" }}>
+          <h3 style={{ marginBottom: "12px" }}>Combined Teaching Groups</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "20px" }}>
+            {teachingGroups.map((group) => (
+              <div key={group.id} style={{ padding: "20px", borderRadius: "12px", background: "#172554", border: "1px solid #1d4ed8" }}>
+                <h3>{group.name}</h3>
+                <p style={{ color: "#bfdbfe" }}>Combined Classes: {group.classes.map((lane) => lane.classSubject.class.name).join(" + ")}</p>
+                <button onClick={() => navigate(`/teacher/combined-gradebook/${group.id}`)} style={{ background: "#2563eb", color: "white", padding: "8px 12px", border: 0, borderRadius: "6px", cursor: "pointer" }}>Open Gradebook</button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {subjects.length === 0 ? (
         <p>No subjects found</p>
