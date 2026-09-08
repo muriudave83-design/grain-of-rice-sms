@@ -68,14 +68,29 @@ test("combined service orchestrates class-specific records safely", { skip: !iso
     assert.equal((await db.score.findUnique({ where: { studentId_assignmentId: { studentId: student8.id, assignmentId: child8.assignmentId } } }))?.score, 0);
     assert.equal(await db.score.count({ where: { studentId: student8.id, assignmentId: child9.assignmentId } }), 0);
     await assert.rejects(() => saveCombinedScore(db, group.id, owner.id, { combinedAssignmentId: first.id, assignmentId: child9.assignmentId, studentId: student8.id, score: 20 }), /injection rejected/);
-    await updateCombinedAssignment(db, group.id, owner.id, first.id, { title: "Composition renamed" });
+    const childIdsBeforeRename = first.children.map((child: any) => child.assignmentId).sort();
+    const scoresBeforeRename = await db.score.findMany({
+      where: { assignmentId: { in: childIdsBeforeRename } },
+      orderBy: [{ assignmentId: "asc" }, { studentId: "asc" }],
+    });
+    const renamed: any = await updateCombinedAssignment(db, group.id, owner.id, first.id, { title: "Composition renamed" });
+    assert.equal(renamed.title, "Composition renamed");
+    assert.deepEqual(renamed.children.map((child: any) => child.assignmentId).sort(), childIdsBeforeRename);
     assert.equal(await db.assignment.count({ where: { id: { in: first.children.map((child: any) => child.assignmentId) }, title: "Composition renamed" } }), 2);
+    assert.deepEqual(
+      await db.score.findMany({ where: { assignmentId: { in: childIdsBeforeRename } }, orderBy: [{ assignmentId: "asc" }, { studentId: "asc" }] }),
+      scoresBeforeRename,
+    );
     const second: any = await createCombinedAssignment(db, group.id, owner.id, { periodId, requestKey: "service-request-2", title: "Composition 2" });
     await reorderCombinedAssignments(db, group.id, owner.id, periodId, [{ id: second.id, position: 0 }, { id: first.id, position: 1 }]);
     assert.equal(await db.assignment.count({ where: { id: { in: first.children.map((child: any) => child.assignmentId) }, position: 1 } }), 2);
     await setCombinedAssignmentLock(db, group.id, owner.id, first.id, true);
     assert.equal(await db.assignment.count({ where: { id: { in: first.children.map((child: any) => child.assignmentId) }, isLocked: true } }), 2);
+    await assert.rejects(() => updateCombinedAssignment(db, group.id, owner.id, first.id, { title: "Locked rename" }), /locked/);
     await setCombinedAssignmentLock(db, group.id, owner.id, first.id, false);
+    await db.term.update({ where: { id: term8.id }, data: { isLocked: true } });
+    await assert.rejects(() => updateCombinedAssignment(db, group.id, owner.id, first.id, { title: "Term-locked rename" }), /locked/);
+    await db.term.update({ where: { id: term8.id }, data: { isLocked: false } });
     await Promise.all([
       db.grade.create({ data: { studentId: student8.id, subjectId: subject8.id, termId: term8.id, average: 0, total: 0 } }),
       db.grade.create({ data: { studentId: student9.id, subjectId: subject9.id, termId: term9.id, average: 0.9, total: 90 } }),
