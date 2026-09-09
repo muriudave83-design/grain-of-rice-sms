@@ -213,7 +213,7 @@ export const upsertScore = async (req: Request, res: Response) => {
   try {
     const assignment = await prisma.assignment.findUnique({
       where: { id: assignmentId },
-      include: { teacherSubject: { select: { teacherId: true, classId: true, isActive: true } } },
+      include: { teacherSubject: { select: { teacherId: true, classId: true, isActive: true } }, term: { select: { isLocked: true } } },
     });
 
     if (!assignment) {
@@ -222,9 +222,9 @@ export const upsertScore = async (req: Request, res: Response) => {
       });
     }
 
-    if (assignment.isLocked) {
+    if (assignment.isLocked || assignment.term?.isLocked) {
       return res.status(403).json({
-        message: "Assignment is locked",
+        message: "Assignment or term is locked",
       });
     }
 
@@ -253,26 +253,11 @@ export const upsertScore = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Score exceeds assignment maximum" });
     }
 
-    const existing = await prisma.score.findFirst({
-      where: { studentId, assignmentId },
+    const result = await prisma.score.upsert({
+      where: { studentId_assignmentId: { studentId, assignmentId } },
+      update: { score: scoreNumber, maxPoints: assignment.maxPoints },
+      create: { studentId, assignmentId, score: scoreNumber, maxPoints: assignment.maxPoints },
     });
-
-    const result = existing
-      ? await prisma.score.update({
-          where: { id: existing.id },
-          data: {
-            score: scoreNumber,
-            maxPoints: assignment.maxPoints, // ✅ ADD THIS
-          },
-        })
-      : await prisma.score.create({
-          data: {
-            studentId,
-            assignmentId,
-            score: scoreNumber,
-            maxPoints: assignment.maxPoints, // ✅ ADD THIS
-          },
-        });
 
     res.json(result);
   } catch (err) {
@@ -588,6 +573,7 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
       select: {
         id: true,
         isLocked: true,
+        term: { select: { isLocked: true } },
         maxPoints: true,
         teacherSubject: { select: { classId: true } },
       },
@@ -624,7 +610,7 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
       if (!assignment) {
         status = "invalid-assignment";
         invalid++;
-      } else if (assignment.isLocked) {
+      } else if (assignment.isLocked || assignment.term?.isLocked) {
         status = "locked";
         skippedLocked++;
       } else if (!student || student.classId !== assignment.teacherSubject.classId) {

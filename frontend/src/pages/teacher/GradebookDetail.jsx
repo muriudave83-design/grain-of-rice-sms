@@ -847,7 +847,10 @@ useEffect(() => {
 
       setLocalScores((prev) => {
         const copy = { ...prev };
-        delete copy[`${studentId}-${assignmentId}`];
+        // A completed save must not discard a newer edit made while it was pending.
+        if (copy[`${studentId}-${assignmentId}`] === value) {
+          delete copy[`${studentId}-${assignmentId}`];
+        }
         return copy;
       });
     } catch (err) {
@@ -896,6 +899,7 @@ useEffect(() => {
         </select>
       </div>
 
+      <p className="text-sm text-gray-500 mb-2">Edit a mark, then press Enter or leave the field to save. Marks can be corrected until the assignment or term is locked.</p>
       {saving && <p className="text-sm text-gray-500 mb-2">Saving...</p>}
 
       {termLocked && (
@@ -1101,17 +1105,23 @@ useEffect(() => {
                       >
                         <input
                           type="number"
+                          min="0"
+                          max={a.maxPoints ?? 100}
+                          step="any"
                           disabled={a.isLocked || termLocked}
                           value={
                             localScores[key] ??
                             (scoreObj ? scoreObj.score : "")
                           }
                           onChange={(e) =>
-                            setLocalScores({
-                              ...localScores,
+                            setLocalScores((prev) => ({
+                              ...prev,
                               [key]: e.target.value,
-                            })
+                            }))
                           }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                          }}
                           onBlur={(e) =>
                             handleScoreChange(
                               student.id,
