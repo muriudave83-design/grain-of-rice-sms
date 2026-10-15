@@ -1,8 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-// 🔎 DEBUG: show which database Prisma is using
-console.log("DATABASE_URL =", process.env.DATABASE_URL);
 
 import express from "express";
 import type { Request, Response } from "express";
