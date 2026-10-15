@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import apiClient from "../../services/apiClient";
 import BackButton from "../../components/BackButton";
-import { formatGrade } from "../../utils/grading";
+import TeacherReportCardSheet from "../../components/report-cards/TeacherReportCardSheet";
 import {
-  displaySubjectComment,
   PRINT_MODE,
   reportsForMode,
 } from "../../utils/reportCardPresentation";
@@ -365,149 +364,25 @@ export default function Reports() {
         <p>No reports found.</p>
       ) : (
         <div>
-          {renderedReports.map((student) => {
-
-            console.log("🧠 FULL STUDENT:", student);
-
-            return (
-              <div
-                key={student.studentId}
-                className="border p-6 rounded mb-6 print-card bg-white"
-              >
-                {/* HEADER */}
-                <div className="mb-4 flex items-center gap-3">
-                  <img
-                    src="/logo.png"
-                    alt="School Logo"
-                    className="w-12 h-12 object-contain"
-                  />
-
-                  <div>
-                    <h2 className="text-xl font-bold">
-                      Grain of Rice Academy
-                    </h2>
-
-                    <p className="text-sm">
-                      Official Report Card
-                    </p>
-                  </div>
-                </div>
-
-                {/* STUDENT INFO */}
-                <div className="mb-4">
-                  <p>
-                    <strong>Student:</strong>{" "}
-                    {student.name}
-                  </p>
-
-                  <p>
-                    <strong>Admission Number:</strong>{" "}
-                    {student.admissionNo || "—"}
-                  </p>
-
-                  <p>
-                    <strong>Grade:</strong>{" "}
-                    {selectedClassName}
-                  </p>
-
-                  <p>
-                    <strong>Term:</strong>{" "}
-                    {selectedTermName}
-                  </p>
-                </div>
-
-                <hr className="my-3" />
-
-                {/* SUBJECT TABLE */}
-                <div className="mb-4">
-                  <div className="report-subject-grid font-semibold border-b pb-2">
-                    <span>Subject</span>
-                    <span>Score</span>
-                    <span>Grade</span>
-                    <span>Teacher Comment</span>
-                  </div>
-
-                  {student.subjects.map((sub) => {
-                    const key = `${termId}-${student.studentId}-${sub.subjectId}`;
-
-                    return (
-                      <div
-                        key={key}
-                        className="report-subject-grid py-2 border-b border-gray-100 items-start"
-                      >
-                        <span>
-                          {sub.subjectName}
-                        </span>
-
-                        <span>
-                          {sub.finalGrade === null ? "Incomplete" : `${sub.finalGrade}%`}
-                        </span>
-
-                        <span>{sub.finalGrade === null ? "—" : formatGrade(sub.letter)}</span>
-
-                        <div>
-                          {sub.canEditComment ? (
-                            <textarea
-                              aria-label={`${sub.subjectName} teacher comment for ${student.name}`}
-                              className="border w-full p-2 print-hidden"
-                              value={comments[key] ?? sub.comment ?? ""}
-                              placeholder="Add subject comment"
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setComments((prev) => ({ ...prev, [key]: val }));
-                              }}
-                              onBlur={(e) => saveComment(
-                                student.studentId,
-                                sub.teacherSubjectId,
-                                sub.subjectId,
-                                e.target.value
-                              )}
-                            />
-                          ) : (
-                            <p className="print-hidden whitespace-pre-wrap break-words text-gray-700">
-                              {displaySubjectComment(sub.comment)}
-                            </p>
-                          )}
-                          <p className="print-only whitespace-pre-wrap break-words">
-                            {displaySubjectComment(comments[key] ?? sub.comment)}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <hr className="my-3" />
-
-                {/* ATTENDANCE */}
-                <div className="mt-4 border-t pt-3">
-                  <h3 className="font-bold mb-2">
-                    Attendance
-                  </h3>
-
-                  <p>
-                      <strong>Present:</strong>{" "}
-                      {Number(student.present || 0)}
-                    </p>
-
-                    <p>
-                      <strong>Absent:</strong>{" "}
-                      {Number(student.absent || 0)}
-                    </p>
-
-                    <p>
-                      <strong>Late:</strong>{" "}
-                      {Number(student.late || 0)}
-                    </p>
-                  <p>
-                    <strong>Attendance Rate:</strong>{" "}
-                    {student.attendanceRate ?? 0}%
-                  </p>
-                </div>
-
-              </div>
-            );
-          })}
+          {renderedReports.map((student) => (
+            <TeacherReportCardSheet
+              key={student.studentId}
+              student={student}
+              className={selectedClassName}
+              termName={selectedTermName}
+              termId={termId}
+              commentValues={comments}
+              onCommentChange={(key, value) => {
+                setComments((previous) => ({ ...previous, [key]: value }));
+              }}
+              onCommentBlur={(subject, value) => saveComment(
+                student.studentId,
+                subject.teacherSubjectId,
+                subject.subjectId,
+                value,
+              )}
+            />
+          ))}
         </div>
       )}
     </div>

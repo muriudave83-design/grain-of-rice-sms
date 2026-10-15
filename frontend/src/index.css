@@ -20,8 +20,21 @@
 
 .report-subject-grid {
   display: grid;
-  grid-template-columns: minmax(8rem, 1.2fr) minmax(4rem, 0.55fr) minmax(4rem, 0.5fr) minmax(14rem, 2.75fr);
+  grid-template-columns: minmax(12rem, 1.6fr) minmax(6rem, 0.6fr) minmax(13rem, 1.5fr) minmax(12rem, 2fr);
   gap: 0.75rem;
+}
+
+.report-subject-grid > * {
+  min-width: 0;
+}
+
+.report-subject-name,
+.report-grade {
+  overflow-wrap: anywhere;
+}
+
+.report-score {
+  white-space: nowrap;
 }
 
 .print-only {
@@ -30,6 +43,11 @@
 
 /* 🧾 PRINT STYLES — FIXED (GLOBAL, CORRECT) */
 @media print {
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
 
   html, body {
     background: white !important;
@@ -64,10 +82,11 @@
   .print-card {
     page-break-after: always;
     break-after: page;
-    page-break-inside: avoid;
-    break-inside: avoid;
+    page-break-inside: auto;
+    break-inside: auto;
     display: block;
-    padding: 20px;
+    padding: 8px !important;
+    margin-bottom: 0 !important;
     border: none;
   }
 
@@ -97,8 +116,75 @@
   }
 
   .report-subject-grid {
-    grid-template-columns: 22% 11% 11% 1fr;
+    grid-template-columns: 30% 10% 25% minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .report-card-header,
+  .report-student-info,
+  .report-subject-header,
+  .report-subject-row,
+  .report-attendance {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .report-card-header,
+  .report-student-info,
+  .report-subject-table {
+    margin-bottom: 6px !important;
+  }
+
+  .report-card-header {
     gap: 8px;
+  }
+
+  .report-card-header img {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .report-card-header h2 {
+    font-size: 14pt;
+    line-height: 1.1;
+  }
+
+  .report-card-divider {
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
+  }
+
+  .report-subject-header {
+    padding-bottom: 4px !important;
+  }
+
+  .report-subject-row {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+  }
+
+  .report-subject-name,
+  .report-score,
+  .report-grade,
+  .report-comment {
+    font-size: 9pt;
+    line-height: 1.15;
+  }
+
+  .report-subject-name {
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
+  .report-attendance {
+    margin-top: 6px !important;
+    padding-top: 5px !important;
+    font-size: 9pt;
+    line-height: 1.15;
+  }
+
+  .report-attendance h3 {
+    margin-bottom: 3px !important;
   }
 }
 
