@@ -27,6 +27,7 @@ import adminSubjectsRoutes from "./routes/admin/admin.subjects.routes";
 import adminStudentsRoutes from "./routes/admin/admin.students.routes";
 import adminClassStudentsRoutes from "./routes/admin/admin.class.students.routes";
 import adminClassSubjectsRoutes from "./routes/admin/admin.classSubjects.routes";
+import adminGradebookRoutes from "./routes/admin/admin.gradebook.routes";
 import adminAttendanceRoutes from "./routes/adminAttendance.routes";
 
 import parentRoutes from "./routes/parentRoutes";
@@ -153,6 +154,7 @@ app.use("/api/admin", adminClassesRoutes);
 app.use("/api/admin", adminSubjectsRoutes);
 app.use("/api/admin", adminClassStudentsRoutes);
 app.use("/api/admin", adminClassSubjectsRoutes);
+app.use("/api/admin", adminGradebookRoutes);
 app.use("/api/admin", adminParentRoutes);
 app.use("/api/admin", teacherSubjectsRoutes);
 
