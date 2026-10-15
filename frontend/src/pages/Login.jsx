@@ -37,8 +37,6 @@ export default function Login() {
         password,
       });
 
-      console.log("✅ LOGIN RESPONSE:", res.data);
-
       const {
         token,
         user,
@@ -61,7 +59,7 @@ export default function Login() {
       }
 
       if (!token || !user || !user.id) {
-        console.error("🚨 Invalid login response:", res.data);
+        console.error("🚨 Invalid login response");
         throw new Error("Invalid server response. Please contact admin.");
       }
 
@@ -71,9 +69,6 @@ export default function Login() {
       localStorage.setItem("user", JSON.stringify(user));
 
       login(user, token);
-
-      console.log("🔥 TOKEN AFTER SAVE:", localStorage.getItem("token"));
-      console.log("👤 USER:", user);
 
       const normalizedRole = user.role?.toUpperCase();
 

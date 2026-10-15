@@ -60,11 +60,9 @@ export function AuthProvider({ children }) {
 
   // 🔐 LOGIN (🔥 FINAL FIX)
   const login = (user, token) => {
-    console.log("🔥 LOGIN DATA RECEIVED:", user);
-
     // ✅ CORRECT VALIDATION (MATCHES NEW SIGNATURE)
     if (!user || !user.role || !token) {
-      console.error("❌ INVALID LOGIN DATA:", { user, token });
+      console.error("❌ INVALID LOGIN DATA");
       throw new Error("Invalid login data structure");
     }
 
@@ -73,7 +71,6 @@ export function AuthProvider({ children }) {
     localStorage.setItem("user", JSON.stringify(user));
     localStorage.setItem("token", token);
 
-    console.log("🔐 AuthContext.login → stored user:", user);
   };
 
   // 🚪 Logout
