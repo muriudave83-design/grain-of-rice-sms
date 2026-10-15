@@ -123,6 +123,10 @@ export default function SidebarNav() {
               Teaching Groups
             </NavLink>
 
+            <NavLink to={path("grades")} className={linkClass}>
+              📊 Grades
+            </NavLink>
+
             <NavLink to={path("reports")} className={linkClass}>
               📊 Reports
             </NavLink>
