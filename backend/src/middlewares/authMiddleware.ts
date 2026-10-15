@@ -42,6 +42,12 @@ export async function authenticate(
       });
     }
 
+    if (user.isActive === false || user.isArchived === true) {
+      return res.status(403).json({
+        message: "Account is deactivated.",
+      });
+    }
+
     // ✅ CLEAN USER CONTEXT (NO RELATIONS)
     req.user = {
       id: user.id,
