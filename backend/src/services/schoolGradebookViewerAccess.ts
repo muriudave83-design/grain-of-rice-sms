@@ -10,8 +10,23 @@ export function schoolGradebookViewerIds(raw = process.env.SCHOOL_GRADEBOOK_VIEW
   );
 }
 
-export function canViewSchoolGradebooks(user: { id: number; role: Role }, raw?: string) {
-  return user.role === Role.TEACHER && schoolGradebookViewerIds(raw).has(user.id);
+export function schoolGradebookViewerEmails(raw = process.env.SCHOOL_GRADEBOOK_VIEWER_EMAILS) {
+  return new Set(
+    (raw || "")
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+export function canViewSchoolGradebooks(
+  user: { id: number; email?: string; role: Role },
+  rawIds?: string,
+  rawEmails?: string,
+) {
+  if (user.role !== Role.TEACHER) return false;
+  if (schoolGradebookViewerIds(rawIds).has(user.id)) return true;
+  return Boolean(user.email && schoolGradebookViewerEmails(rawEmails).has(user.email.trim().toLowerCase()));
 }
 
 export function requireSchoolGradebookViewer(req: Request, res: Response, next: NextFunction) {
