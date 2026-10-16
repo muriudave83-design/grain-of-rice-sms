@@ -3,7 +3,10 @@ import apiClient from "../../services/apiClient";
 
 const emptyOptions = { subjects: [], terms: [], teacherSubjects: [] };
 
-export default function Grades() {
+export default function Grades({
+  apiBase = "/admin/gradebook",
+  title = "Administrator Gradebook",
+}) {
   const [classes, setClasses] = useState([]);
   const [options, setOptions] = useState(emptyOptions);
   const [classId, setClassId] = useState("");
@@ -23,7 +26,7 @@ export default function Grades() {
   useEffect(() => {
     const controller = new AbortController();
     let current = true;
-    apiClient.get("/admin/gradebook/classes", { signal: controller.signal })
+    apiClient.get(`${apiBase}/classes`, { signal: controller.signal })
       .then(({ data }) => { if (current) setClasses(data); })
       .catch((requestError) => {
         if (current && requestError.code !== "ERR_CANCELED") {
@@ -35,7 +38,7 @@ export default function Grades() {
       current = false;
       controller.abort();
     };
-  }, []);
+  }, [apiBase]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -55,7 +58,7 @@ export default function Grades() {
     }
 
     setOptionsLoading(true);
-    apiClient.get(`/admin/gradebook/classes/${classId}/options`, { signal: controller.signal })
+    apiClient.get(`${apiBase}/classes/${classId}/options`, { signal: controller.signal })
       .then(({ data }) => { if (current && optionsRequestId.current === requestId) setOptions(data); })
       .catch((requestError) => {
         if (current && optionsRequestId.current === requestId && requestError.code !== "ERR_CANCELED") {
@@ -67,7 +70,7 @@ export default function Grades() {
       current = false;
       controller.abort();
     };
-  }, [classId]);
+  }, [apiBase, classId]);
 
   const teacherSubjects = useMemo(
     () => options.teacherSubjects.filter((item) => String(item.subjectId) === String(subjectId)),
@@ -86,7 +89,7 @@ export default function Grades() {
     }
 
     setGradebookLoading(true);
-    apiClient.get(`/admin/gradebook/teacher-subjects/${teacherSubjectId}`, {
+    apiClient.get(`${apiBase}/teacher-subjects/${teacherSubjectId}`, {
       params: { termId },
       signal: controller.signal,
     })
@@ -101,7 +104,7 @@ export default function Grades() {
       current = false;
       controller.abort();
     };
-  }, [teacherSubjectId, termId]);
+  }, [apiBase, teacherSubjectId, termId]);
 
   const scoreFor = (assignment, studentId) =>
     assignment.scores.find((score) => score.studentId === studentId)?.score;
@@ -112,7 +115,7 @@ export default function Grades() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-semibold">Administrator Gradebook</h1>
+        <h1 className="text-xl font-semibold">{title}</h1>
         <p className="mt-1 text-sm text-gray-600">
           Read-only view of legacy assignments and scores. Historical teacher ownership is preserved.
         </p>

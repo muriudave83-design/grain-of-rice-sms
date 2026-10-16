@@ -20,6 +20,12 @@ export default function TeacherNavbar() {
   // 👤 Fake user (replace later with real user data)
   const userName = localStorage.getItem("userName") || "Teacher";
   const userInitial = userName.charAt(0).toUpperCase();
+  let canViewSchoolGradebooks = false;
+  try {
+    canViewSchoolGradebooks = JSON.parse(localStorage.getItem("user") || "null")?.canViewSchoolGradebooks === true;
+  } catch {
+    canViewSchoolGradebooks = false;
+  }
 
   return (
     <div className="bg-gray-900 p-3 border-b border-gray-700 flex items-center justify-between">
@@ -39,6 +45,15 @@ export default function TeacherNavbar() {
         >
           Reports
         </Link>
+
+        {canViewSchoolGradebooks && (
+          <Link
+            to="/teacher/school-gradebooks"
+            className={linkClass("/teacher/school-gradebooks")}
+          >
+            School Gradebooks
+          </Link>
+        )}
 
         <Link
           to="/teacher/attendance"

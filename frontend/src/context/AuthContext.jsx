@@ -46,6 +46,7 @@ export function AuthProvider({ children }) {
         email: parsed.email,
         role: parsed.role,
         forcePasswordChange: parsed.forcePasswordChange || false,
+        canViewSchoolGradebooks: parsed.canViewSchoolGradebooks === true,
       });
 
     } catch (err) {

@@ -339,6 +339,10 @@ export default function AppRoutes() {
           {/* ✅ FIXED GRADEBOOK FLOW */}
           <Route path="gradebook" element={<TeacherClasses />} />
           <Route path="gradebook/:id" element={<GradebookDetail />} />
+          <Route
+            path="school-gradebooks"
+            element={<Grades apiBase="/gradebook-viewer" title="School-wide Gradebooks" />}
+          />
 
           {/* LEGACY */}
           <Route path="combined-gradebook/:groupId" element={<CombinedGradebook />} />

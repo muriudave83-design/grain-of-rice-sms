@@ -5,8 +5,9 @@ import test from "node:test";
 const source = fs.readFileSync(new URL("./Grades.jsx", import.meta.url), "utf8");
 
 test("administrator gradebook uses only read APIs and renders no score editing controls", () => {
-  assert.match(source, /apiClient\.get\("\/admin\/gradebook\/classes", \{ signal: controller\.signal \}\)/);
-  assert.match(source, /apiClient\.get\(`\/admin\/gradebook\/teacher-subjects\/\$\{teacherSubjectId\}`/);
+  assert.match(source, /apiBase = "\/admin\/gradebook"/);
+  assert.match(source, /apiClient\.get\(`\$\{apiBase\}\/classes`, \{ signal: controller\.signal \}\)/);
+  assert.match(source, /apiClient\.get\(`\$\{apiBase\}\/teacher-subjects\/\$\{teacherSubjectId\}`/);
   assert.doesNotMatch(source, /apiClient\.(post|put|patch|delete)/);
   assert.doesNotMatch(source, /type=["']number["']/);
 });

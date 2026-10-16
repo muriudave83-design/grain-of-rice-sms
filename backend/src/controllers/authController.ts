@@ -3,6 +3,7 @@ import { PrismaClient, AuditAction } from "@prisma/client";
 import jwt from "jsonwebtoken";
 import { createAuditLog } from "../services/auditLog.service";
 import { hashPassword, normalizeEmail, verifyPassword } from "../utils/password";
+import { canViewSchoolGradebooks } from "../services/schoolGradebookViewerAccess";
 
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
@@ -166,7 +167,10 @@ export const loginUser = async (req: Request, res: Response) => {
     return res.json({
       token,
       mustChangePassword: user.mustChangePassword,
-      user: safeUser,
+      user: {
+        ...safeUser,
+        canViewSchoolGradebooks: canViewSchoolGradebooks(user),
+      },
     });
 
   } catch (err: any) {
