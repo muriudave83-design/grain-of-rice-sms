@@ -109,7 +109,7 @@ test("teacher report preserves data loading, comment saving, attendance, and sha
   assert.match(component, /apiClient\.get\(/);
   assert.match(component, /apiClient\.post\([\s\S]*\/teacher\/report\/comment/);
   assert.match(component, /TeacherReportCardSheet/);
-  assert.match(component, /commentValues=\{comments\}/);
+  assert.match(component, /commentSaveStates=\{commentSaveStates\}/);
   assert.match(component, /onCommentBlur=\{\(subject, value\) => saveComment/);
   assert.match(sheet, /student\.attendanceRate/);
   assert.match(sheet, /className="[^"]*print-card/);

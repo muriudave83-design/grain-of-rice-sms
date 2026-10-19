@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { createBrowserRouter, Navigate, Route, RouterProvider, Routes } from "react-router-dom";
 
 import ProtectedRoute from "../components/ProtectedRoute";
 import AdminLayout from "../layouts/AdminLayout";
@@ -148,7 +148,7 @@ function PublicRoute({ children }) {
   return children;
 }
 
-export default function AppRoutes() {
+function RoutedApp() {
   (function enforceSessionValidity() {
     const token = localStorage.getItem("token");
 
@@ -171,8 +171,7 @@ export default function AppRoutes() {
   })();
 
   return (
-    <BrowserRouter>
-      <Routes>
+    <Routes>
 
         <Route path="/teacher/gradebook" element={<div>TEST PAGE</div>} />
 
@@ -445,7 +444,12 @@ export default function AppRoutes() {
         {/* FALLBACK */}
         <Route path="*" element={<Navigate to="/login" replace />} />
 
-      </Routes>
-    </BrowserRouter>
+    </Routes>
   );
+}
+
+const router = createBrowserRouter([{ path: "*", Component: RoutedApp }]);
+
+export default function AppRoutes() {
+  return <RouterProvider router={router} />;
 }

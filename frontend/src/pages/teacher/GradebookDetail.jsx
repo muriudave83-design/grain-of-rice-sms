@@ -14,6 +14,16 @@ import {
 import Papa from "papaparse";
 import { formatGrade, getLetterGrade } from "../../utils/grading";
 import { fitAssignmentMenuToViewport } from "../../utils/assignmentMenuPosition";
+import {
+  beginSave,
+  beginConfirmedOverwrite,
+  acceptAuthoritativeValue,
+  editSaveField,
+  failSave,
+  finishSave,
+  hasUnresolvedSaves,
+} from "../../utils/reliableSaveState";
+import useUnsavedChangesGuard from "../../utils/useUnsavedChangesGuard";
 
 const PUBLISHED_DELETE_CONFIRMATION = "DELETE PUBLISHED ASSIGNMENT";
 
@@ -43,8 +53,11 @@ export default function GradebookDetail() {
     dueDate: "",
   });
 
-  const [localScores, setLocalScores] = useState({});
-  const [saving, setSaving] = useState(false);
+  const [scoreSaveStates, setScoreSaveStates] = useState({});
+  const scoreSaveStatesRef = useRef(scoreSaveStates);
+  useEffect(() => { scoreSaveStatesRef.current = scoreSaveStates; }, [scoreSaveStates]);
+  const hasUnresolvedScores = hasUnresolvedSaves(scoreSaveStates);
+  const confirmDiscardScores = useUnsavedChangesGuard(scoreSaveStates, scoreSaveStatesRef);
 
   const [contextMenu, setContextMenu] = useState(null);
   const contextMenuRef = useRef(null);
@@ -552,7 +565,7 @@ useEffect(() => {
       ...prev,
       assignments: prev.assignments.filter((assignment) => assignment.id !== assignmentId),
     }));
-    setLocalScores((prev) => Object.fromEntries(
+    setScoreSaveStates((prev) => Object.fromEntries(
       Object.entries(prev).filter(([key]) => !key.endsWith(`-${assignmentId}`)),
     ));
     setContextMenu(null);
@@ -721,6 +734,7 @@ useEffect(() => {
           assignmentMap[a.title.trim()] = {
             id: a.id,
             isLocked: a.isLocked,
+            scores: a.scores || [],
           };
         });
 
@@ -754,13 +768,17 @@ useEffect(() => {
               studentId: student.id,
               assignmentId: assignment.id,
               score,
+              expectedScore: assignment.scores.find(
+                (entry) => String(entry.studentId) === String(student.id)
+              )?.score ?? null,
             });
           });
         });
 
         try {
-          await apiClient.post("/teacher/score/bulk", { updates });
-          alert(`Imported ${updates.length} scores ✅`);
+          const response = await apiClient.post("/teacher/score/bulk", { updates });
+          const { updated = 0, conflicted = 0, skippedLocked = 0, invalid = 0 } = response.data;
+          alert(`Import complete: ${updated} updated, ${conflicted} conflicted, ${skippedLocked} locked, ${invalid} invalid.`);
           // re-run init logic safely
           navigate(0);
         } catch (err) {
@@ -776,7 +794,8 @@ useEffect(() => {
       studentId,
       assignmentId,
       value,
-      isLocked
+      isLocked,
+      serverValue
     ) => {
 
       // 🔒 TERM LOCK
@@ -801,14 +820,21 @@ useEffect(() => {
         return;
       }
 
+      const key = `${studentId}-${assignmentId}`;
+      const savingState = beginSave(scoreSaveStatesRef.current[key], serverValue);
+      const sequence = savingState.sequence;
+      scoreSaveStatesRef.current = { ...scoreSaveStatesRef.current, [key]: savingState };
+      setScoreSaveStates(scoreSaveStatesRef.current);
       try {
-        setSaving(true);
 
-        await apiClient.post("/teacher/score", {
+        const response = await apiClient.post("/teacher/score", {
           studentId,
           assignmentId,
           score,
+          expectedScore: savingState.serverValue,
         });
+
+        if (scoreSaveStatesRef.current[key]?.sequence !== sequence) return;
 
         setData((prev) => {
           if (!prev) return prev;
@@ -827,13 +853,13 @@ useEffect(() => {
               if (existing) {
                 updatedScores = a.scores.map((s) =>
                   String(s.studentId) === String(studentId)
-                    ? { ...s, score }
+                    ? response.data
                     : s
                 );
               } else {
                 updatedScores = [
                   ...(a.scores || []),
-                  { studentId, score },
+                  response.data,
                 ];
               }
 
@@ -845,20 +871,55 @@ useEffect(() => {
           };
         });
 
-      setLocalScores((prev) => {
-        const copy = { ...prev };
-        // A completed save must not discard a newer edit made while it was pending.
-        if (copy[`${studentId}-${assignmentId}`] === value) {
-          delete copy[`${studentId}-${assignmentId}`];
-        }
-        return copy;
-      });
+      setScoreSaveStates((previous) => ({
+        ...previous,
+        [key]: finishSave(previous[key], sequence, response.data.score),
+      }));
     } catch (err) {
       console.error("Failed to save score", err);
-      alert(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to save score");
-    } finally {
-      setSaving(false);
+      if (!err?.response) {
+        try {
+          const refreshed = await apiClient.get(`/teacher/gradebook/${id}`, { params: { termId: selectedTerm } });
+          const authoritative = refreshed.data.assignments?.find((item) => item.id === assignmentId)?.scores?.find((item) => String(item.studentId) === String(studentId))?.score ?? null;
+          if (scoreSaveStatesRef.current[key]?.sequence === sequence && authoritative === score) {
+            setData(refreshed.data);
+            setScoreSaveStates((previous) => ({ ...previous, [key]: finishSave(previous[key], sequence, authoritative) }));
+            return;
+          }
+        } catch (reconcileError) {
+          console.error("Score reconciliation failed", reconcileError);
+        }
+      }
+      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to save score";
+      setScoreSaveStates((previous) => ({
+        ...previous,
+        [key]: failSave(previous[key], sequence, message, err?.response?.status === 409, err?.response?.data?.current?.score),
+      }));
     }
+  };
+
+  const acceptSavedScore = (key) => {
+    const current = scoreSaveStatesRef.current[key];
+    if (!current || current.status !== "Conflict") return;
+    const accepted = acceptAuthoritativeValue(current, current.authoritativeValue);
+    scoreSaveStatesRef.current = { ...scoreSaveStatesRef.current, [key]: accepted };
+    setScoreSaveStates(scoreSaveStatesRef.current);
+  };
+
+  const overwriteScore = (studentId, assignmentId, isLocked, key) => {
+    const current = scoreSaveStatesRef.current[key];
+    if (!current || current.status !== "Conflict") return;
+    if (!globalThis.confirm("Overwrite the newer saved score with your value?")) return;
+    const prepared = beginConfirmedOverwrite(current, current.authoritativeValue);
+    scoreSaveStatesRef.current = { ...scoreSaveStatesRef.current, [key]: prepared };
+    setScoreSaveStates(scoreSaveStatesRef.current);
+    handleScoreChange(studentId, assignmentId, prepared.draftValue, isLocked, prepared.serverValue);
+  };
+
+  const editScore = (key, serverValue, draftValue) => {
+    const edited = editSaveField(scoreSaveStatesRef.current[key], serverValue, draftValue);
+    scoreSaveStatesRef.current = { ...scoreSaveStatesRef.current, [key]: edited };
+    setScoreSaveStates(scoreSaveStatesRef.current);
   };
     console.log("RENDER STATE:", { loading, error, data });
 
@@ -882,9 +943,13 @@ useEffect(() => {
       <div className="mb-4">
         <select
           value={selectedTerm ?? ""}
-          onChange={(e) =>
-            setSelectedTerm(Number(e.target.value))
-          }
+          onChange={(e) => {
+            if (confirmDiscardScores()) {
+              scoreSaveStatesRef.current = {};
+              setScoreSaveStates({});
+              setSelectedTerm(Number(e.target.value));
+            }
+          }}
           className="border p-2"
         >
           <option value="" disabled>
@@ -900,7 +965,7 @@ useEffect(() => {
       </div>
 
       <p className="text-sm text-gray-500 mb-2">Edit a mark, then press Enter or leave the field to save. Marks can be corrected until the assignment or term is locked.</p>
-      {saving && <p className="text-sm text-gray-500 mb-2">Saving...</p>}
+      {hasUnresolvedScores && <p className="text-sm text-amber-700 mb-2">Some marks are Unsaved, Saving, Failed, or in Conflict.</p>}
 
       {termLocked && (
         <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
@@ -1110,15 +1175,10 @@ useEffect(() => {
                           step="any"
                           disabled={a.isLocked || termLocked}
                           value={
-                            localScores[key] ??
+                            scoreSaveStates[key]?.draftValue ??
                             (scoreObj ? scoreObj.score : "")
                           }
-                          onChange={(e) =>
-                            setLocalScores((prev) => ({
-                              ...prev,
-                              [key]: e.target.value,
-                            }))
-                          }
+                          onChange={(e) => editScore(key, scoreObj?.score ?? null, e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") e.currentTarget.blur();
                           }}
@@ -1127,7 +1187,8 @@ useEffect(() => {
                               student.id,
                               a.id,
                               e.target.value,
-                              a.isLocked
+                              a.isLocked,
+                              scoreObj?.score ?? null
                             )
                           }
                           className={`w-20 border p-1 ${
@@ -1140,6 +1201,21 @@ useEffect(() => {
                         <div className="text-xs text-gray-500">
                           / {a.maxPoints || 100}
                         </div>
+                        {scoreSaveStates[key] && (
+                          <div className={`text-xs ${scoreSaveStates[key].status === "Failed" || scoreSaveStates[key].status === "Conflict" ? "text-red-700" : "text-gray-600"}`}>
+                            {scoreSaveStates[key].status}
+                            {scoreSaveStates[key].error && <span className="ml-1">— {scoreSaveStates[key].error}</span>}
+                            {scoreSaveStates[key].status === "Failed" && (
+                              <button type="button" className="ml-2 underline" onClick={() => handleScoreChange(student.id, a.id, scoreSaveStates[key].draftValue, a.isLocked, scoreSaveStates[key].serverValue)}>Retry</button>
+                            )}
+                            {scoreSaveStates[key].status === "Conflict" && (
+                              <span className="ml-2 space-x-2">
+                                <button type="button" className="underline" onClick={() => acceptSavedScore(key)}>Use saved value</button>
+                                <button type="button" className="underline" onClick={() => overwriteScore(student.id, a.id, a.isLocked, key)}>Overwrite with my value</button>
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
                     );
                   })}

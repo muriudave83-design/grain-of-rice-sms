@@ -9,9 +9,12 @@ export default function TeacherReportCardSheet({
   className,
   termName,
   termId,
-  commentValues = {},
+  commentSaveStates = {},
   onCommentChange,
   onCommentBlur,
+  onCommentRetry,
+  onCommentUseSaved,
+  onCommentOverwrite,
 }) {
   return (
     <article className="border p-6 rounded mb-6 print-card bg-white">
@@ -47,7 +50,8 @@ export default function TeacherReportCardSheet({
 
         {student.subjects.map((subject) => {
           const key = `${termId}-${student.studentId}-${subject.subjectId}`;
-          const displayedComment = commentValues[key] ?? subject.comment;
+          const saveState = commentSaveStates[key];
+          const displayedComment = saveState?.draftValue ?? subject.comment;
           const canEditComment = Boolean(
             subject.canEditComment && onCommentChange && onCommentBlur,
           );
@@ -78,7 +82,7 @@ export default function TeacherReportCardSheet({
                     className="border w-full p-2 print-hidden"
                     value={displayedComment ?? ""}
                     placeholder="Add subject comment"
-                    onChange={(event) => onCommentChange(key, event.target.value)}
+                    onChange={(event) => onCommentChange(key, event.target.value, subject)}
                     onBlur={(event) => onCommentBlur(subject, event.target.value)}
                   />
                 ) : (
@@ -86,8 +90,23 @@ export default function TeacherReportCardSheet({
                     {displaySubjectComment(displayedComment)}
                   </p>
                 )}
+                {saveState && (
+                  <div className={`print-hidden text-xs ${saveState.status === "Failed" || saveState.status === "Conflict" ? "text-red-700" : "text-gray-600"}`}>
+                    {saveState.status}
+                    {saveState.error && <span className="ml-1">— {saveState.error}</span>}
+                    {saveState.status === "Failed" && (
+                      <button type="button" className="ml-2 underline" onClick={() => onCommentRetry(subject, saveState.draftValue)}>Retry</button>
+                    )}
+                    {saveState.status === "Conflict" && (
+                      <span className="ml-2 space-x-2">
+                        <button type="button" className="underline" onClick={() => onCommentUseSaved(subject)}>Use saved value</button>
+                        <button type="button" className="underline" onClick={() => onCommentOverwrite(subject)}>Overwrite with my value</button>
+                      </span>
+                    )}
+                  </div>
+                )}
                 <p className="print-only whitespace-pre-wrap break-words">
-                  {displaySubjectComment(displayedComment)}
+                  {displaySubjectComment(saveState?.status === "Saved" || !saveState ? displayedComment : saveState.serverValue)}
                 </p>
               </div>
             </div>

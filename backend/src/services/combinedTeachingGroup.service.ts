@@ -1,4 +1,5 @@
 import { AssessmentType, Prisma } from "@prisma/client";
+import { compareAndSetScore, hasRequiredPrecondition, lockScoreWriteScope, SavePreconditionError, validateLockedScoreScope } from "./optimisticSave.service";
 
 export const COMBINED_SCORE_CONFIRMATION = "DELETE ASSIGNMENT";
 export const COMBINED_PUBLISHED_CONFIRMATION = "DELETE PUBLISHED ASSIGNMENT";
@@ -30,6 +31,17 @@ function normalizedType(value: unknown): AssessmentType {
 
 function assertLifecycle(active: boolean, endedAt: Date | null, label: string) {
   if (active === Boolean(endedAt)) throw new CombinedTeachingGroupError(409, `${label} has an invalid lifecycle state`);
+}
+
+async function serializableTransactionWithRetry<T>(client: any, operation: (tx: any) => Promise<T>) {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await client.$transaction(operation, serializable);
+    } catch (error: any) {
+      if (error?.code !== "P2034" || attempt === 3) throw error;
+    }
+  }
+  throw new Error("Serializable transaction retry limit reached");
 }
 
 export async function createTeachingGroup(client: any, input: any) {
@@ -252,7 +264,9 @@ export async function saveCombinedScore(client: any, groupId: number, teacherId:
   const studentId = positiveId(input?.studentId, "Student");
   const score = Number(input?.score);
   if (!Number.isFinite(score) || score < 0) throw new CombinedTeachingGroupError(400, "Score must be zero or greater");
-  return client.$transaction(async (tx: any) => {
+  if (!hasRequiredPrecondition(input, "expectedScore")) throw new CombinedTeachingGroupError(428, "expectedScore precondition is required");
+  if (input.expectedScore !== null && !Number.isFinite(Number(input.expectedScore))) throw new CombinedTeachingGroupError(428, "expectedScore must be null or a finite number");
+  return serializableTransactionWithRetry(client, async (tx: any) => {
     const group = await loadWorkspace(tx, groupId, teacherId, true);
     const student = await tx.student.findFirst({ where: { id: studentId, isArchived: false } });
     if (!student) throw new CombinedTeachingGroupError(404, "Active student not found");
@@ -266,13 +280,23 @@ export async function saveCombinedScore(client: any, groupId: number, teacherId:
     if (input?.assignmentId !== undefined && Number(input.assignmentId) !== child.assignmentId) throw new CombinedTeachingGroupError(400, "Cross-class child assignment injection rejected");
     const mapping = lane.termMappings.find((item: any) => item.teachingGroupPeriodId === child.combinedAssignment.teachingGroupPeriodId);
     if (!mapping || mapping.term.isLocked || !mapping.term.isActive || child.assignment.isLocked) throw new CombinedTeachingGroupError(409, "This combined assignment is locked or inactive");
-    if (score > child.assignment.maxPoints) throw new CombinedTeachingGroupError(400, "Score exceeds assignment maximum");
-    return tx.score.upsert({
-      where: { studentId_assignmentId: { studentId, assignmentId: child.assignmentId } },
-      update: { score, maxPoints: child.assignment.maxPoints },
-      create: { studentId, assignmentId: child.assignmentId, score, maxPoints: child.assignment.maxPoints },
-    });
-  }, serializable);
+    try {
+      const locked = validateLockedScoreScope(
+        await lockScoreWriteScope(tx, child.assignmentId, studentId),
+        { teacherId, score },
+      );
+      return await compareAndSetScore(tx, {
+        studentId,
+        assignmentId: child.assignmentId,
+        score,
+        maxPoints: locked.maxPoints,
+        expectedScore: input.expectedScore === null ? null : Number(input.expectedScore),
+      });
+    } catch (error) {
+      if (error instanceof SavePreconditionError) throw new CombinedTeachingGroupError(error.status, error.message, { current: error.current });
+      throw error;
+    }
+  });
 }
 
 async function ownedLogical(tx: any, groupId: number, teacherId: number, logicalId: number) {

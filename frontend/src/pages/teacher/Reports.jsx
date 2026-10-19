@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import apiClient from "../../services/apiClient";
 import BackButton from "../../components/BackButton";
 import TeacherReportCardSheet from "../../components/report-cards/TeacherReportCardSheet";
@@ -6,6 +6,8 @@ import {
   PRINT_MODE,
   reportsForMode,
 } from "../../utils/reportCardPresentation";
+import { acceptAuthoritativeValue, beginConfirmedOverwrite, beginSave, editSaveField, failSave, finishSave, hasUnresolvedSaves } from "../../utils/reliableSaveState";
+import useUnsavedChangesGuard from "../../utils/useUnsavedChangesGuard";
 
 export default function Reports() {
   const [classId, setClassId] = useState("");
@@ -22,44 +24,92 @@ export default function Reports() {
   const [terms, setTerms] = useState([]);
   const [termId, setTermId] = useState(null);
 
-  const [comments, setComments] = useState({});
+  const [commentSaveStates, setCommentSaveStates] = useState({});
+  const commentSaveStatesRef = useRef(commentSaveStates);
+  useEffect(() => { commentSaveStatesRef.current = commentSaveStates; }, [commentSaveStates]);
+  const confirmDiscardComments = useUnsavedChangesGuard(commentSaveStates, commentSaveStatesRef);
+  const clearCommentSaveStates = () => {
+    commentSaveStatesRef.current = {};
+    setCommentSaveStates({});
+  };
 
   const saveComment = async (
     studentId,
-    teacherSubjectId,
-    subjectId,
+    subject,
     value
   ) => {
+    const key = `${termId}-${studentId}-${subject.subjectId}`;
+    const previous = commentSaveStatesRef.current[key];
+    const saving = { ...beginSave(previous, subject.comment), serverToken: previous?.serverToken ?? subject.commentUpdatedAt ?? null };
+    commentSaveStatesRef.current = { ...commentSaveStatesRef.current, [key]: saving };
+    setCommentSaveStates(commentSaveStatesRef.current);
     try {
-      if (!teacherSubjectId) return;
+      if (!subject.teacherSubjectId) return;
 
-      await apiClient.post(
+      const response = await apiClient.post(
         "/teacher/report/comment",
         {
           studentId,
-          teacherSubjectId,
+          teacherSubjectId: subject.teacherSubjectId,
           termId,
           comment: value,
+          expectedUpdatedAt: saving.serverToken,
         }
       );
 
-      setComments((prev) => ({
-        ...prev,
-        [`${termId}-${studentId}-${subjectId}`]:
-          value,
-      }));
+      if (commentSaveStatesRef.current[key]?.sequence !== saving.sequence) return;
+      setCommentSaveStates((current) => ({ ...current, [key]: { ...finishSave(current[key], saving.sequence, response.data.comment), serverToken: response.data.updatedAt } }));
     } catch (err) {
       console.error(
         "SAVE COMMENT ERROR:",
         err.response?.data || err
       );
-      setError(
-        err?.response?.data?.message ||
-          err?.response?.data?.error ||
-          err?.message ||
-          "Failed to save comment"
-      );
+      if (!err?.response) {
+        try {
+          const refreshed = (await apiClient.get(`/teacher/report/${classId}?termId=${termId}`)).data;
+          const refreshedStudent = refreshed.find((item) => item.studentId === studentId);
+          const refreshedSubject = refreshedStudent?.subjects?.find((item) => item.subjectId === subject.subjectId);
+          if (commentSaveStatesRef.current[key]?.sequence === saving.sequence && refreshedSubject?.comment === value) {
+            setReports(refreshed);
+            setCommentSaveStates((current) => ({ ...current, [key]: { ...finishSave(current[key], saving.sequence, value), serverToken: refreshedSubject.commentUpdatedAt } }));
+            return;
+          }
+        } catch (reconcileError) { console.error("Comment reconciliation failed", reconcileError); }
+      }
+      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to save comment";
+      const authoritative = err?.response?.data?.current;
+      setCommentSaveStates((current) => ({ ...current, [key]: { ...failSave(current[key], saving.sequence, message, err?.response?.status === 409, authoritative?.comment), ...(authoritative?.updatedAt ? { authoritativeToken: authoritative.updatedAt } : {}) } }));
     }
+  };
+
+  const acceptSavedComment = (studentId, subject) => {
+    const key = `${termId}-${studentId}-${subject.subjectId}`;
+    const current = commentSaveStatesRef.current[key];
+    if (!current || current.status !== "Conflict") return;
+    const accepted = acceptAuthoritativeValue(current, current.authoritativeValue, current.authoritativeToken);
+    commentSaveStatesRef.current = { ...commentSaveStatesRef.current, [key]: accepted };
+    setCommentSaveStates(commentSaveStatesRef.current);
+  };
+
+  const overwriteComment = (studentId, subject) => {
+    const key = `${termId}-${studentId}-${subject.subjectId}`;
+    const current = commentSaveStatesRef.current[key];
+    if (!current || current.status !== "Conflict") return;
+    if (!globalThis.confirm("Overwrite the newer saved comment with your value?")) return;
+    const prepared = beginConfirmedOverwrite(current, current.authoritativeValue, current.authoritativeToken);
+    commentSaveStatesRef.current = { ...commentSaveStatesRef.current, [key]: prepared };
+    setCommentSaveStates(commentSaveStatesRef.current);
+    saveComment(studentId, subject, prepared.draftValue);
+  };
+
+  const editComment = (key, value, subject) => {
+    const previous = commentSaveStatesRef.current[key];
+    const edited = {
+      ...editSaveField(previous, subject.comment, value),
+      serverToken: previous?.serverToken ?? subject.commentUpdatedAt ?? null,
+    };
+    commentSaveStatesRef.current = { ...commentSaveStatesRef.current, [key]: edited };
+    setCommentSaveStates(commentSaveStatesRef.current);
   };
 
   useEffect(() => {
@@ -80,10 +130,12 @@ export default function Reports() {
   }, [printMode]);
 
   const handlePrintSelected = () => {
+    if (hasUnresolvedSaves(commentSaveStates)) return setError("Resolve Unsaved, Saving, Failed, or Conflict comments before printing.");
     if (selectedStudentId) setPrintMode(PRINT_MODE.SELECTED);
   };
 
   const handlePrintAll = () => {
+    if (hasUnresolvedSaves(commentSaveStates)) return setError("Resolve Unsaved, Saving, Failed, or Conflict comments before printing.");
     if (reports.length) setPrintMode(PRINT_MODE.ALL);
   };
 
@@ -119,7 +171,7 @@ export default function Reports() {
       setTermId(null);
       setReports([]);
       setSelectedStudentId("");
-      setComments({});
+      clearCommentSaveStates();
       setError("");
 
       try {
@@ -150,6 +202,7 @@ export default function Reports() {
   }, [classId]);
 
   const handleGenerate = async () => {
+    if (!confirmDiscardComments()) return;
     if (!classId || !termId) {
       alert("Select class and term");
       return;
@@ -175,7 +228,7 @@ export default function Reports() {
 
       setReports(res.data);
       setSelectedStudentId("");
-      setComments({});
+      clearCommentSaveStates();
     } catch (err) {
       console.error(
         "❌ GENERATE REPORT ERROR:",
@@ -235,6 +288,7 @@ export default function Reports() {
       </div>
 
       <div className="mb-4 print-hidden">
+        {hasUnresolvedSaves(commentSaveStates) && <p className="text-amber-700">Comments are pending: Unsaved, Saving, Failed, or Conflict. Resolve them before printing.</p>}
         <strong>Grade:</strong>{" "}
         {selectedClassName} <br />
         <strong>Term:</strong>{" "}
@@ -252,9 +306,12 @@ export default function Reports() {
       <div className="mb-6 flex gap-3 flex-wrap print-hidden">
         <select
           value={classId}
-          onChange={(e) =>
-            setClassId(e.target.value)
-          }
+          onChange={(e) => {
+            if (confirmDiscardComments()) {
+              clearCommentSaveStates();
+              setClassId(e.target.value);
+            }
+          }}
           className="border px-3 py-2"
         >
           <option value="">
@@ -271,10 +328,12 @@ export default function Reports() {
         <select
           value={termId ?? ""}
           onChange={(e) => {
-            setTermId(Number(e.target.value));
-            setReports([]);
-            setSelectedStudentId("");
-            setComments({});
+            if (confirmDiscardComments()) {
+              setTermId(Number(e.target.value));
+              setReports([]);
+              setSelectedStudentId("");
+              clearCommentSaveStates();
+            }
           }}
           className="border px-3 py-2"
         >
@@ -334,7 +393,7 @@ export default function Reports() {
 
         <button
           onClick={handlePrintSelected}
-          disabled={!selectedStudentId || loading || Boolean(printMode)}
+          disabled={!selectedStudentId || loading || Boolean(printMode) || hasUnresolvedSaves(commentSaveStates)}
           className="bg-green-600 text-white px-4 py-2"
         >
           Print Selected Student
@@ -342,7 +401,7 @@ export default function Reports() {
 
         <button
           onClick={handlePrintAll}
-          disabled={reports.length === 0 || loading || Boolean(printMode)}
+          disabled={reports.length === 0 || loading || Boolean(printMode) || hasUnresolvedSaves(commentSaveStates)}
           className="bg-emerald-700 text-white px-4 py-2"
         >
           Print All Report Cards
@@ -371,16 +430,16 @@ export default function Reports() {
               className={selectedClassName}
               termName={selectedTermName}
               termId={termId}
-              commentValues={comments}
-              onCommentChange={(key, value) => {
-                setComments((previous) => ({ ...previous, [key]: value }));
-              }}
+              commentSaveStates={commentSaveStates}
+              onCommentChange={editComment}
               onCommentBlur={(subject, value) => saveComment(
                 student.studentId,
-                subject.teacherSubjectId,
-                subject.subjectId,
+                subject,
                 value,
               )}
+              onCommentRetry={(subject, value) => saveComment(student.studentId, subject, value)}
+              onCommentUseSaved={(subject) => acceptSavedComment(student.studentId, subject)}
+              onCommentOverwrite={(subject) => overwriteComment(student.studentId, subject)}
             />
           ))}
         </div>

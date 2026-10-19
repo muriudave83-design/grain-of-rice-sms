@@ -60,14 +60,14 @@ test("combined service orchestrates class-specific records safely", { skip: !iso
     const retry: any = await createCombinedAssignment(db, group.id, owner.id, { periodId, requestKey: "service-request", title: "Composition 1", maxPoints: 50, weight: 2 });
     assert.equal(first.id, retry.id); assert.equal(first.children.length, 2);
     assert.deepEqual(first.children.map((child: any) => child.assignment.termId).sort(), [term8.id, term9.id].sort());
-    await saveCombinedScore(db, group.id, owner.id, { combinedAssignmentId: first.id, studentId: student8.id, score: 0 });
-    await saveCombinedScore(db, group.id, owner.id, { combinedAssignmentId: first.id, studentId: student9.id, score: 45 });
+    await saveCombinedScore(db, group.id, owner.id, { combinedAssignmentId: first.id, studentId: student8.id, score: 0, expectedScore: null });
+    await saveCombinedScore(db, group.id, owner.id, { combinedAssignmentId: first.id, studentId: student9.id, score: 45, expectedScore: null });
     const child8 = first.children.find((child: any) => child.assignment.termId === term8.id);
     const child9 = first.children.find((child: any) => child.assignment.termId === term9.id);
     await assert.rejects(() => assertNotCombinedChild(db, [child8.assignmentId]), /combined teaching group/);
     assert.equal((await db.score.findUnique({ where: { studentId_assignmentId: { studentId: student8.id, assignmentId: child8.assignmentId } } }))?.score, 0);
     assert.equal(await db.score.count({ where: { studentId: student8.id, assignmentId: child9.assignmentId } }), 0);
-    await assert.rejects(() => saveCombinedScore(db, group.id, owner.id, { combinedAssignmentId: first.id, assignmentId: child9.assignmentId, studentId: student8.id, score: 20 }), /injection rejected/);
+    await assert.rejects(() => saveCombinedScore(db, group.id, owner.id, { combinedAssignmentId: first.id, assignmentId: child9.assignmentId, studentId: student8.id, score: 20, expectedScore: 0 }), /injection rejected/);
     const childIdsBeforeRename = first.children.map((child: any) => child.assignmentId).sort();
     const scoresBeforeRename = await db.score.findMany({
       where: { assignmentId: { in: childIdsBeforeRename } },

@@ -2,6 +2,7 @@ type ReportCommentRecord = {
   studentId: number;
   teacherSubjectId: number;
   comment: string;
+  updatedAt: Date;
 };
 
 type AssignmentRecord = {
@@ -66,7 +67,7 @@ export function assembleClassSubjectResults({
   requestingTeacherId: number;
   classSubjects: ClassSubjectRecord[];
   grades: GradeRecord[];
-  comments: Map<string, string>;
+  comments: Map<string, { comment: string; updatedAt: Date }>;
 }) {
   return classSubjects.map((classSubject) => {
     const teacherSubject = selectReportingTeacherSubject(classSubject.subject.teacherSubjects);
@@ -88,8 +89,11 @@ export function assembleClassSubjectResults({
         teacherSubject?.isActive && teacherSubject.teacherId === requestingTeacherId,
       ),
       comment: teacherSubject
-        ? getSubjectReportComment(comments, studentId, teacherSubject.id)
+        ? getSubjectReportComment(comments, studentId, teacherSubject.id)?.comment ?? ""
         : "",
+      commentUpdatedAt: teacherSubject
+        ? getSubjectReportComment(comments, studentId, teacherSubject.id)?.updatedAt ?? null
+        : null,
     };
   });
 }
@@ -98,15 +102,15 @@ export function indexReportComments(comments: ReportCommentRecord[]) {
   return new Map(
     comments.map((comment) => [
       `${comment.studentId}:${comment.teacherSubjectId}`,
-      comment.comment,
+      { comment: comment.comment, updatedAt: comment.updatedAt },
     ]),
   );
 }
 
 export function getSubjectReportComment(
-  comments: Map<string, string>,
+  comments: Map<string, { comment: string; updatedAt: Date }>,
   studentId: number,
   teacherSubjectId: number,
 ) {
-  return comments.get(`${studentId}:${teacherSubjectId}`) ?? "";
+  return comments.get(`${studentId}:${teacherSubjectId}`) ?? null;
 }

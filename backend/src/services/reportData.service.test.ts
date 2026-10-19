@@ -9,16 +9,17 @@ import {
 } from "./reportData.service";
 
 test("subject comments match both student and teacher-subject assignment", () => {
+  const updatedAt = new Date("2026-01-01T00:00:00.000Z");
   const comments = indexReportComments([
-    { studentId: 1, teacherSubjectId: 10, comment: "Student 1 English" },
-    { studentId: 1, teacherSubjectId: 20, comment: "Student 1 Mathematics" },
-    { studentId: 2, teacherSubjectId: 10, comment: "Student 2 English" },
+    { studentId: 1, teacherSubjectId: 10, comment: "Student 1 English", updatedAt },
+    { studentId: 1, teacherSubjectId: 20, comment: "Student 1 Mathematics", updatedAt },
+    { studentId: 2, teacherSubjectId: 10, comment: "Student 2 English", updatedAt },
   ]);
 
-  assert.equal(getSubjectReportComment(comments, 1, 10), "Student 1 English");
-  assert.equal(getSubjectReportComment(comments, 1, 20), "Student 1 Mathematics");
-  assert.equal(getSubjectReportComment(comments, 2, 10), "Student 2 English");
-  assert.equal(getSubjectReportComment(comments, 2, 20), "");
+  assert.equal(getSubjectReportComment(comments, 1, 10)?.comment, "Student 1 English");
+  assert.equal(getSubjectReportComment(comments, 1, 20)?.comment, "Student 1 Mathematics");
+  assert.equal(getSubjectReportComment(comments, 2, 10)?.comment, "Student 2 English");
+  assert.equal(getSubjectReportComment(comments, 2, 20), null);
 });
 
 test("teacher report authorization and term-scoped comment query remain enforced", () => {
@@ -31,12 +32,14 @@ test("teacher report authorization and term-scoped comment query remain enforced
   assert.match(controller, /teacherSubjectId: \{ in: teacherSubjectIds \}/);
   assert.match(controller, /prisma\.grade\.findMany\(/);
   assert.match(controller, /termId,/);
-  assert.match(controller, /id: Number\(teacherSubjectId\),\s*teacherId: \(req as any\)\.user\.id,\s*isActive: true/s);
+  assert.match(controller, /lockCommentWriteScope\(tx, Number\(teacherSubjectId\), Number\(termId\), Number\(studentId\)\)/);
+  assert.match(controller, /validateLockedCommentScope/);
 });
 
 test("class-wide assembly includes every configured subject and prefers published grades", () => {
+  const updatedAt = new Date("2026-01-01T00:00:00.000Z");
   const comments = indexReportComments([
-    { studentId: 1, teacherSubjectId: 20, comment: "Pauline's comment" },
+    { studentId: 1, teacherSubjectId: 20, comment: "Pauline's comment", updatedAt },
   ]);
   const subjects = [
     {
@@ -94,7 +97,7 @@ test("missing scores are incomplete while a genuine zero remains zero", () => {
       }],
     },
   });
-  const base = { studentId: 1, requestingTeacherId: 100, grades: [], comments: new Map<string, string>() };
+  const base = { studentId: 1, requestingTeacherId: 100, grades: [], comments: new Map<string, { comment: string; updatedAt: Date }>() };
   assert.equal(assembleClassSubjectResults({ ...base, classSubjects: [makeSubject([{ studentId: 1, score: 0 }])] })[0].finalGrade, null);
 
   const completeZero = makeSubject([{ studentId: 1, score: 0 }]);

@@ -1,11 +1,21 @@
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { getGradeDescription, getLetterGrade } from "../utils/gradeDescriptions";
 import { AssessmentType } from "@prisma/client";
 import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
 import { assembleClassSubjectResults, indexReportComments } from "../services/reportData.service";
 import { deleteOwnedAssignment } from "../services/assignmentDeletion.service";
 import { assertNotCombinedChild, CombinedTeachingGroupError } from "../services/combinedTeachingGroup.service";
+import {
+  compareAndSetReportComment,
+  compareAndSetScore,
+  hasRequiredPrecondition,
+  lockCommentWriteScope,
+  lockScoreWriteScope,
+  SavePreconditionError,
+  validateLockedCommentScope,
+  validateLockedScoreScope,
+} from "../services/optimisticSave.service";
 
 const prisma = new PrismaClient();
 
@@ -203,7 +213,14 @@ export const getClassStudents = async (req: Request, res: Response) => {
 //
 
 export const upsertScore = async (req: Request, res: Response) => {
-  const { studentId, assignmentId, score } = req.body;
+  const { studentId, assignmentId, score, expectedScore } = req.body;
+
+  if (!hasRequiredPrecondition(req.body, "expectedScore")) {
+    return res.status(428).json({ message: "expectedScore precondition is required" });
+  }
+  if (expectedScore !== null && !Number.isFinite(Number(expectedScore))) {
+    return res.status(428).json({ message: "expectedScore must be null or a finite number" });
+  }
 
   const scoreNumber = Number(score);
   if (!isValidScore(scoreNumber)) {
@@ -211,56 +228,25 @@ export const upsertScore = async (req: Request, res: Response) => {
   }
 
   try {
-    const assignment = await prisma.assignment.findUnique({
-      where: { id: assignmentId },
-      include: { teacherSubject: { select: { teacherId: true, classId: true, isActive: true } }, term: { select: { isLocked: true } } },
+    const result = await prisma.$transaction(async (tx) => {
+    const locked = validateLockedScoreScope(
+      await lockScoreWriteScope(tx, Number(assignmentId), Number(studentId)),
+      { teacherId: (req as any).user.id, score: scoreNumber },
+    );
+    await assertNotCombinedChild(tx, [locked.assignmentId]);
+
+    return compareAndSetScore(tx, {
+      studentId: Number(studentId),
+      assignmentId: Number(assignmentId),
+      score: scoreNumber,
+      maxPoints: locked.maxPoints,
+      expectedScore: expectedScore === null ? null : Number(expectedScore),
     });
-
-    if (!assignment) {
-      return res.status(404).json({
-        message: "Assignment not found",
-      });
-    }
-
-    if (assignment.isLocked || assignment.term?.isLocked) {
-      return res.status(403).json({
-        message: "Assignment or term is locked",
-      });
-    }
-
-    await assertNotCombinedChild(prisma, [assignment.id]);
-
-    if (assignment.teacherSubject.teacherId !== (req as any).user.id) {
-      return res.status(403).json({ message: "Not authorized for this assignment" });
-    }
-    if (!assignment.teacherSubject.isActive) {
-      return res.status(403).json({ message: "This teacher assignment is inactive" });
-    }
-
-    const student = await prisma.student.findFirst({
-      where: {
-        id: Number(studentId),
-        classId: assignment.teacherSubject.classId,
-        isArchived: false,
-      },
-      select: { id: true },
-    });
-    if (!student) {
-      return res.status(400).json({ message: "Student is not active in this assignment's class" });
-    }
-
-    if (scoreNumber > assignment.maxPoints) {
-      return res.status(400).json({ message: "Score exceeds assignment maximum" });
-    }
-
-    const result = await prisma.score.upsert({
-      where: { studentId_assignmentId: { studentId, assignmentId } },
-      update: { score: scoreNumber, maxPoints: assignment.maxPoints },
-      create: { studentId, assignmentId, score: scoreNumber, maxPoints: assignment.maxPoints },
     });
 
     res.json(result);
   } catch (err) {
+    if (err instanceof SavePreconditionError) return res.status(err.status).json({ message: err.message, current: err.current });
     if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
     console.error("UPSERT SCORE ERROR:", err);
     res.status(500).json({ message: "Error saving score" });
@@ -560,6 +546,12 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
     }
 
     const uniqueUpdates = dedupeUpdates(updates);
+    if (uniqueUpdates.some((update: any) => !hasRequiredPrecondition(update, "expectedScore"))) {
+      return res.status(428).json({ message: "Every score update requires expectedScore" });
+    }
+    if (uniqueUpdates.some((update: any) => update.expectedScore !== null && !Number.isFinite(Number(update.expectedScore)))) {
+      return res.status(428).json({ message: "Every expectedScore must be null or a finite number" });
+    }
 
     const assignmentIds = [
       ...new Set(uniqueUpdates.map((u: any) => Number(u.assignmentId))),
@@ -596,6 +588,7 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
     let updated = 0;
     let skippedLocked = 0;
     let invalid = 0;
+    let conflicted = 0;
 
     const preview: any[] = [];
     const validUpdates: any[] = [];
@@ -625,6 +618,7 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
           assignmentId: Number(u.assignmentId),
           score,
           maxPoints: assignment.maxPoints,
+          expectedScore: u.expectedScore === null ? null : Number(u.expectedScore),
         });
       }
 
@@ -646,30 +640,45 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
       });
     }
 
-    await prisma.$transaction(
-      validUpdates.map((u) =>
-        prisma.score.upsert({
-          where: {
-            studentId_assignmentId: {
-              studentId: u.studentId,
-              assignmentId: u.assignmentId,
-            },
-          },
-          update: { score: u.score, maxPoints: u.maxPoints },
-          create: u,
-        })
-      )
-    );
-
-    updated = validUpdates.length;
+    for (const update of validUpdates) {
+      try {
+        await prisma.$transaction(async (tx) => {
+          const locked = validateLockedScoreScope(
+            await lockScoreWriteScope(tx, update.assignmentId, update.studentId),
+            { teacherId: (req as any).user.id, score: update.score },
+          );
+          await assertNotCombinedChild(tx, [locked.assignmentId]);
+          return compareAndSetScore(tx, { ...update, maxPoints: locked.maxPoints });
+        });
+        updated++;
+      } catch (error) {
+        if (!(error instanceof SavePreconditionError)) throw error;
+        const item = preview.find((entry) => Number(entry.studentId) === update.studentId && Number(entry.assignmentId) === update.assignmentId);
+        if (error.status === 409 && error.current !== undefined) {
+          conflicted++;
+          if (item) {
+          item.status = "conflict";
+          item.current = error.current;
+          }
+        } else if (/locked|inactive/i.test(error.message)) {
+          skippedLocked++;
+          if (item) item.status = "locked";
+        } else {
+          invalid++;
+          if (item) item.status = "invalid";
+        }
+      }
+    }
 
     res.json({
       success: true,
       mode: "commit",
       updated,
       skippedLocked,
+      conflicted,
       invalid,
       totalReceived: updates.length,
+      results: preview,
     });
   } catch (err) {
     if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
@@ -772,7 +781,7 @@ export const getReportData = async (req: Request, res: Response) => {
         teacherSubjectId: { in: teacherSubjectIds },
         termId,
       },
-      select: { studentId: true, teacherSubjectId: true, comment: true },
+      select: { studentId: true, teacherSubjectId: true, comment: true, updatedAt: true },
       }),
       prisma.attendanceEntry.findMany({
         where: { studentId: { in: studentIds }, session: { termId } },
@@ -849,57 +858,32 @@ export const getReportData = async (req: Request, res: Response) => {
 
 export const saveReportComment = async (req: Request, res: Response) => {
   try {
-    const { studentId, teacherSubjectId, termId, comment } = req.body;
+    const { studentId, teacherSubjectId, termId, comment, expectedUpdatedAt } = req.body;
 
     if (!studentId || !teacherSubjectId || !termId) {
       return res.status(400).json({ error: "studentId, teacherSubjectId, and termId are required" });
     }
-
-    const teacherSubject = await prisma.teacherSubject.findFirst({
-      where: {
-        id: Number(teacherSubjectId),
-        teacherId: (req as any).user.id,
-        isActive: true,
-      },
-      select: { classId: true },
-    });
-    if (!teacherSubject) {
-      return res.status(403).json({ error: "Not authorized for this subject" });
+    if (!hasRequiredPrecondition(req.body, "expectedUpdatedAt")) {
+      return res.status(428).json({ error: "expectedUpdatedAt precondition is required" });
     }
 
-    const [student, term] = await Promise.all([
-      prisma.student.findFirst({
-        where: { id: Number(studentId), classId: teacherSubject.classId, isArchived: false },
-        select: { id: true },
-      }),
-      prisma.term.findFirst({
-        where: { id: Number(termId), classId: teacherSubject.classId },
-        select: { id: true },
-      }),
-    ]);
-    if (!student || !term) {
-      return res.status(400).json({ error: "Student or term does not belong to this class" });
-    }
-
-    const saved = await prisma.reportComment.upsert({
-      where: {
-        studentId_teacherSubjectId_termId: {
-          studentId: Number(studentId),
-          teacherSubjectId: Number(teacherSubjectId),
-          termId: Number(termId),
-        },
-      },
-      update: { comment },
-      create: {
+    const saved = await prisma.$transaction(async (tx) => {
+      validateLockedCommentScope(
+        await lockCommentWriteScope(tx, Number(teacherSubjectId), Number(termId), Number(studentId)),
+        (req as any).user.id,
+      );
+      return compareAndSetReportComment(tx, {
         studentId: Number(studentId),
         teacherSubjectId: Number(teacherSubjectId),
         termId: Number(termId),
-        comment,
-      },
+        comment: String(comment ?? ""),
+        expectedUpdatedAt: expectedUpdatedAt === null ? null : String(expectedUpdatedAt),
+      });
     });
 
     res.json(saved);
   } catch (err) {
+    if (err instanceof SavePreconditionError) return res.status(err.status).json({ error: err.message, current: err.current });
     console.error("Comment save failed:", err);
     res.status(500).json({ error: "Failed to save comment" });
   }

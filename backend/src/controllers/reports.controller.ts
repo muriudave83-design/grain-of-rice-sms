@@ -2,6 +2,13 @@ import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
 import { Prisma } from "@prisma/client";
 import { getGradeDescription, getLetterGrade } from "../utils/gradeDescriptions";
+import {
+  compareAndSetReportComment,
+  hasRequiredPrecondition,
+  lockCommentWriteScope,
+  SavePreconditionError,
+  validateLockedCommentScope,
+} from "../services/optimisticSave.service";
 
 type TeacherSubjectWithRelations = Prisma.TeacherSubjectGetPayload<{
   include: {
@@ -25,59 +32,36 @@ export const saveReportComment = async (
   res: Response
 ) => {
   try {
-    const { studentId, teacherSubjectId, termId, comment } = req.body;
+    const { studentId, teacherSubjectId, termId, comment, expectedUpdatedAt } = req.body;
 
     if (!studentId || !teacherSubjectId || !termId) {
       return res.status(400).json({
         message: "Missing fields",
       });
     }
-
-    const teacherSubject = await prisma.teacherSubject.findFirst({
-      where: { id: Number(teacherSubjectId), teacherId: req.user!.id, isActive: true },
-      select: { classId: true },
-    });
-    if (!teacherSubject) {
-      return res.status(403).json({ message: "Not authorized for this subject" });
+    if (!hasRequiredPrecondition(req.body, "expectedUpdatedAt")) {
+      return res.status(428).json({ message: "expectedUpdatedAt precondition is required" });
     }
 
-    const [student, term] = await Promise.all([
-      prisma.student.findFirst({
-        where: { id: Number(studentId), classId: teacherSubject.classId, isArchived: false },
-        select: { id: true },
-      }),
-      prisma.term.findFirst({
-        where: { id: Number(termId), classId: teacherSubject.classId },
-        select: { id: true },
-      }),
-    ]);
-    if (!student || !term) {
-      return res.status(400).json({ message: "Student or term does not belong to this class" });
-    }
-
-    await prisma.reportComment.upsert({
-      where: {
-        studentId_teacherSubjectId_termId: {
-          studentId: Number(studentId),
-          teacherSubjectId: Number(teacherSubjectId),
-          termId: Number(termId)
-        },
-      },
-
-      update: {
-        comment,
-      },
-
-      create: {
+    const saved = await prisma.$transaction(async (tx) => {
+      validateLockedCommentScope(
+        await lockCommentWriteScope(tx, Number(teacherSubjectId), Number(termId), Number(studentId)),
+        req.user!.id,
+      );
+      return compareAndSetReportComment(tx, {
         studentId: Number(studentId),
         teacherSubjectId: Number(teacherSubjectId),
         termId: Number(termId),
-        comment,
-      },
+        comment: String(comment ?? ""),
+        expectedUpdatedAt: expectedUpdatedAt === null ? null : String(expectedUpdatedAt),
+      });
     });
 
-    res.json({ success: true });
+    res.json(saved);
   } catch (err) {
+    if (err instanceof SavePreconditionError) {
+      return res.status(err.status).json({ message: err.message, current: err.current });
+    }
     console.error("Save comment error:", err);
 
     res.status(500).json({
@@ -226,6 +210,7 @@ export const getStudentReport = async (
           gradeDescription: getGradeDescription(grade),
           comment:
             existingComment?.comment || "",
+          commentUpdatedAt: existingComment?.updatedAt?.toISOString() ?? null,
         };
       })
     );
