@@ -8,6 +8,7 @@ import {
   validateLockedCommentScope,
 } from "../services/optimisticSave.service";
 import { loadAuthoritativeReportResults, summarizeCompleteReport } from "../services/authoritativeReport.service";
+import { loadReportAttendance } from "../services/attendance/reportAttendance.service";
 
 export const saveReportComment = async (req: Request, res: Response) => {
   try {
@@ -92,13 +93,23 @@ export const getStudentReport = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "termId must identify a term for the student's current class" });
     }
 
-    const { resultsByStudent } = await loadAuthoritativeReportResults(prisma, {
-      classId,
-      termId,
-      studentIds: [student.id],
-      requestingTeacherId: user.role === "TEACHER" ? user.id : undefined,
-      includeComments: true,
-    });
+    const selectedTerm = terms.find((term) => term.id === termId)!;
+    const [{ resultsByStudent }, attendanceByStudent] = await Promise.all([
+      loadAuthoritativeReportResults(prisma, {
+        classId,
+        termId,
+        studentIds: [student.id],
+        requestingTeacherId: user.role === "TEACHER" ? user.id : undefined,
+        includeComments: true,
+      }),
+      loadReportAttendance(prisma, {
+        classId,
+        termId,
+        startDate: selectedTerm.startDate,
+        endDate: selectedTerm.endDate,
+        studentIds: [student.id],
+      }),
+    ]);
     const subjects = (resultsByStudent.get(student.id) ?? []).map((subject) => ({
       ...subject,
       subject: subject.subjectName,
@@ -110,6 +121,7 @@ export const getStudentReport = async (req: Request, res: Response) => {
       selectedTermId: termId,
       subjects,
       summary: summarizeCompleteReport(subjects),
+      attendance: attendanceByStudent.get(student.id),
     });
   } catch (err) {
     console.error("getStudentReport error:", err);

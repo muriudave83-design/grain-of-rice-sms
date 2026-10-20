@@ -10,8 +10,22 @@ test("administrator report renders authoritative incomplete and configuration st
   assert.match(source, /Review required/);
   assert.match(source, /Incomplete/);
   assert.match(source, /NO_TERM_ASSIGNMENTS/);
+  assert.match(source, /Attendance summary/);
+  assert.match(source, /DRAFT_ONLY/);
+  assert.match(source, /FINALIZED_INCOMPLETE/);
+  assert.match(source, /attendanceRate === null/);
   assert.doesNotMatch(source, /average \|\| 0/);
   assert.doesNotMatch(source, /getLetterGrade/);
+});
+
+test("administrator student list supports live name search, class filtering, clear, and empty state", () => {
+  const source = read("../pages/admin/AdminReportsPage.jsx");
+  assert.match(source, /Search student by any name\.\.\./);
+  assert.match(source, /onChange=\{\(event\) => setSearch\(event\.target\.value\)\}/);
+  assert.match(source, /onClick=\{\(\) => setSearch\(""\)\}/);
+  assert.match(source, /All classes/);
+  assert.match(source, /No students match your search and class filter\./);
+  assert.match(source, /filterAndSortReportStudents/);
 });
 
 test("legacy teacher print screen consumes server summaries and blocks partial publication", () => {
