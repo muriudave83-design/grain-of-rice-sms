@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { AttendancePeriod, AttendanceSessionStatus, AttendanceStatus, Role } from "@prisma/client";
 import { prisma } from "../../prisma/client";
 import { buildAfternoonCopies, parseClientAttendancePeriod } from "../../services/attendance/attendanceDomain";
+import { resolveAttendanceTermId } from "../../services/attendance/reportAttendance.service";
 
 function parseDay(value: unknown) {
   const date = value ? new Date(String(value)) : new Date();
@@ -47,8 +48,9 @@ export async function markAttendance(req: Request, res: Response) {
       orderBy: { id: "desc" },
     });
     if (!session) {
+      const termId = await resolveAttendanceTermId(prisma, classId, day.date);
       session = await prisma.attendanceSession.create({
-        data: { classId, teacherId: req.user!.id, date: day.date, status: AttendanceSessionStatus.DRAFT },
+        data: { classId, teacherId: req.user!.id, date: day.date, termId, status: AttendanceSessionStatus.DRAFT },
       });
     }
     if (session.status !== AttendanceSessionStatus.DRAFT) {
@@ -90,8 +92,9 @@ export async function markAllPresent(req: Request, res: Response) {
         where: { classId, date: { gte: day.date, lt: day.nextDay } }, orderBy: { id: "desc" },
       });
       if (!session) {
+        const termId = await resolveAttendanceTermId(tx, classId, day.date);
         session = await tx.attendanceSession.create({
-          data: { classId, teacherId: req.user!.id, date: day.date, status: AttendanceSessionStatus.DRAFT },
+          data: { classId, teacherId: req.user!.id, date: day.date, termId, status: AttendanceSessionStatus.DRAFT },
         });
       }
       if (session.status !== AttendanceSessionStatus.DRAFT) {

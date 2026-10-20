@@ -46,7 +46,7 @@ export default function ParentAttendanceSummary() {
             <li key={entry.id}>
               <strong>{entry.student?.name}</strong> —{" "}
               {entry.status} (
-              {entry.session?.class?.name})
+              {entry.session?.class?.name}) — {entry.session?.status === "SUBMITTED" ? "Finalized" : "Draft; excluded from official reports"}
             </li>
           ))}
         </ul>

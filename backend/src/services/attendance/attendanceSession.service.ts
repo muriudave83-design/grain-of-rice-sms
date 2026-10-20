@@ -4,6 +4,7 @@ import {
 } from "@prisma/client";
 import { createAuditLog } from "../auditLog.service";
 import { AuditAction } from "@prisma/client";
+import { resolveAttendanceTermId, schoolDayRange } from "./reportAttendance.service";
 
 const prisma = new PrismaClient();
 
@@ -47,11 +48,7 @@ export class AttendanceSessionService {
         /* ---------------------------------------------------- */
         /* Prevent duplicate attendance sessions                 */
         /* ---------------------------------------------------- */
-        const today = new Date(date);
-        today.setHours(0, 0, 0, 0);
-
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
+        const { start: today, endExclusive: tomorrow } = schoolDayRange(date);
 
         const existing = await tx.attendanceSession.findFirst({
           where: {
@@ -71,11 +68,13 @@ export class AttendanceSessionService {
           };
         }
 
+        const termId = await resolveAttendanceTermId(tx, classId, date);
         return await tx.attendanceSession.create({
           data: {
             classId,
             teacherId,
             date,
+            termId,
             status: AttendanceSessionStatus.DRAFT,
           },
         });

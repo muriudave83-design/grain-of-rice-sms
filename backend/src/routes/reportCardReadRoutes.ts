@@ -4,7 +4,7 @@ import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
 import { Prisma, Role } from "@prisma/client";
 import { ReportCardStatus } from "@prisma/client";
-import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
+import { loadReportAttendance } from "../services/attendance/reportAttendance.service";
 import {
   loadAuthoritativeReportResults,
   summarizeCompleteReport,
@@ -84,6 +84,13 @@ router.get(
         studentIds: students.map((student) => student.id),
         requestingTeacherId: req.user!.id,
       });
+      const attendanceByStudent = await loadReportAttendance(prisma, {
+        classId,
+        termId: term.id,
+        startDate: term.startDate,
+        endDate: term.endDate,
+        studentIds: students.map((student) => student.id),
+      });
 
       const report = await Promise.all(
         students.map(async (student) => {
@@ -100,29 +107,8 @@ router.get(
           }));
 
           // ✅ FIXED ATTENDANCE DATA
-          const attendanceEntries =
-            await prisma.attendanceEntry.findMany({
-              where: {
-                studentId: student.id,
-                session: { termId: term.id },
-              },
-              include: { session: true },
-            });
-
-          const attendance = summarizeAttendanceDays(attendanceEntries.map((entry) => ({
-            period: entry.period,
-            status: entry.status,
-            date: entry.session.date,
-          })));
-          const { present, absent, late } = attendance;
-          const totalAttendance = attendance.completedDays;
-
-          const attendanceRate =
-            totalAttendance > 0
-              ? Math.round(
-                  ((totalAttendance - absent) / totalAttendance) * 100
-                )
-              : 0;
+          const attendance = attendanceByStudent.get(student.id)!;
+          const { present, absent, late, attendanceRate } = attendance;
 
           return {
             studentId: student.id,
@@ -139,6 +125,9 @@ router.get(
             absent,
             late,
             attendanceRate,
+            attendanceState: attendance.state,
+            attendanceDraftDays: attendance.draftDays,
+            attendanceIncompleteDays: attendance.incomplete,
           };
         })
       );

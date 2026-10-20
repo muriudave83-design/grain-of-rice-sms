@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { Role } from "@prisma/client";
+import { AttendanceSessionStatus, Role } from "@prisma/client";
 import { prisma } from "../prisma/client";
 import { AttendanceSessionService } from "../services/attendance/attendanceSession.service";
 import { countAbsentDays, dailyAttendanceResult, summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
@@ -110,6 +110,7 @@ export const getAttendanceReport = async (
         select: {
           id: true,
           date: true,
+          status: true,
         },
         orderBy: { id: "desc" },
       });
@@ -125,16 +126,28 @@ export const getAttendanceReport = async (
           late: 0,
           excused: 0,
           incomplete: 0,
+          draftDays: 0,
         },
       });
     }
 
-    const latestSessionByDate = new Map<string, number>();
+    const latestSessionByDate = new Map<string, (typeof sessions)[number]>();
     for (const session of sessions) {
       const dateKey = session.date.toISOString().slice(0, 10);
-      if (!latestSessionByDate.has(dateKey)) latestSessionByDate.set(dateKey, session.id);
+      const current = latestSessionByDate.get(dateKey);
+      if (!current ||
+        (session.status === AttendanceSessionStatus.SUBMITTED && current.status !== AttendanceSessionStatus.SUBMITTED) ||
+        (session.status === current.status && session.id > current.id)) {
+        latestSessionByDate.set(dateKey, session);
+      }
     }
-    const sessionIds = [...latestSessionByDate.values()];
+    const selectedSessions = [...latestSessionByDate.values()];
+    const sessionIds = selectedSessions
+      .filter((session) => session.status === AttendanceSessionStatus.SUBMITTED)
+      .map((session) => session.id);
+    const draftDays = selectedSessions.filter(
+      (session) => session.status === AttendanceSessionStatus.DRAFT,
+    ).length;
 
         const allRecords =
           await prisma.attendanceEntry.findMany({
@@ -198,6 +211,7 @@ export const getAttendanceReport = async (
         late: report.filter((record) => record.status === "LATE").length,
         excused: report.filter((record) => record.status === "EXCUSED").length,
         incomplete: report.filter((record) => record.status === "INCOMPLETE").length,
+          draftDays,
       };
 
     return res.json({
@@ -262,18 +276,24 @@ export const getStudentAttendanceSummary =
           include: { session: true },
         });
 
-      const daily = summarizeAttendanceDays(records.map((entry) => ({
+      const finalizedRecords = records.filter(
+        (entry) => entry.session.status === AttendanceSessionStatus.SUBMITTED,
+      );
+      const daily = summarizeAttendanceDays(finalizedRecords.map((entry) => ({
         period: entry.period,
         status: entry.status,
         date: entry.session.date,
       })));
       const { totalDays, present, absent } = daily;
+      const draftDays = new Set(records
+        .filter((entry) => entry.session.status === AttendanceSessionStatus.DRAFT)
+        .map((entry) => entry.session.date.toISOString().slice(0, 10))).size;
 
       const percentage =
-        totalDays === 0
-          ? 0
+        daily.completedDays === 0
+          ? null
           : Math.round(
-              ((daily.completedDays - absent) / Math.max(daily.completedDays, 1)) * 100
+              ((daily.completedDays - absent) / daily.completedDays) * 100
             );
 
       return res.json({
@@ -281,6 +301,11 @@ export const getStudentAttendanceSummary =
         present,
         absent,
         percentage,
+        draftDays,
+        incompleteDays: daily.incomplete,
+        state: daily.completedDays > 0
+          ? daily.incomplete > 0 ? "PARTIALLY_FINALIZED" : "FINALIZED"
+          : draftDays > 0 ? "DRAFT_ONLY" : totalDays > 0 ? "FINALIZED_INCOMPLETE" : "NO_DATA",
       });
     } catch (error: unknown) {
       console.error(

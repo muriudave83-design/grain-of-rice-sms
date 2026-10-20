@@ -1,6 +1,6 @@
 import { Prisma, ReportCardStatus } from "@prisma/client";
 import { prisma } from "../prisma/client";
-import { countAbsentDays } from "./attendance/attendanceDomain";
+import { loadReportAttendance } from "./attendance/reportAttendance.service";
 import {
   loadAuthoritativeReportResults,
   summarizeCompleteReport,
@@ -39,6 +39,13 @@ export async function generateReportCardsForClass({
       termId,
       studentIds,
     });
+    const attendanceByStudent = await loadReportAttendance(tx, {
+      classId,
+      termId,
+      startDate: term.startDate,
+      endDate: term.endDate,
+      studentIds,
+    });
 
     let generated = 0;
     let preservedPublished = 0;
@@ -66,24 +73,7 @@ export async function generateReportCardsForClass({
         continue;
       }
 
-      const attendanceRecords = await tx.attendanceEntry.findMany({
-        where: {
-          studentId: student.id,
-          session: { date: { gte: term.startDate, lte: term.endDate } },
-        },
-        select: {
-          period: true,
-          status: true,
-          session: { select: { date: true } },
-        },
-      });
-      const attendanceAbsent = countAbsentDays(
-        attendanceRecords.map((entry) => ({
-          period: entry.period,
-          status: entry.status,
-          date: entry.session.date,
-        })),
-      );
+      const attendanceAbsent = attendanceByStudent.get(student.id)!.absent;
 
       const reportCard = await tx.reportCard.upsert({
         where: { studentId_termId: { studentId: student.id, termId } },

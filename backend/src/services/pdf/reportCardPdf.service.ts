@@ -2,7 +2,7 @@ import PDFDocument from "pdfkit";
 import { prisma } from "../../prisma/client";
 import { ReportCardStatus } from "@prisma/client";
 import { formatGrade, getLetterGrade } from "../../utils/gradeDescriptions";
-import { summarizeAttendanceDays } from "../attendance/attendanceDomain";
+import { loadReportAttendance } from "../attendance/reportAttendance.service";
 
 /**
  * Phase-8 v1.1 — Report Card PDF Generator
@@ -39,30 +39,14 @@ export async function generateReportCardPdf(
   }
 
   // 2️⃣ ATTENDANCE (REAL DB LOGIC FIX)
-  const attendanceRecords = await prisma.attendanceEntry.findMany({
-    where: {
-      studentId: reportCard.student.id,
-      session: {
-        date: {
-          gte: reportCard.term.startDate,
-          lte: reportCard.term.endDate,
-        },
-      },
-    },
-    include: { session: true },
+  const attendanceByStudent = await loadReportAttendance(prisma, {
+    classId: reportCard.classId,
+    termId: reportCard.termId,
+    startDate: reportCard.term.startDate,
+    endDate: reportCard.term.endDate,
+    studentIds: [reportCard.student.id],
   });
-
-  const dailyAttendance = summarizeAttendanceDays(attendanceRecords.map((entry) => ({
-    period: entry.period,
-    status: entry.status,
-    date: entry.session.date,
-  })));
-  const attendance = {
-    ...dailyAttendance,
-    percentage: dailyAttendance.completedDays > 0
-      ? Math.round(((dailyAttendance.completedDays - dailyAttendance.absent) / dailyAttendance.completedDays) * 100)
-      : 0,
-  };
+  const attendance = attendanceByStudent.get(reportCard.student.id)!;
 
   // 3️⃣ Create PDF document
   const doc = new PDFDocument({
@@ -205,7 +189,9 @@ export async function generateReportCardPdf(
      .text(`Present: ${attendance.present}`, 50, 130)
      .text(`Absent: ${attendance.absent}`, 50, 145)
      .text(`Late: ${attendance.late}`, 50, 160)
-     .text(`Attendance Rate: ${attendance.percentage}%`, 50, 175);
+     .text(`Attendance Rate: ${attendance.attendanceRate === null ? "Not available" : `${attendance.attendanceRate}%`}`, 50, 175)
+     .text(`Attendance Status: ${attendance.state}`, 50, 190)
+     .text(`Draft days excluded: ${attendance.draftDays}`, 50, 205);
 
   // =========================
   // 9️⃣ FOOTER (PROFESSIONAL)

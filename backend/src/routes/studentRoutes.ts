@@ -1,10 +1,11 @@
 import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
+import { AttendanceSessionStatus, PrismaClient } from "@prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
 import { authorizeStudentAccess } from "../middlewares/ownershipMiddleware";
 import { getStudentTranscript, updateHealth } from "../controllers/student.controller";
 import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
+import { loadReportAttendance } from "../services/attendance/reportAttendance.service";
 import { getOperationalStudentForUser } from "../services/studentOperational.service";
 
 const prisma = new PrismaClient();
@@ -311,31 +312,32 @@ router.get(
       }
 
       // ✅ ATTENDANCE (TERM AWARE)
-      const attendance = await prisma.attendanceEntry.findMany({
-        where: {
-          studentId,
-
-          ...(termId
-            ? {
-                session: {
-                  termId,
-                },
-              }
-            : {}),
-        },
-
-        select: {
-          status: true,
-          period: true,
-          session: { select: { date: true } },
-        },
-      });
-
-      const attendanceSummary = summarizeAttendanceDays(attendance.map((entry) => ({
-        period: entry.period,
-        status: entry.status,
-        date: entry.session.date,
-      })));
+      let attendanceSummary;
+      if (termId) {
+        const term = await prisma.term.findUnique({
+          where: { id: termId },
+          select: { id: true, classId: true, startDate: true, endDate: true },
+        });
+        if (!term) return res.status(404).json({ message: "Term not found" });
+        const byStudent = await loadReportAttendance(prisma, {
+          classId: term.classId,
+          termId: term.id,
+          startDate: term.startDate,
+          endDate: term.endDate,
+          studentIds: [studentId],
+        });
+        attendanceSummary = byStudent.get(studentId)!;
+      } else {
+        const attendance = await prisma.attendanceEntry.findMany({
+          where: { studentId, session: { status: AttendanceSessionStatus.SUBMITTED } },
+          select: { status: true, period: true, session: { select: { date: true } } },
+        });
+        attendanceSummary = summarizeAttendanceDays(attendance.map((entry) => ({
+          period: entry.period,
+          status: entry.status,
+          date: entry.session.date,
+        })));
+      }
       const present = attendanceSummary.present;
       const absent = attendanceSummary.absent;
 
@@ -384,6 +386,14 @@ router.get(
       res.json({
         present,
         absent,
+        attendanceRate: "attendanceRate" in attendanceSummary
+          ? attendanceSummary.attendanceRate
+          : attendanceSummary.completedDays > 0
+            ? Math.round(((attendanceSummary.completedDays - absent) / attendanceSummary.completedDays) * 100)
+            : null,
+        attendanceState: "state" in attendanceSummary ? attendanceSummary.state : undefined,
+        attendanceDraftDays: "draftDays" in attendanceSummary ? attendanceSummary.draftDays : undefined,
+        attendanceIncompleteDays: attendanceSummary.incomplete,
         logs,
         discipline,
         healthNotes: student?.healthNotes || "",

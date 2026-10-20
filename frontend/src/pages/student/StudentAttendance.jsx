@@ -107,9 +107,14 @@ const StudentAttendance = () => {
 
         <div style={{ background: "#222", padding: "15px", borderRadius: "8px" }}>
           <h4>Attendance %</h4>
-          <p>{attendance?.percentage ?? 0}%</p>
+          <p>{attendance?.percentage == null ? "Not available" : `${attendance.percentage}%`}</p>
         </div>
       </div>
+      {attendance?.draftDays > 0 && (
+        <p style={{ marginTop: "16px", color: "#fbbf24" }}>
+          {attendance.draftDays} attendance day(s) are still draft and are excluded from official totals.
+        </p>
+      )}
     </div>
   );
 };

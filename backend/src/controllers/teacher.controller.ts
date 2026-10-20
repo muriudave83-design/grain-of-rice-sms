@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
 import { Prisma, PrismaClient } from "@prisma/client";
-import { getGradeDescription, getLetterGrade } from "../utils/gradeDescriptions";
+import { getLetterGrade } from "../utils/gradeDescriptions";
 import { AssessmentType } from "@prisma/client";
-import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
-import { assembleClassSubjectResults, indexReportComments } from "../services/reportData.service";
+import { loadReportAttendance } from "../services/attendance/reportAttendance.service";
+import { loadAuthoritativeReportResults } from "../services/authoritativeReport.service";
 import { FinalGradePublicationError, publishFinalGradesAtomically } from "../services/finalGradePublication.service";
 import { deleteOwnedAssignment } from "../services/assignmentDeletion.service";
 import { assertNotCombinedChild, CombinedTeachingGroupError } from "../services/combinedTeachingGroup.service";
@@ -748,109 +748,40 @@ export const getReportData = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Term not found for this class" });
     }
 
-    const [students, classSubjects] = await Promise.all([
-      prisma.student.findMany({
-        where: { classId, isArchived: false },
-        orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-      }),
-      prisma.classSubject.findMany({
-        where: { classId },
-        orderBy: { subject: { name: "asc" } },
-        include: {
-          subject: {
-            select: {
-              name: true,
-              teacherSubjects: {
-                where: { classId },
-                select: {
-                  id: true,
-                  teacherId: true,
-                  isActive: true,
-                  assignments: {
-                    where: { termId },
-                    select: {
-                      id: true,
-                      weight: true,
-                      maxPoints: true,
-                      gradeContributionStatus: true,
-                      scores: { select: { studentId: true, score: true } },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      }),
-    ]);
-
-    const teacherSubjectIds = classSubjects.flatMap((entry) =>
-      entry.subject.teacherSubjects.map((teacherSubject) => teacherSubject.id),
-    );
+    const students = await prisma.student.findMany({
+      where: { classId, isArchived: false },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+    });
     const studentIds = students.map((student) => student.id);
-    const subjectIds = classSubjects.map((entry) => entry.subjectId);
-    const [grades, comments, attendanceEntries, contributionScopes] = await Promise.all([
-      prisma.grade.findMany({
-        where: { termId, studentId: { in: studentIds }, subjectId: { in: subjectIds } },
-        select: { studentId: true, subjectId: true, total: true, contributionRevision: true },
-      }),
-      prisma.reportComment.findMany({
-      where: {
-        studentId: { in: studentIds },
-        teacherSubjectId: { in: teacherSubjectIds },
+    const [{ resultsByStudent }, attendanceByStudent] = await Promise.all([
+      loadAuthoritativeReportResults(prisma, {
+        classId,
         termId,
-      },
-      select: { studentId: true, teacherSubjectId: true, comment: true, updatedAt: true },
+        studentIds,
+        requestingTeacherId: teacherId,
+        includeComments: true,
       }),
-      prisma.attendanceEntry.findMany({
-        where: { studentId: { in: studentIds }, session: { termId } },
-        include: { session: true },
-      }),
-      prisma.gradeContributionScope.findMany({
-        where: { classId, termId, subjectId: { in: subjectIds } },
-        select: { subjectId: true, mode: true, revision: true },
+      loadReportAttendance(prisma, {
+        classId,
+        termId,
+        startDate: term.startDate,
+        endDate: term.endDate,
+        studentIds,
       }),
     ]);
-    const commentsByStudentAndSubject = indexReportComments(comments);
 
     /**
      * BUILD REPORTS
      */
     const result = students.map((student) => {
-        const subjectResults = assembleClassSubjectResults({
-          studentId: student.id,
-          requestingTeacherId: teacherId,
-          classSubjects,
-          grades,
-          comments: commentsByStudentAndSubject,
-          contributionScopes: new Map(contributionScopes.map((scope) => [scope.subjectId, scope])),
-        }).map((subject) => {
-          const letter = getLetterGrade(subject.finalGrade);
-          return {
-            ...subject,
-            letter,
-            gradeDescription: getGradeDescription(letter),
-            status: subject.finalGrade === null ? "incomplete" : "complete",
-          };
-        });
+        const subjectResults = (resultsByStudent.get(student.id) ?? []).map((subject) => ({
+          ...subject,
+          letter: subject.grade,
+          status: subject.finalGrade === null ? "incomplete" : "complete",
+        }));
 
-        const studentAttendance = attendanceEntries.filter(
-          (entry) => entry.studentId === student.id,
-        );
-        const dailyAttendance = summarizeAttendanceDays(studentAttendance.map((entry) => ({
-          period: entry.period,
-          status: entry.status,
-          date: entry.session.date,
-        })));
-        const { present, absent, late } = dailyAttendance;
-        const totalAttendance = dailyAttendance.completedDays;
-
-        const attendanceRate =
-          totalAttendance > 0
-            ? Math.round(
-                ((totalAttendance - absent) / totalAttendance) * 100
-              )
-            : 0;
+        const attendance = attendanceByStudent.get(student.id)!;
+        const { present, absent, late, attendanceRate } = attendance;
 
         return {
           studentId: student.id,
@@ -862,6 +793,9 @@ export const getReportData = async (req: Request, res: Response) => {
           absent,
           late,
           attendanceRate,
+          attendanceState: attendance.state,
+          attendanceDraftDays: attendance.draftDays,
+          attendanceIncompleteDays: attendance.incomplete,
         };
       });
 

@@ -30,5 +30,8 @@ test("PDF display derives percentages and summary from immutable subject snapsho
   const pdf = read("src/services/pdf/reportCardPdf.service.ts");
   assert.match(pdf, /Number\(entry\.total\)/);
   assert.match(pdf, /displayedPercentages/);
+  assert.match(pdf, /loadReportAttendance/);
+  assert.match(pdf, /attendanceRate === null \? "Not available"/);
+  assert.match(pdf, /Draft days excluded/);
   assert.doesNotMatch(pdf, /SAMPLE ATTENDANCE STUDENT IDS/);
 });
