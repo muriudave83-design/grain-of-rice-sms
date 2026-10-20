@@ -199,6 +199,31 @@ test("an empty active teacher record cannot hide a scored Music record", () => {
   assert.equal(music.completenessState, "COMPLETE");
 });
 
+test("grade selection does not transfer comment ownership to a historical teacher", () => {
+  const updatedAt = new Date("2026-10-20T10:00:00.000Z");
+  const [music] = assembleClassSubjectResults({
+    studentId: 190,
+    requestingTeacherId: 200,
+    classSubjects: [{
+      subjectId: 9,
+      subject: { name: "Music", teacherSubjects: [
+        { id: 145, teacherId: 100, isActive: false, assignments: [{ weight: 1, maxPoints: 20, scores: [{ studentId: 190, score: 19 }] }] },
+        { id: 150, teacherId: 200, isActive: true, assignments: [] },
+      ] },
+    }],
+    grades: [],
+    comments: indexReportComments([
+      { studentId: 190, teacherSubjectId: 145, comment: "Historical", updatedAt },
+      { studentId: 190, teacherSubjectId: 150, comment: "Current", updatedAt },
+    ]),
+  });
+
+  assert.equal(music.finalGrade, 95);
+  assert.equal(music.teacherSubjectId, 150);
+  assert.equal(music.comment, "Current");
+  assert.equal(music.canEditComment, true);
+});
+
 test("complete weighted subjects use maximum points, preserve zero, and round once for reporting", () => {
   const [subject] = assembleClassSubjectResults({
     studentId: 1,

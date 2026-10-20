@@ -97,19 +97,6 @@ app.get("/api", (_req: Request, res: Response) => {
 });
 
 // ----------------------------------
-// DEBUG ROUTES
-// ----------------------------------
-app.get("/debug/users", async (_req: Request, res: Response) => {
-  const users = await prisma.user.findMany();
-  res.json(users);
-});
-
-app.get("/debug/subjects", async (_req: Request, res: Response) => {
-  const subjects = await prisma.subject.findMany();
-  res.json(subjects);
-});
-
-// ----------------------------------
 // CORE ROUTES
 // ----------------------------------
 app.use("/api/auth", authRoutes);
@@ -168,8 +155,11 @@ app.get("/", (_req: Request, res: Response) => {
 // ----------------------------------
 // SERVER
 // ----------------------------------
-const PORT = Number(process.env.PORT) || 5055;
+if (require.main === module) {
+  const PORT = Number(process.env.PORT) || 5055;
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
-});
+export { app };

@@ -76,6 +76,9 @@ export function assembleClassSubjectResults({
 }) {
   return classSubjects.map((classSubject) => {
     const teacherSubject = selectReportingTeacherSubject(classSubject.subject.teacherSubjects);
+    const commentTeacherSubject = classSubject.subject.teacherSubjects.find(
+      (record) => record.isActive && record.teacherId === requestingTeacherId,
+    ) ?? teacherSubject;
     const published = grades.find(
       (grade) => grade.studentId === studentId && grade.subjectId === classSubject.subjectId,
     );
@@ -97,20 +100,20 @@ export function assembleClassSubjectResults({
 
     return {
       subjectId: classSubject.subjectId,
-      teacherSubjectId: teacherSubject?.id ?? null,
+      teacherSubjectId: commentTeacherSubject?.id ?? null,
       subjectName: classSubject.subject.name,
       finalGrade: result === null ? null : Number(result.toFixed(1)),
       resultSource: published ? "published-grade" : result === null ? "incomplete" : "assignment-draft",
       completenessState,
       needsRevalidation: explicit?.status === "PUBLISHED" ? explicit.needsRevalidation : false,
       canEditComment: Boolean(
-        teacherSubject?.isActive && teacherSubject.teacherId === requestingTeacherId,
+        commentTeacherSubject?.isActive && commentTeacherSubject.teacherId === requestingTeacherId,
       ),
-      comment: teacherSubject
-        ? getSubjectReportComment(comments, studentId, teacherSubject.id)?.comment ?? ""
+      comment: commentTeacherSubject
+        ? getSubjectReportComment(comments, studentId, commentTeacherSubject.id)?.comment ?? ""
         : "",
-      commentUpdatedAt: teacherSubject
-        ? getSubjectReportComment(comments, studentId, teacherSubject.id)?.updatedAt ?? null
+      commentUpdatedAt: commentTeacherSubject
+        ? getSubjectReportComment(comments, studentId, commentTeacherSubject.id)?.updatedAt ?? null
         : null,
     };
   });

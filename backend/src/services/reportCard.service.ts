@@ -1,6 +1,10 @@
+import { Prisma, ReportCardStatus } from "@prisma/client";
 import { prisma } from "../prisma/client";
-import { ReportCardStatus } from "@prisma/client";
 import { countAbsentDays } from "./attendance/attendanceDomain";
+import {
+  loadAuthoritativeReportResults,
+  summarizeCompleteReport,
+} from "./authoritativeReport.service";
 
 type GenerateReportCardsInput = {
   classId: number;
@@ -11,157 +15,82 @@ export async function generateReportCardsForClass({
   classId,
   termId,
 }: GenerateReportCardsInput) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await prisma.$transaction(async (tx) => {
+    const term = await tx.term.findFirst({
+      where: { id: termId, classId },
+      select: { id: true, startDate: true, endDate: true },
+    });
+    if (!term) throw new Error("Term does not belong to this class");
 
-  console.log("🚀 REPORT CARD GENERATION STARTED", { classId, termId });
-
-  return prisma.$transaction(async (tx) => {
-
-    /**
-     * 1. Fetch students in class
-     */
     const students = await tx.student.findMany({
-      where: { classId },
+      where: { classId, isArchived: false },
       select: { id: true },
+      orderBy: { id: "asc" },
+    });
+    const studentIds = students.map((student) => student.id);
+    if (studentIds.length === 0) {
+      return { generated: 0, preservedPublished: 0, incomplete: [] };
+    }
+
+    const { resultsByStudent } = await loadAuthoritativeReportResults(tx, {
+      classId,
+      termId,
+      studentIds,
     });
 
-    console.log("👩‍🎓 STUDENTS IN CLASS:", students.length);
+    let generated = 0;
+    let preservedPublished = 0;
+    const incomplete: Array<{ studentId: number; subjectIds: number[] }> = [];
 
-    if (students.length === 0) {
-      console.log("⚠️ No students found for class");
-      return { generated: 0 };
-    }
-
-    const studentIds = students.map((s) => s.id);
-
-    /**
-     * 2. Fetch grades
-     */
-    const grades = await tx.grade.findMany({
-      where: {
-        studentId: { in: studentIds },
-        termId,
-      },
-    });
-
-    console.log("📊 GRADES FOUND:", grades.length);
-
-    if (grades.length === 0) {
-      console.log("⚠️ No grades found for report card generation");
-      return { generated: 0 };
-    }
-
-    /**
-     * 3. Group grades per student
-     */
-    const gradesByStudent = new Map<number, typeof grades>();
-
-    for (const g of grades) {
-
-      if (!gradesByStudent.has(g.studentId)) {
-        gradesByStudent.set(g.studentId, []);
-      }
-
-      gradesByStudent.get(g.studentId)!.push(g);
-    }
-
-    let generatedCount = 0;
-
-    /**
-     * 4. Generate report cards
-     */
     for (const student of students) {
-
-      const studentGrades = gradesByStudent.get(student.id);
-
-      if (!studentGrades || studentGrades.length === 0) {
-        console.log(`⚠️ Student ${student.id} has no grades`);
-        continue;
-      }
-
-      /**
-       * Check existing report card
-       */
       const existing = await tx.reportCard.findUnique({
-        where: {
-          studentId_termId: {
-            studentId: student.id,
-            termId,
-          },
-        },
+        where: { studentId_termId: { studentId: student.id, termId } },
+        select: { id: true, status: true },
       });
-
-      if (existing && existing.status === ReportCardStatus.PUBLISHED) {
-        console.log(`⚠️ Report card already published for student ${student.id}`);
+      if (existing?.status === ReportCardStatus.PUBLISHED) {
+        preservedPublished += 1;
         continue;
       }
 
-      /**
-       * Compute totals
-       */
-      const total = studentGrades.reduce(
-        (sum, g) => sum + g.total,
-        0
-      );
-
-      const count = studentGrades.length;
-      const average = count > 0 ? total / count : 0;
-
-      /**
-       * Attendance Absence Count
-       */
-      const term = await tx.term.findUnique({
-        where: { id: termId },
-      });
-
-      if (!term) {
-        throw new Error("Term not found");
+      const subjects = resultsByStudent.get(student.id) ?? [];
+      const summary = summarizeCompleteReport(subjects);
+      if (!summary.isComplete || summary.total === null || summary.average === null) {
+        incomplete.push({
+          studentId: student.id,
+          subjectIds: subjects
+            .filter((subject) => subject.finalGrade === null)
+            .map((subject) => subject.subjectId),
+        });
+        continue;
       }
 
       const attendanceRecords = await tx.attendanceEntry.findMany({
         where: {
           studentId: student.id,
-          session: {
-            date: {
-              gte: new Date(term.startDate),
-              lte: new Date(term.endDate),
-            },
-          },
+          session: { date: { gte: term.startDate, lte: term.endDate } },
         },
-        include: {
-          session: true,
+        select: {
+          period: true,
+          status: true,
+          session: { select: { date: true } },
         },
       });
-
-      console.log("📅 TERM:", term.name);
-      console.log("📅 START:", term.startDate);
-      console.log("📅 END:", term.endDate);
-      console.log("👨 STUDENT:", student.id);
-      console.log("📊 ATTENDANCE FOUND:", attendanceRecords.length);
-
-      const attendanceAbsent = countAbsentDays(attendanceRecords.map((entry) => ({
-        period: entry.period,
-        status: entry.status,
-        date: entry.session.date,
-      })));
-
-      console.log(
-        `📅 Student ${student.id} absent days:`,
-        attendanceAbsent
+      const attendanceAbsent = countAbsentDays(
+        attendanceRecords.map((entry) => ({
+          period: entry.period,
+          status: entry.status,
+          date: entry.session.date,
+        })),
       );
 
-      /**
-       * Upsert report card
-       */
       const reportCard = await tx.reportCard.upsert({
-        where: {
-          studentId_termId: {
-            studentId: student.id,
-            termId,
-          },
-        },
+        where: { studentId_termId: { studentId: student.id, termId } },
         update: {
-          total,
-          average,
+          classId,
+          total: summary.total,
+          average: summary.average,
           attendanceAbsent,
           status: ReportCardStatus.GENERATED,
         },
@@ -169,41 +98,32 @@ export async function generateReportCardsForClass({
           studentId: student.id,
           classId,
           termId,
-          total,
-          average,
+          total: summary.total,
+          average: summary.average,
           attendanceAbsent,
           status: ReportCardStatus.GENERATED,
         },
       });
 
-      /**
-       * Remove old subject entries
-       */
-      await tx.reportCardSubjectEntry.deleteMany({
-        where: { reportCardId: reportCard.id },
-      });
-
-      /**
-       * Insert subject entries
-       */
+      await tx.reportCardSubjectEntry.deleteMany({ where: { reportCardId: reportCard.id } });
       await tx.reportCardSubjectEntry.createMany({
-        data: studentGrades.map((g) => ({
+        data: subjects.map((subject) => ({
           reportCardId: reportCard.id,
-          subjectId: g.subjectId,
-          total: g.total,
-          average: g.average,
+          subjectId: subject.subjectId,
+          total: subject.finalGrade,
+          average: subject.finalGrade,
         })),
       });
-
-      console.log(`✅ Report card generated for student ${student.id}`);
-
-      generatedCount++;
+      generated += 1;
     }
 
-    console.log(`🎯 FINAL REPORT CARDS GENERATED: ${generatedCount}`);
-
-    return { generated: generatedCount };
-
-  });
-
+        return { generated, preservedPublished, incomplete };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    } catch (error) {
+      const serializationConflict =
+        error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+      if (!serializationConflict || attempt === 3) throw error;
+    }
+  }
+  throw new Error("Report-card generation conflicted with another update");
 }

@@ -1,7 +1,7 @@
 import PDFDocument from "pdfkit";
 import { prisma } from "../../prisma/client";
 import { ReportCardStatus } from "@prisma/client";
-import { formatGrade, getLetterGrade, normalizeGradePercentage } from "../../utils/gradeDescriptions";
+import { formatGrade, getLetterGrade } from "../../utils/gradeDescriptions";
 import { summarizeAttendanceDays } from "../attendance/attendanceDomain";
 
 /**
@@ -51,18 +51,6 @@ export async function generateReportCardPdf(
     },
     include: { session: true },
   });
-
-  console.log("REPORT STUDENT ID:", reportCard.student.id);
-  console.log("ATTENDANCE MATCHES:", attendanceRecords.length);
-
-  const allAttendance = await prisma.attendanceEntry.findMany({
-    take: 5,
-  });
-
-  console.log(
-    "SAMPLE ATTENDANCE STUDENT IDS:",
-    allAttendance.map(a => a.studentId)
-  );
 
   const dailyAttendance = summarizeAttendanceDays(attendanceRecords.map((entry) => ({
     period: entry.period,
@@ -176,9 +164,10 @@ export async function generateReportCardPdf(
     }
 
     doc.text(entry.subject.name, col.subject, rowY);
-    doc.text(entry.total.toFixed(1), col.total, rowY);
-    doc.text(entry.average.toFixed(1), col.average, rowY);
-    doc.text(formatGrade(getLetterGrade(normalizeGradePercentage(entry.average))), col.grade, rowY, {
+    const percentage = Number(entry.total);
+    doc.text(percentage.toFixed(1), col.total, rowY);
+    doc.text(`${percentage.toFixed(1)}%`, col.average, rowY);
+    doc.text(formatGrade(getLetterGrade(percentage)), col.grade, rowY, {
       width: 200,
     });
 
@@ -194,9 +183,12 @@ export async function generateReportCardPdf(
   doc.moveDown(0.5);
   doc.font("Helvetica");
 
-  doc.text(`Term Total Marks: ${reportCard.total.toFixed(1)}`);
-  doc.text(`Term Average: ${reportCard.average.toFixed(1)}`);
-  doc.text(`Overall Grade: ${formatGrade(getLetterGrade(normalizeGradePercentage(reportCard.average)))}`);
+  const displayedPercentages = reportCard.subjects.map((entry) => Number(entry.total));
+  const displayedTotal = displayedPercentages.reduce((sum, percentage) => sum + percentage, 0);
+  const displayedAverage = displayedPercentages.length > 0 ? displayedTotal / displayedPercentages.length : 0;
+  doc.text(`Term Total Marks: ${displayedTotal.toFixed(1)}`);
+  doc.text(`Term Average: ${displayedAverage.toFixed(1)}%`);
+  doc.text(`Overall Grade: ${formatGrade(getLetterGrade(displayedAverage))}`);
 
   // =========================
   // 8️⃣ ATTENDANCE (FORCED NEW PAGE FIX)

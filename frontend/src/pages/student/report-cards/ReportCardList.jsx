@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import api from "@/services/apiClient";
 
 export default function StudentReportCardList() {
   const [reportCards, setReportCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  const navigate = useNavigate();
 
   useEffect(() => {
     async function fetchReportCards() {
@@ -16,7 +13,7 @@ export default function StudentReportCardList() {
 
         // Defensive: show ONLY published cards
         const publishedOnly = (res.data || []).filter(
-          (rc) => rc.status === "published"
+          (rc) => rc.status === "PUBLISHED"
         );
 
         setReportCards(publishedOnly);
@@ -33,6 +30,22 @@ export default function StudentReportCardList() {
 
     fetchReportCards();
   }, []);
+
+  async function downloadReportCard(reportCardId) {
+    try {
+      const response = await api.get(`/report-cards/${reportCardId}/pdf`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `report-card-${reportCardId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setError("Failed to download the report card.");
+    }
+  }
 
   if (loading) {
     return <div className="p-4">Loading report cards...</div>;
@@ -58,15 +71,17 @@ export default function StudentReportCardList() {
         {reportCards.map((rc) => (
           <div
             key={rc.id}
-            onClick={() => navigate(`/student/reportcards/${rc.id}`)}
-            className="border rounded p-3 cursor-pointer hover:bg-gray-50"
+            className="border rounded p-3 flex items-center justify-between gap-4"
           >
             <div className="font-medium">
               {rc.term?.name} — {rc.class?.name}
             </div>
             <div className="text-sm text-gray-600">
-              Average: {rc.average ?? "—"}
+              Average: {rc.average == null ? "—" : `${Number(rc.average).toFixed(1)}%`}
             </div>
+            <button type="button" onClick={() => downloadReportCard(rc.id)} className="rounded bg-blue-600 px-3 py-2 text-white">
+              Download PDF
+            </button>
           </div>
         ))}
       </div>

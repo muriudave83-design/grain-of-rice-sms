@@ -2,10 +2,14 @@ import { Router } from "express";
 import { prisma } from "../prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
-import { Role } from "@prisma/client";
-import { AssessmentStatus } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import { ReportCardStatus } from "@prisma/client";
 import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
+import {
+  loadAuthoritativeReportResults,
+  summarizeCompleteReport,
+} from "../services/authoritativeReport.service";
+import { presentReportCardSnapshot } from "../services/reportCardSnapshotPresentation.service";
 
 const router = Router();
 
@@ -44,11 +48,6 @@ router.get(
         });
       }
 
-      const normalizedTermName = termName
-        .toLowerCase()
-        .replace("term", "term ")
-        .trim();
-
       const assigned = await prisma.teacherSubject.findFirst({
         where: { teacherId: req.user!.id, classId, isActive: true },
         select: { id: true },
@@ -58,13 +57,9 @@ router.get(
       }
 
       const term = await prisma.term.findFirst({
-        where: {
-          classId,
-          name: {
-            equals: normalizedTermName,
-            mode: "insensitive",
-          },
-        },
+        where: /^\d+$/.test(termName)
+          ? { id: Number(termName), classId }
+          : { classId, name: { equals: termName.replace(/^term\s*/i, "Term ").trim(), mode: "insensitive" } },
       });
 
       if (!term) {
@@ -83,75 +78,26 @@ router.get(
         },
       });
 
-      const assessments = await prisma.assessment.findMany({
-        where: {
-          classId,
-          termId: term.id,
-          status: {
-            in: ["SUBMITTED", "DRAFT"],
-          },
-        },
-        include: {
-          subject: true,
-          scores: true,
-        },
+      const { resultsByStudent } = await loadAuthoritativeReportResults(prisma, {
+        classId,
+        termId: term.id,
+        studentIds: students.map((student) => student.id),
+        requestingTeacherId: req.user!.id,
       });
 
       const report = await Promise.all(
         students.map(async (student) => {
-          const subjectMap: Record<
-            string,
-            {
-              total: number;
-              count: number;
-            }
-          > = {};
-
-          assessments.forEach((assessment) => {
-            const score = assessment.scores.find(
-              (s) => s.studentId === student.id
-            );
-
-            if (!score) return;
-
-            const subjectName =
-              assessment.subject?.name ||
-              `Subject ${assessment.subjectId}`;
-
-            if (!subjectMap[subjectName]) {
-              subjectMap[subjectName] = {
-                total: 0,
-                count: 0,
-              };
-            }
-
-            subjectMap[subjectName].total += score.score;
-            subjectMap[subjectName].count++;
-          });
-
-          const subjects = Object.entries(subjectMap).map(
-            ([subject, data]) => {
-              const avg =
-                data.count > 0
-                  ? data.total / data.count
-                  : 0;
-
-              return {
-                subject,
-                average: avg,
-              };
-            }
-          );
-
-          const overallTotal = subjects.reduce(
-            (sum, s) => sum + s.average,
-            0
-          );
-
-          const overallAverage =
-            subjects.length > 0
-              ? overallTotal / subjects.length
-              : 0;
+          const authoritativeSubjects = resultsByStudent.get(student.id) ?? [];
+          const summary = summarizeCompleteReport(authoritativeSubjects);
+          const subjects = authoritativeSubjects.map((subject) => ({
+            subject: subject.subjectName,
+            subjectId: subject.subjectId,
+            average: subject.finalGrade,
+            grade: subject.grade,
+            gradeDescription: subject.gradeDescription,
+            completenessState: subject.completenessState,
+            configurationWarnings: subject.configurationWarnings,
+          }));
 
           // ✅ FIXED ATTENDANCE DATA
           const attendanceEntries =
@@ -186,7 +132,8 @@ router.get(
               `${student.firstName} ${student.lastName}`,
 
             subjects,
-            overallAverage,
+            overallAverage: summary.average,
+            summary,
 
             present,
             absent,
@@ -234,11 +181,6 @@ router.post(
         });
       }
 
-      const normalizedTermName = termParam
-        .toLowerCase()
-        .replace("term", "term ")
-        .trim();
-
       const assigned = await prisma.teacherSubject.findFirst({
         where: { teacherId: req.user!.id, classId, isActive: true },
         select: { id: true },
@@ -248,13 +190,9 @@ router.post(
       }
 
       const term = await prisma.term.findFirst({
-        where: {
-          classId,
-          name: {
-            equals: normalizedTermName,
-            mode: "insensitive",
-          },
-        },
+        where: /^\d+$/.test(termParam)
+          ? { id: Number(termParam), classId }
+          : { classId, name: { equals: termParam.replace(/^term\s*/i, "Term ").trim(), mode: "insensitive" } },
       });
 
       if (!term) {
@@ -263,41 +201,57 @@ router.post(
         });
       }
 
-      const result = await prisma.reportCard.updateMany({
-        where: {
+      const publishedCount = await prisma.$transaction(async (tx) => {
+        const students = await tx.student.findMany({
+          where: { classId, isArchived: false },
+          select: { id: true },
+        });
+        const { resultsByStudent } = await loadAuthoritativeReportResults(tx, {
           classId,
           termId: term.id,
-        },
-        data: {
-          status: ReportCardStatus.PUBLISHED,
-        },
-      });
-
-      const assessmentsUpdated =
-        await prisma.assessment.updateMany({
-          where: {
-            classId,
-            termId: term.id,
-            status: "SUBMITTED",
-          },
-          data: {
-            status: "SUBMITTED",
-          },
+          studentIds: students.map((student) => student.id),
         });
+        const snapshots = await tx.reportCard.findMany({
+          where: { classId, termId: term.id, status: ReportCardStatus.GENERATED },
+          include: { subjects: true },
+        });
+        const byStudent = new Map(snapshots.map((snapshot) => [snapshot.studentId, snapshot]));
+        for (const student of students) {
+          const subjects = resultsByStudent.get(student.id) ?? [];
+          const summary = summarizeCompleteReport(subjects);
+          const snapshot = byStudent.get(student.id);
+          const matches = summary.isComplete && snapshot &&
+            snapshot.subjects.length === subjects.length &&
+            subjects.every((subject) => snapshot.subjects.some((entry) =>
+              entry.subjectId === subject.subjectId && subject.finalGrade !== null &&
+              Math.abs(entry.average - subject.finalGrade) < 0.05
+            ));
+          if (!matches) throw new Error(`REPORT_NOT_READY:${student.id}`);
+        }
+        const update = await tx.reportCard.updateMany({
+          where: { classId, termId: term.id, status: ReportCardStatus.GENERATED },
+          data: { status: ReportCardStatus.PUBLISHED, publishedAt: new Date() },
+        });
+        return update.count;
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
       return res.json({
         message: "Report cards published successfully",
-        updated: result.count,
-        assessmentsUpdated:
-          assessmentsUpdated.count,
+        updated: publishedCount,
       });
 
     } catch (err) {
       console.error("❌ PUBLISH ERROR:", err);
 
-      return res.status(500).json({
-        message: "Failed to publish report cards",
-      });
+      if ((err as Error).message.startsWith("REPORT_NOT_READY:")) {
+        return res.status(422).json({
+          message: "Every active student must have a complete, current generated report before publication",
+        });
+      }
+      if ((err as { code?: string }).code === "P2034") {
+        return res.status(409).json({ message: "Report data changed during publication; refresh and try again" });
+      }
+      return res.status(500).json({ message: "Failed to publish report cards" });
     }
   }
 );
@@ -374,7 +328,7 @@ router.get(
       });
     }
 
-    res.json(reportCard);
+    res.json(presentReportCardSnapshot(reportCard));
   }
 );
 
@@ -432,6 +386,65 @@ router.get(
 
     res.json(reportCards);
   }
+);
+
+router.get(
+  "/student",
+  authenticate,
+  requireRole([Role.STUDENT]),
+  async (req, res) => {
+    const student = await prisma.student.findFirst({
+      where: { userId: req.user!.id, isArchived: false },
+      select: { id: true },
+    });
+    if (!student) return res.status(404).json({ message: "Student record not found" });
+    const reportCards = await prisma.reportCard.findMany({
+      where: { studentId: student.id, status: ReportCardStatus.PUBLISHED },
+      include: { term: true, class: true, subjects: true },
+      orderBy: { generatedAt: "desc" },
+    });
+    return res.json(reportCards.map(presentReportCardSnapshot));
+  },
+);
+
+/** Published immutable snapshot used by the parent report-card screen. */
+router.get(
+  "/student/:studentId/term/:termId",
+  authenticate,
+  requireRole([Role.ADMIN, Role.PARENT, Role.STUDENT]),
+  async (req, res) => {
+    const studentId = Number(req.params.studentId);
+    const termId = Number(req.params.termId);
+    if (!Number.isInteger(studentId) || !Number.isInteger(termId)) {
+      return res.status(400).json({ message: "Invalid student or term" });
+    }
+
+    if (req.user!.role === Role.PARENT) {
+      const linked = await prisma.parentStudent.findFirst({
+        where: { studentId, parent: { userId: req.user!.id } },
+        select: { id: true },
+      });
+      if (!linked) return res.status(403).json({ message: "Not allowed to view this report card" });
+    } else if (req.user!.role === Role.STUDENT) {
+      const owned = await prisma.student.findFirst({
+        where: { id: studentId, userId: req.user!.id },
+        select: { id: true },
+      });
+      if (!owned) return res.status(403).json({ message: "Not allowed to view this report card" });
+    }
+
+    const reportCard = await prisma.reportCard.findFirst({
+      where: { studentId, termId, status: ReportCardStatus.PUBLISHED },
+      include: {
+        student: true,
+        class: true,
+        term: true,
+        subjects: { include: { subject: true }, orderBy: { subject: { name: "asc" } } },
+      },
+    });
+    if (!reportCard) return res.status(404).json({ message: "Report card not available" });
+    return res.json(presentReportCardSnapshot(reportCard));
+  },
 );
 
 /**
@@ -504,7 +517,7 @@ router.get(
       }
     }
 
-    res.json(reportCard);
+    res.json(presentReportCardSnapshot(reportCard));
   }
 );
 
