@@ -250,10 +250,32 @@ export async function createCombinedAssignment(client: any, groupId: number, tea
       if (!owner || owner.teacherSubject.teacherId !== teacherId) throw new CombinedTeachingGroupError(403, "Assignment-owner coverage changed; retry after Admin resolves membership");
       const child = await tx.assignment.create({ data: {
         title, teacherSubjectId: owner.teacherSubjectId, termId: mapping.termId,
+        gradeContributionStatus: "INCLUDED",
         type: logical.type, weight, maxPoints, position: logical.position,
         dateAssigned: logical.dateAssigned, dueDate: logical.dueDate,
       } });
       await tx.combinedAssignmentChild.create({ data: { combinedAssignmentId: logical.id, teachingGroupClassId: lane.id, assignmentId: child.id } });
+      const scopeKey = {
+        classId: lane.classSubject.classId,
+        subjectId: lane.classSubject.subjectId,
+        termId: mapping.termId,
+      };
+      const assignments = await tx.assignment.findMany({
+        where: { termId: mapping.termId, teacherSubject: { classId: scopeKey.classId, subjectId: scopeKey.subjectId } },
+        select: { combinedAssignmentChild: { select: { combinedAssignment: { select: { deletedAt: true } } } } },
+      });
+      const allActiveCombined = assignments.length > 0 && assignments.every((assignment: any) =>
+        assignment.combinedAssignmentChild?.combinedAssignment?.deletedAt === null,
+      );
+      await tx.gradeContributionScope.upsert({
+        where: { classId_subjectId_termId: scopeKey },
+        update: { revision: { increment: 1 } },
+        create: {
+          ...scopeKey,
+          mode: allActiveCombined ? "ACTIVE" : "REVIEWING",
+          activatedAt: allActiveCombined ? new Date() : null,
+        },
+      });
     }
     return tx.combinedAssignment.findUnique({ where: { id: logical.id }, include: { children: { include: { assignment: true } } } });
   }, serializable);

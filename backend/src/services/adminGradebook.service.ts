@@ -82,6 +82,9 @@ export async function getAdminGradebook(client: any, teacherSubjectId: number, t
         title: true,
         maxPoints: true,
         isLocked: true,
+        gradeContributionStatus: true,
+        gradeContributionNote: true,
+        gradeContributionReviewedAt: true,
         position: true,
         scores: {
           where: { student: { classId: teacherSubject.classId, isArchived: false } },
@@ -93,4 +96,65 @@ export async function getAdminGradebook(client: any, teacherSubjectId: number, t
   ]);
 
   return { teacherSubject, term, students, assignments };
+}
+
+export async function reviewAssignmentContribution(client: any, input: {
+  assignmentId: number; status: "UNREVIEWED" | "INCLUDED" | "EXCLUDED";
+  note?: string; expectedReviewedAt?: string | null; actorUserId: number;
+}) {
+  if (!["UNREVIEWED", "INCLUDED", "EXCLUDED"].includes(input.status)) throw Object.assign(new Error("Invalid contribution status"), { status: 400 });
+  if (input.status === "EXCLUDED" && !String(input.note ?? "").trim()) throw Object.assign(new Error("A reason is required to exclude an assignment"), { status: 400 });
+  return client.$transaction(async (tx: any) => {
+    const assignment = await tx.assignment.findUnique({
+      where: { id: input.assignmentId },
+      include: { teacherSubject: true, scores: { select: { id: true } } },
+    });
+    if (!assignment) throw Object.assign(new Error("Assignment not found"), { status: 404 });
+    const currentToken = assignment.gradeContributionReviewedAt?.toISOString() ?? null;
+    if (currentToken !== (input.expectedReviewedAt ?? null)) throw Object.assign(new Error("Assignment review changed; refresh and try again"), { status: 409 });
+    const reviewedAt = new Date();
+    const changed = await tx.assignment.updateMany({ where: {
+      id: assignment.id,
+      gradeContributionReviewedAt: assignment.gradeContributionReviewedAt,
+    }, data: {
+      gradeContributionStatus: input.status,
+      gradeContributionNote: String(input.note ?? "").trim() || null,
+      gradeContributionReviewedAt: reviewedAt,
+    }});
+    if (changed.count !== 1) throw Object.assign(new Error("Assignment review changed; refresh and try again"), { status: 409 });
+    const updated = await tx.assignment.findUniqueOrThrow({ where: { id: assignment.id } });
+    const scope = await tx.gradeContributionScope.upsert({
+      where: { classId_subjectId_termId: { classId: assignment.teacherSubject.classId, subjectId: assignment.teacherSubject.subjectId, termId: assignment.termId } },
+      update: { revision: { increment: 1 }, mode: "REVIEWING", activatedAt: null },
+      create: { classId: assignment.teacherSubject.classId, subjectId: assignment.teacherSubject.subjectId, termId: assignment.termId, mode: "REVIEWING" },
+    });
+    await tx.auditLog.create({ data: {
+      actorUserId: String(input.actorUserId), actorRole: "ADMIN", action: "ASSIGNMENT_GRADE_CONTRIBUTION_REVIEWED",
+      entityType: "Assignment", entityId: String(assignment.id), metadata: {
+        previousStatus: assignment.gradeContributionStatus, status: input.status, note: input.note ?? null,
+        classId: assignment.teacherSubject.classId, subjectId: assignment.teacherSubject.subjectId,
+        termId: assignment.termId, scoreCount: assignment.scores.length, scopeRevision: scope.revision,
+      },
+    }});
+    return { ...updated, scores: assignment.scores, scope };
+  });
+}
+
+export async function activateContributionScope(client: any, input: { classId: number; subjectId: number; termId: number; actorUserId: number }) {
+  return client.$transaction(async (tx: any) => {
+    const assignments = await tx.assignment.findMany({
+      where: { termId: input.termId, teacherSubject: { classId: input.classId, subjectId: input.subjectId } },
+      select: { id: true, gradeContributionStatus: true },
+    });
+    const unreviewed = assignments.filter((item: any) => item.gradeContributionStatus === "UNREVIEWED").map((item: any) => item.id);
+    if (unreviewed.length) throw Object.assign(new Error(`Assignments require review: ${unreviewed.join(", ")}`), { status: 409, details: { unreviewed } });
+    if (!assignments.some((item: any) => item.gradeContributionStatus === "INCLUDED")) throw Object.assign(new Error("At least one assignment must be included"), { status: 409 });
+    const scope = await tx.gradeContributionScope.upsert({
+      where: { classId_subjectId_termId: { classId: input.classId, subjectId: input.subjectId, termId: input.termId } },
+      update: { mode: "ACTIVE", activatedAt: new Date() },
+      create: { classId: input.classId, subjectId: input.subjectId, termId: input.termId, mode: "ACTIVE", activatedAt: new Date() },
+    });
+    await tx.auditLog.create({ data: { actorUserId: String(input.actorUserId), actorRole: "ADMIN", action: "GRADE_CONTRIBUTION_SCOPE_ACTIVATED", entityType: "GradeContributionScope", entityId: String(scope.id), metadata: input } });
+    return scope;
+  });
 }

@@ -131,11 +131,13 @@ export default function Reports() {
 
   const handlePrintSelected = () => {
     if (hasUnresolvedSaves(commentSaveStates)) return setError("Resolve Unsaved, Saving, Failed, or Conflict comments before printing.");
+    if (reports.some((report) => report.subjects.some((subject) => subject.completenessState === "REVIEW_REQUIRED"))) return setError("An administrator must review assignment inclusion before printing.");
     if (selectedStudentId) setPrintMode(PRINT_MODE.SELECTED);
   };
 
   const handlePrintAll = () => {
     if (hasUnresolvedSaves(commentSaveStates)) return setError("Resolve Unsaved, Saving, Failed, or Conflict comments before printing.");
+    if (reports.some((report) => report.subjects.some((subject) => subject.completenessState === "REVIEW_REQUIRED"))) return setError("An administrator must review assignment inclusion before printing.");
     if (reports.length) setPrintMode(PRINT_MODE.ALL);
   };
 

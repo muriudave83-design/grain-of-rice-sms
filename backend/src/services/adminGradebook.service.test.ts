@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getAdminGradebook, getAdminGradebookOptions, listAdminGradebookClasses } from "./adminGradebook.service";
+import { getAdminGradebook, getAdminGradebookOptions, listAdminGradebookClasses, reviewAssignmentContribution } from "./adminGradebook.service";
 
 test("class and option queries exclude archived structure but retain historical teacher assignments", async () => {
   const calls: any = {};
@@ -24,6 +24,40 @@ test("class and option queries exclude archived structure but retain historical 
   assert.equal(calls.teacherSubjects.where.class.isArchived, false);
   assert.equal(calls.teacherSubjects.where.subject.isArchived, false);
   assert.equal("isActive" in calls.teacherSubjects.where, false);
+});
+
+test("review uses an atomic timestamp precondition and returns a scope to REVIEWING", async () => {
+  const reviewedAt = new Date("2026-10-20T06:00:00.000Z");
+  const calls: any = {};
+  const tx = {
+    assignment: {
+      findUnique: async () => ({ id: 44, termId: 12, gradeContributionStatus: "INCLUDED", gradeContributionReviewedAt: reviewedAt, teacherSubject: { classId: 3, subjectId: 5 }, scores: [] }),
+      updateMany: async (args: any) => { calls.cas = args; return { count: 1 }; },
+      findUniqueOrThrow: async () => ({ id: 44, gradeContributionStatus: "EXCLUDED" }),
+    },
+    gradeContributionScope: { upsert: async (args: any) => { calls.scope = args; return { id: 8, revision: 3, mode: "REVIEWING" }; } },
+    auditLog: { create: async () => ({}) },
+  };
+  const client = { $transaction: async (fn: any) => fn(tx) };
+  await reviewAssignmentContribution(client, { assignmentId: 44, status: "EXCLUDED", note: "Duplicate", expectedReviewedAt: reviewedAt.toISOString(), actorUserId: 1 });
+  assert.equal(calls.cas.where.gradeContributionReviewedAt, reviewedAt);
+  assert.equal(calls.scope.update.mode, "REVIEWING");
+  assert.equal(calls.scope.update.activatedAt, null);
+});
+
+test("a concurrent review loses the compare-and-set and returns 409", async () => {
+  const reviewedAt = new Date("2026-10-20T06:00:00.000Z");
+  const tx = {
+    assignment: {
+      findUnique: async () => ({ id: 44, termId: 12, gradeContributionStatus: "INCLUDED", gradeContributionReviewedAt: reviewedAt, teacherSubject: { classId: 3, subjectId: 5 }, scores: [] }),
+      updateMany: async () => ({ count: 0 }),
+    },
+  };
+  const client = { $transaction: async (fn: any) => fn(tx) };
+  await assert.rejects(
+    () => reviewAssignmentContribution(client, { assignmentId: 44, status: "EXCLUDED", note: "Duplicate", expectedReviewedAt: reviewedAt.toISOString(), actorUserId: 1 }),
+    (error: any) => error.status === 409,
+  );
 });
 
 test("exact TeacherSubject and Assignment IDs are used while archived students are excluded", async () => {

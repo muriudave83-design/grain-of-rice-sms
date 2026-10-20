@@ -4,6 +4,7 @@ import { getGradeDescription, getLetterGrade } from "../utils/gradeDescriptions"
 import { AssessmentType } from "@prisma/client";
 import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain";
 import { assembleClassSubjectResults, indexReportComments } from "../services/reportData.service";
+import { FinalGradePublicationError, publishFinalGradesAtomically } from "../services/finalGradePublication.service";
 import { deleteOwnedAssignment } from "../services/assignmentDeletion.service";
 import { assertNotCombinedChild, CombinedTeachingGroupError } from "../services/combinedTeachingGroup.service";
 import {
@@ -346,11 +347,12 @@ export const createAssignment = async (req: Request, res: Response) => {
 
     const position = last ? last.position + 1 : 0;
 
-    const assignment = await prisma.assignment.create({
-      data: {
+    const assignment = await prisma.$transaction(async (tx) => {
+      const created = await tx.assignment.create({ data: {
         title,
         teacherSubjectId: tsId,
         termId: Number(termId),
+        gradeContributionStatus: "INCLUDED",
 
         type: normalizedType as AssessmentType,
 
@@ -362,7 +364,23 @@ export const createAssignment = async (req: Request, res: Response) => {
         // Existing fields (unchanged)
         position,
         ...(weight !== undefined && { weight }),
-      },
+      }});
+      const scopeKey = { classId: teacherSubject.classId, subjectId: teacherSubject.subjectId, termId: numericTermId };
+      const ownerRows = await tx.assignment.findMany({
+        where: { termId: numericTermId, teacherSubject: { classId: teacherSubject.classId, subjectId: teacherSubject.subjectId } },
+        select: { teacherSubjectId: true },
+      });
+      const ownerCount = new Set(ownerRows.map((row) => row.teacherSubjectId)).size;
+      const existingScope = await tx.gradeContributionScope.findUnique({ where: { classId_subjectId_termId: scopeKey } });
+      if (existingScope) {
+        await tx.gradeContributionScope.update({
+          where: { id: existingScope.id },
+          data: { revision: { increment: 1 } },
+        });
+      } else if (ownerCount > 1) {
+        await tx.gradeContributionScope.create({ data: { ...scopeKey, mode: "REVIEWING" } });
+      }
+      return created;
     });
 
     res.json(assignment);
@@ -754,6 +772,7 @@ export const getReportData = async (req: Request, res: Response) => {
                       id: true,
                       weight: true,
                       maxPoints: true,
+                      gradeContributionStatus: true,
                       scores: { select: { studentId: true, score: true } },
                     },
                   },
@@ -770,10 +789,10 @@ export const getReportData = async (req: Request, res: Response) => {
     );
     const studentIds = students.map((student) => student.id);
     const subjectIds = classSubjects.map((entry) => entry.subjectId);
-    const [grades, comments, attendanceEntries] = await Promise.all([
+    const [grades, comments, attendanceEntries, contributionScopes] = await Promise.all([
       prisma.grade.findMany({
         where: { termId, studentId: { in: studentIds }, subjectId: { in: subjectIds } },
-        select: { studentId: true, subjectId: true, total: true },
+        select: { studentId: true, subjectId: true, total: true, contributionRevision: true },
       }),
       prisma.reportComment.findMany({
       where: {
@@ -786,6 +805,10 @@ export const getReportData = async (req: Request, res: Response) => {
       prisma.attendanceEntry.findMany({
         where: { studentId: { in: studentIds }, session: { termId } },
         include: { session: true },
+      }),
+      prisma.gradeContributionScope.findMany({
+        where: { classId, termId, subjectId: { in: subjectIds } },
+        select: { subjectId: true, mode: true, revision: true },
       }),
     ]);
     const commentsByStudentAndSubject = indexReportComments(comments);
@@ -800,6 +823,7 @@ export const getReportData = async (req: Request, res: Response) => {
           classSubjects,
           grades,
           comments: commentsByStudentAndSubject,
+          contributionScopes: new Map(contributionScopes.map((scope) => [scope.subjectId, scope])),
         }).map((subject) => {
           const letter = getLetterGrade(subject.finalGrade);
           return {
@@ -894,139 +918,26 @@ export const saveReportComment = async (req: Request, res: Response) => {
 //
 
 export const publishFinalGrades = async (req: Request, res: Response) => {
+  const classId = Number(req.params.classId);
+  const termId = Number(req.body.termId);
+  const teacherId = (req as any).user.id;
+  if (!classId || !termId) return res.status(400).json({ error: "classId and termId are required" });
+
   try {
-    const classId = Number(req.params.classId);
-    const termId = Number(req.body.termId);
-    const teacherId = (req as any).user.id;
-
-    if (!classId || !termId) {
-      return res.status(400).json({ error: "classId and termId are required" });
-    }
-
-    const [term, students, teacherSubjects] = await Promise.all([
-      prisma.term.findFirst({ where: { id: termId, classId }, select: { id: true } }),
-      prisma.student.findMany({
-        where: { classId, isArchived: false },
-        select: { id: true, firstName: true, lastName: true },
-      }),
-      prisma.teacherSubject.findMany({
-        where: { teacherId, classId, isActive: true, class: { isArchived: false } },
-        include: {
-          subject: { select: { id: true, name: true } },
-          assignments: { where: { termId }, include: { scores: true } },
-        },
-      }),
-    ]);
-
-    if (teacherSubjects.length === 0) {
-      return res.status(403).json({ error: "Not assigned to this class" });
-    }
-    if (!term) {
-      return res.status(400).json({ error: "Term does not belong to this class" });
-    }
-    if (students.length === 0) {
-      return res.status(400).json({ error: "No active students are assigned to this class" });
-    }
-
-    const missing: Array<{
-      studentId?: number;
-      student?: string;
-      subject: string;
-      assignment?: string;
-    }> = [];
-
-    for (const teacherSubject of teacherSubjects) {
-      if (teacherSubject.assignments.length === 0) {
-        missing.push({ subject: teacherSubject.subject.name });
-        continue;
-      }
-
-      if (teacherSubject.assignments.some((assignment) => assignment.maxPoints <= 0)) {
-        return res.status(409).json({
-          error: `Cannot publish ${teacherSubject.subject.name}: assignment max points must be greater than zero.`,
-        });
-      }
-
-      const totalWeight = teacherSubject.assignments.reduce(
-        (sum, assignment) => sum + (assignment.weight ?? 1),
-        0
-      );
-      if (totalWeight <= 0) {
-        return res.status(409).json({
-          error: `Cannot publish ${teacherSubject.subject.name}: total assignment weight must be greater than zero.`,
-        });
-      }
-
-      for (const student of students) {
-        for (const assignment of teacherSubject.assignments) {
-          if (!assignment.scores.some((score) => score.studentId === student.id)) {
-            missing.push({
-              studentId: student.id,
-              student: `${student.firstName} ${student.lastName}`,
-              subject: teacherSubject.subject.name,
-              assignment: assignment.title,
-            });
-          }
-        }
-      }
-    }
-
-    if (missing.length > 0) {
-      return res.status(409).json({
-        error: "Final grades cannot be published until every active student has a score for every assignment.",
-        missing,
-      });
-    }
-
-    const result = await prisma.$transaction(async (tx) => {
-      let publishedGrades = 0;
-
-      for (const teacherSubject of teacherSubjects) {
-        for (const student of students) {
-          const calculated = calculateFinalGradeForStudent(student.id, teacherSubject.assignments);
-          if (calculated === null) throw new Error("Publication completeness guard failed");
-          const total = Number(calculated.toFixed(1));
-
-          await tx.grade.upsert({
-            where: {
-              studentId_subjectId_termId: {
-                studentId: student.id,
-                subjectId: teacherSubject.subjectId,
-                termId,
-              },
-            },
-            update: { average: total / 100, total },
-            create: {
-              studentId: student.id,
-              subjectId: teacherSubject.subjectId,
-              termId,
-              average: total / 100,
-              total,
-            },
-          });
-          publishedGrades++;
-        }
-
-        await tx.assignment.updateMany({
-          where: { id: { in: teacherSubject.assignments.map((assignment) => assignment.id) } },
-          data: { isLocked: true },
-        });
-      }
-
-      return { publishedGrades };
-    });
-
+    const result = await publishFinalGradesAtomically(prisma, { classId, termId, teacherId });
     return res.json({
       success: true,
       ...result,
       message: "Final grades published and contributing assignments locked.",
     });
   } catch (err) {
+    if (err instanceof FinalGradePublicationError) {
+      return res.status(err.status).json({ error: err.message, ...(err.details as object ?? {}) });
+    }
     console.error("PUBLISH FINAL GRADES ERROR:", err);
     return res.status(500).json({ error: "Failed to publish final grades" });
   }
 };
-
 export const generateTranscripts = async (req: Request, res: Response) => {
   try {
     const classId = Number(req.body.classId);

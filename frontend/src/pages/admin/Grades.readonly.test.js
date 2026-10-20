@@ -4,11 +4,14 @@ import test from "node:test";
 
 const source = fs.readFileSync(new URL("./Grades.jsx", import.meta.url), "utf8");
 
-test("administrator gradebook uses only read APIs and renders no score editing controls", () => {
+test("administrator gradebook keeps marks read-only while exposing only explicit contribution review writes", () => {
   assert.match(source, /apiBase = "\/admin\/gradebook"/);
   assert.match(source, /apiClient\.get\(`\$\{apiBase\}\/classes`, \{ signal: controller\.signal \}\)/);
   assert.match(source, /apiClient\.get\(`\$\{apiBase\}\/teacher-subjects\/\$\{teacherSubjectId\}`/);
-  assert.doesNotMatch(source, /apiClient\.(post|put|patch|delete)/);
+  assert.match(source, /apiClient\.patch\(`\$\{apiBase\}\/assignments\/\$\{assignment\.id\}\/contribution`/);
+  assert.match(source, /apiClient\.post\(`\$\{apiBase\}\/contribution-scopes\/activate`/);
+  assert.doesNotMatch(source, /apiClient\.(put|delete)/);
+  assert.doesNotMatch(source, /apiClient\.(post|patch)\([^\n]*(score|scores)/i);
   assert.doesNotMatch(source, /type=["']number["']/);
 });
 

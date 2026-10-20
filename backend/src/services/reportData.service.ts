@@ -5,10 +5,13 @@ type ReportCommentRecord = {
   updatedAt: Date;
 };
 
+import { resolveExplicitSubjectGrade } from "./gradeContribution.service";
+
 type AssignmentRecord = {
   id?: number;
   weight?: number | null;
   maxPoints?: number | null;
+  gradeContributionStatus?: "UNREVIEWED" | "INCLUDED" | "EXCLUDED";
   scores: Array<{ studentId: number; score: number | null }>;
 };
 
@@ -24,7 +27,7 @@ type ClassSubjectRecord = {
   subject: { name: string; teacherSubjects: TeacherSubjectRecord[] };
 };
 
-type GradeRecord = { studentId: number; subjectId: number; total: number };
+type GradeRecord = { studentId: number; subjectId: number; total: number; contributionRevision?: number | null };
 
 export function calculateCompleteAssignmentResult(
   studentId: number,
@@ -62,22 +65,35 @@ export function assembleClassSubjectResults({
   classSubjects,
   grades,
   comments,
+  contributionScopes = new Map(),
 }: {
   studentId: number;
   requestingTeacherId: number;
   classSubjects: ClassSubjectRecord[];
   grades: GradeRecord[];
   comments: Map<string, { comment: string; updatedAt: Date }>;
+  contributionScopes?: Map<number, { mode: "REVIEWING" | "ACTIVE"; revision: number }>;
 }) {
   return classSubjects.map((classSubject) => {
     const teacherSubject = selectReportingTeacherSubject(classSubject.subject.teacherSubjects);
     const published = grades.find(
       (grade) => grade.studentId === studentId && grade.subjectId === classSubject.subjectId,
     );
-    const calculated = teacherSubject
+    const legacyCalculated = teacherSubject
       ? calculateCompleteAssignmentResult(studentId, teacherSubject.assignments)
       : null;
-    const result = published ? published.total : calculated;
+    const explicit = resolveExplicitSubjectGrade({
+      studentId,
+      assignments: classSubject.subject.teacherSubjects
+        .flatMap((record) => record.assignments)
+        .filter((assignment): assignment is AssignmentRecord & { id: number } => assignment.id !== undefined),
+      scope: contributionScopes.get(classSubject.subjectId) ?? null,
+      published,
+    });
+    const result = explicit && (explicit.status === "PUBLISHED" || explicit.status === "COMPLETE")
+      ? explicit.value
+      : explicit ? null : published ? published.total : legacyCalculated;
+    const completenessState = explicit?.status ?? (result === null ? "INCOMPLETE" : published ? "PUBLISHED" : "COMPLETE");
 
     return {
       subjectId: classSubject.subjectId,
@@ -85,6 +101,8 @@ export function assembleClassSubjectResults({
       subjectName: classSubject.subject.name,
       finalGrade: result === null ? null : Number(result.toFixed(1)),
       resultSource: published ? "published-grade" : result === null ? "incomplete" : "assignment-draft",
+      completenessState,
+      needsRevalidation: explicit?.status === "PUBLISHED" ? explicit.needsRevalidation : false,
       canEditComment: Boolean(
         teacherSubject?.isActive && teacherSubject.teacherId === requestingTeacherId,
       ),

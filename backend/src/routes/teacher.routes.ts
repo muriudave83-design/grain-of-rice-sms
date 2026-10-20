@@ -119,6 +119,7 @@ router.get("/final-grades/:classId", async (req, res) => {
           gradeDescription: null,
           subjects: subjects.map((subject: any) => subject.subjectName),
           isComplete: false,
+          reviewRequired: subjects.some((subject: any) => subject.completenessState === "REVIEW_REQUIRED"),
           remarks: "",
         };
       }
@@ -140,6 +141,7 @@ router.get("/final-grades/:classId", async (req, res) => {
         gradeDescription: getGradeDescription(letter),
         subjects: subjects.map((subject: any) => subject.subjectName),
         isComplete: true,
+        reviewRequired: false,
         remarks: "",
       };
     });

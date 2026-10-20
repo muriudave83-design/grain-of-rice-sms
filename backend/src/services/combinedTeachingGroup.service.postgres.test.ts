@@ -60,6 +60,13 @@ test("combined service orchestrates class-specific records safely", { skip: !iso
     const retry: any = await createCombinedAssignment(db, group.id, owner.id, { periodId, requestKey: "service-request", title: "Composition 1", maxPoints: 50, weight: 2 });
     assert.equal(first.id, retry.id); assert.equal(first.children.length, 2);
     assert.deepEqual(first.children.map((child: any) => child.assignment.termId).sort(), [term8.id, term9.id].sort());
+    const autoScopes = await db.gradeContributionScope.findMany({ where: { OR: [
+      { classId: class8.id, subjectId: subject8.id, termId: term8.id },
+      { classId: class9.id, subjectId: subject9.id, termId: term9.id },
+    ] } });
+    assert.equal(autoScopes.length, 2);
+    assert.ok(autoScopes.every((scope) => scope.mode === "ACTIVE"));
+    assert.equal(await db.assignment.count({ where: { id: { in: first.children.map((child: any) => child.assignmentId) }, gradeContributionStatus: "INCLUDED" } }), 2);
     await saveCombinedScore(db, group.id, owner.id, { combinedAssignmentId: first.id, studentId: student8.id, score: 0, expectedScore: null });
     await saveCombinedScore(db, group.id, owner.id, { combinedAssignmentId: first.id, studentId: student9.id, score: 45, expectedScore: null });
     const child8 = first.children.find((child: any) => child.assignment.termId === term8.id);

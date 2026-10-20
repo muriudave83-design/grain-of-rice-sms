@@ -112,6 +112,30 @@ export default function Grades({
   const loading = classesLoading || optionsLoading || gradebookLoading;
   const error = gradebookError || optionsError || classesError;
 
+  const reviewAssignment = async (assignment, status) => {
+    const note = status === "EXCLUDED" ? globalThis.prompt("Reason for excluding this assignment:") : globalThis.prompt("Review note (optional):", assignment.gradeContributionNote || "");
+    if (note === null || (status === "EXCLUDED" && !note.trim())) return;
+    if (status === "EXCLUDED" && assignment.scores.length && !globalThis.confirm("Exclude this scored assignment from future final-grade calculations? Scores will be preserved.")) return;
+    try {
+      const { data } = await apiClient.patch(`${apiBase}/assignments/${assignment.id}/contribution`, {
+        status, note, expectedReviewedAt: assignment.gradeContributionReviewedAt || null,
+      });
+      setGradebook((current) => ({ ...current, assignments: current.assignments.map((item) => item.id === assignment.id ? { ...item, ...data, scores: item.scores } : item) }));
+    } catch (requestError) {
+      setGradebookError(requestError?.response?.data?.message || "Failed to review assignment");
+    }
+  };
+
+  const activateScope = async () => {
+    if (!globalThis.confirm("Activate reviewed assignment inclusion for this class, subject and term?")) return;
+    try {
+      await apiClient.post(`${apiBase}/contribution-scopes/activate`, { classId: Number(classId), subjectId: Number(subjectId), termId: Number(termId) });
+      globalThis.alert("Explicit grade calculation activated for this class, subject and term.");
+    } catch (requestError) {
+      setGradebookError(requestError?.response?.data?.message || "Unable to activate reviewed assignments");
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div>
@@ -178,6 +202,7 @@ export default function Grades({
               {gradebook.teacherSubject.isActive ? "Active assignment" : "Historical assignment"}
             </span>
             <span className="text-gray-600">{gradebook.teacherSubject.teacher.name}</span>
+            <button type="button" className="rounded bg-blue-700 px-3 py-1 text-white" onClick={activateScope}>Activate reviewed set</button>
           </div>
 
           {!hasScores && (
@@ -195,6 +220,11 @@ export default function Grades({
                     <th key={assignment.id} className="min-w-36 p-3 text-center">
                       <span className="block">{assignment.title}</span>
                       <span className="font-normal text-gray-500">Assignment #{assignment.id} · Max {assignment.maxPoints}</span>
+                      <span className="block font-normal">{assignment.gradeContributionStatus}</span>
+                      <span className="mt-1 block space-x-1 font-normal">
+                        <button type="button" className="underline" onClick={() => reviewAssignment(assignment, "INCLUDED")}>Include</button>
+                        <button type="button" className="underline text-red-700" onClick={() => reviewAssignment(assignment, "EXCLUDED")}>Exclude</button>
+                      </span>
                     </th>
                   ))}
                 </tr>

@@ -253,7 +253,7 @@ export default function FinalGrades() {
                   <td style={tdStyle}>{student.name}</td>
                   <td style={{ ...tdStyle, textAlign: "center" }}>{avg == null ? "—" : `${avg.toFixed(1)}%`}</td>
                   <td style={{ ...tdStyle, fontWeight: "bold", color: grade === "F" ? "red" : "black", textAlign: "center" }}>
-                    {student.isComplete === false ? "Incomplete" : formatGrade(grade, "-")}
+                    {student.reviewRequired ? "Review required" : student.isComplete === false ? "Incomplete" : formatGrade(grade, "-")}
                   </td>
                   <td style={tdStyle}>{student.remarks ?? "-"}</td>
                 </tr>

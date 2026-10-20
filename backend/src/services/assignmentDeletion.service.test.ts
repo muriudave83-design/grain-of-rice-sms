@@ -121,8 +121,9 @@ test("remaining assignments alone drive recalculated average and completeness", 
 
 test("published lifecycle still locks assignments and blocks edit and unlock", () => {
   const controller = fs.readFileSync(path.resolve(process.cwd(), "src/controllers/teacher.controller.ts"), "utf8");
+  const publication = fs.readFileSync(path.resolve(process.cwd(), "src/services/finalGradePublication.service.ts"), "utf8");
   const routes = fs.readFileSync(path.resolve(process.cwd(), "src/routes/teacher.routes.ts"), "utf8");
-  assert.match(controller, /data: \{ isLocked: true \}/);
+  assert.match(publication, /data: \{ isLocked: true \}/);
   assert.match(controller, /Published final-grade assignments cannot be edited/);
   assert.match(routes, /Published final-grade assignments cannot be unlocked/);
   assert.match(routes, /subjectId: owned\.teacherSubject\.subjectId/);

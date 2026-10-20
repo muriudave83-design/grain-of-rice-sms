@@ -64,7 +64,11 @@ export default function TeacherReportCardSheet({
               <span className="report-subject-name">{subject.subjectName}</span>
 
               <span className="report-score">
-                {subject.finalGrade === null
+                {subject.completenessState === "REVIEW_REQUIRED"
+                  ? "Review required"
+                  : subject.needsRevalidation
+                    ? `${formatReportPercentage(subject.finalGrade)} (revalidation required)`
+                    : subject.finalGrade === null
                   ? "Incomplete"
                   : formatReportPercentage(subject.finalGrade)}
               </span>

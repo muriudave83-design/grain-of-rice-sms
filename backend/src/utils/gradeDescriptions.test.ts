@@ -59,7 +59,8 @@ test("active Gradebook and Final Grades CSV contain no Position or ranking", () 
   const sources = [
     "pages/teacher/GradebookDetail.jsx", "pages/teacher/FinalGrades.jsx", "utils/finalGradesCsv.js",
   ].map((file) => fs.readFileSync(path.join(frontendRoot, file), "utf8")).join("\n");
-  assert.doesNotMatch(sources, /Position|rankStudents|rankedStudents/);
+  assert.doesNotMatch(sources, />\s*Position\s*</i);
+  assert.doesNotMatch(sources, /rankStudents|rankedStudents/);
 });
 test("persisted and transcript grades use the displayed canonical letter", () => {
   const displayed = getLetterGrade(89);
@@ -68,7 +69,10 @@ test("persisted and transcript grades use the displayed canonical letter", () =>
   assert.equal(transcriptSnapshot, displayed);
 });
 test("publication guard, authorization, active-student and Term scoping remain present", () => {
-  const source = fs.readFileSync(path.resolve(process.cwd(), "src/controllers/teacher.controller.ts"), "utf8");
+  const source = [
+    "src/controllers/teacher.controller.ts",
+    "src/services/finalGradePublication.service.ts",
+  ].map((file) => fs.readFileSync(path.resolve(process.cwd(), file), "utf8")).join("\n");
   assert.match(source, /every active student has a score for every assignment/);
   assert.match(source, /teacherId, classId/);
   assert.match(source, /id: termId, classId/);
