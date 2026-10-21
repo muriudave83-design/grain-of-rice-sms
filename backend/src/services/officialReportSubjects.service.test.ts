@@ -48,6 +48,63 @@ test("a group name is harmless when it is itself the configured class lane", () 
   assert.equal(excluded.has(100), false);
 });
 
+test("Grade 3 Mathematics keeps the evidenced class-specific subject and removes its empty generic duplicate", () => {
+  const subjects = [
+    { id: 30, subjectId: 300, subject: { name: "GRADE 3 MATHEMATICS" } },
+    { id: 31, subjectId: 301, subject: { name: "MATHEMATICS" } },
+  ];
+  const excluded = findUnbackedCombinedLabelSubjectIds({
+    className: "Grade 3",
+    classSubjects: subjects,
+    groupLanes: [],
+    evidenceSubjectIds: [300],
+  });
+  assert.deepEqual([...excluded], [301]);
+  assert.deepEqual(filterExcludedReportSubjects(subjects, excluded).map((entry) => entry.subject.name), ["GRADE 3 MATHEMATICS"]);
+});
+
+test("class prefixes are only equivalent inside their own class", () => {
+  const subjects = [
+    { id: 40, subjectId: 400, subject: { name: "GRADE 3 MATHEMATICS" } },
+    { id: 41, subjectId: 401, subject: { name: "MATHEMATICS" } },
+  ];
+  const excluded = findUnbackedCombinedLabelSubjectIds({
+    className: "Grade 4",
+    classSubjects: subjects,
+    groupLanes: [],
+    evidenceSubjectIds: [400],
+  });
+  assert.equal(excluded.size, 0);
+});
+
+test("equivalent incomplete subjects remain visible when neither has academic evidence", () => {
+  const subjects = [
+    { id: 50, subjectId: 500, subject: { name: "GRADE 3 SCIENCE" } },
+    { id: 51, subjectId: 501, subject: { name: "SCIENCE" } },
+  ];
+  const excluded = findUnbackedCombinedLabelSubjectIds({
+    className: "Grade 3",
+    classSubjects: subjects,
+    groupLanes: [],
+    evidenceSubjectIds: [],
+  });
+  assert.equal(excluded.size, 0);
+});
+
+test("conflicting academic evidence preserves both equivalent subject configurations", () => {
+  const subjects = [
+    { id: 60, subjectId: 600, subject: { name: "GRADE 3 MATHEMATICS" } },
+    { id: 61, subjectId: 601, subject: { name: "MATHEMATICS" } },
+  ];
+  const excluded = findUnbackedCombinedLabelSubjectIds({
+    className: "Grade 3",
+    classSubjects: subjects,
+    groupLanes: [],
+    evidenceSubjectIds: [600, 601],
+  });
+  assert.equal(excluded.size, 0);
+});
+
 test("teacher generation, published API views, and PDFs share the official-subject filter", () => {
   const authoritative = fs.readFileSync(path.resolve(process.cwd(), "src/services/authoritativeReport.service.ts"), "utf8");
   const snapshots = fs.readFileSync(path.resolve(process.cwd(), "src/services/reportCardSnapshotPresentation.service.ts"), "utf8");

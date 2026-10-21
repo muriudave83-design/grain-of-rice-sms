@@ -20,7 +20,26 @@ export function normalizeReportSubjectName(value: string) {
     .trim();
 }
 
+export function subjectNameWithinClass(value: string, className: string) {
+  const subjectName = normalizeReportSubjectName(value);
+  const normalizedClassName = normalizeReportSubjectName(className);
+  const prefixes = new Set([normalizedClassName]);
+  const numberedClass = normalizedClassName.match(/^(?:GRADE|CLASS|FORM)\s+(\d+)$/);
+  if (numberedClass) {
+    prefixes.add(`GRADE ${numberedClass[1]}`);
+    prefixes.add(`CLASS ${numberedClass[1]}`);
+    prefixes.add(`FORM ${numberedClass[1]}`);
+  }
+  for (const prefix of prefixes) {
+    if (subjectName.startsWith(`${prefix} `) || subjectName.startsWith(`${prefix}-`) || subjectName.startsWith(`${prefix}:`)) {
+      return subjectName.slice(prefix.length + 1).trim();
+    }
+  }
+  return subjectName;
+}
+
 export function findUnbackedCombinedLabelSubjectIds(input: {
+  className?: string;
   classSubjects: ClassSubjectIdentity[];
   groupLanes: TeachingGroupLaneIdentity[];
   evidenceSubjectIds: Iterable<number>;
@@ -35,7 +54,7 @@ export function findUnbackedCombinedLabelSubjectIds(input: {
     laneSubjectIdsByGroupName.set(groupName, subjectIds);
   }
 
-  return new Set(input.classSubjects
+  const excluded = new Set(input.classSubjects
     .filter((classSubject) => {
       const laneSubjectIds = laneSubjectIdsByGroupName.get(
         normalizeReportSubjectName(classSubject.subject.name),
@@ -47,13 +66,34 @@ export function findUnbackedCombinedLabelSubjectIds(input: {
       );
     })
     .map((classSubject) => classSubject.subjectId));
+
+  if (!input.className) return excluded;
+
+  const equivalentSubjects = new Map<string, ClassSubjectIdentity[]>();
+  for (const classSubject of input.classSubjects) {
+    const canonicalName = subjectNameWithinClass(classSubject.subject.name, input.className);
+    const matches = equivalentSubjects.get(canonicalName) ?? [];
+    matches.push(classSubject);
+    equivalentSubjects.set(canonicalName, matches);
+  }
+  for (const matches of equivalentSubjects.values()) {
+    if (matches.length < 2 || !matches.some((entry) => evidence.has(entry.subjectId))) continue;
+    for (const classSubject of matches) {
+      if (!evidence.has(classSubject.subjectId)) excluded.add(classSubject.subjectId);
+    }
+  }
+  return excluded;
 }
 
 export async function loadExcludedCombinedLabelSubjectIds(
   client: any,
   input: { classId: number; termId: number },
 ) {
-  const [classSubjects, groupLanes, grades, assignments, assessments] = await Promise.all([
+  const [schoolClass, classSubjects, groupLanes, grades, assignments, assessments] = await Promise.all([
+    client.class.findUnique({
+      where: { id: input.classId },
+      select: { name: true },
+    }),
     client.classSubject.findMany({
       where: { classId: input.classId, subject: { isArchived: false } },
       select: { id: true, subjectId: true, subject: { select: { name: true } } },
@@ -69,21 +109,22 @@ export async function loadExcludedCombinedLabelSubjectIds(
       },
     }),
     client.grade.findMany({
-      where: { termId: input.termId, student: { classId: input.classId } },
+      where: { student: { classId: input.classId } },
       select: { subjectId: true },
       distinct: ["subjectId"],
     }),
     client.assignment.findMany({
-      where: { termId: input.termId, teacherSubject: { classId: input.classId } },
+      where: { teacherSubject: { classId: input.classId } },
       select: { teacherSubject: { select: { subjectId: true } } },
     }),
     client.assessment.findMany({
-      where: { termId: input.termId, classId: input.classId },
+      where: { classId: input.classId },
       select: { subjectId: true },
     }),
   ]);
 
   return findUnbackedCombinedLabelSubjectIds({
+    className: schoolClass?.name,
     classSubjects,
     groupLanes,
     evidenceSubjectIds: [

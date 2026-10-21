@@ -4,6 +4,7 @@ import { loadAuthoritativeReportResults, summarizeCompleteReport } from "./autho
 
 function clientFixture() {
   return {
+    class: { findUnique: async () => ({ name: "Grade 8" }) },
     classSubject: {
       findMany: async () => [
         {
