@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   acceptAuthoritativeValue,
+  acknowledgeTokenizedSave,
   beginConfirmedOverwrite,
   beginSave,
   editSaveField,
@@ -50,11 +51,33 @@ test("ordinary conflict retry cannot adopt the authoritative token", () => {
   assert.equal(ordinaryRetry.draftValue, "30");
 });
 
+test("confirmed overwrite adopts the authoritative token and preserves the intended draft", () => {
+  const saving = { ...beginSave(editSaveField(null, "saved", "mine"), "saved"), serverToken: "old-token" };
+  const conflict = {
+    ...failSave(saving, saving.sequence, "stale", true, "newer saved"),
+    authoritativeToken: "new-token",
+  };
+  const overwrite = beginConfirmedOverwrite(conflict, conflict.authoritativeValue, conflict.authoritativeToken);
+  assert.equal(overwrite.serverToken, "new-token");
+  assert.equal(overwrite.serverValue, "newer saved");
+  assert.equal(overwrite.draftValue, "mine");
+});
+
 test("late responses cannot replace a newer draft", () => {
   const first = beginSave(editSaveField(null, 10, "20"), 10);
   const newerDraft = editSaveField(first, 10, "45");
   assert.equal(finishSave(newerDraft, first.sequence, 20), newerDraft);
   assert.equal(failSave(newerDraft, first.sequence, "late"), newerDraft);
+});
+
+test("a completed save advances the token without replacing a newer draft", () => {
+  const first = beginSave({ ...editSaveField(null, "old", "first"), serverToken: "token-1" }, "old");
+  const newerDraft = editSaveField(first, "old", "second");
+  const acknowledged = acknowledgeTokenizedSave(newerDraft, first.sequence, "first", "token-2");
+  assert.equal(acknowledged.draftValue, "second");
+  assert.equal(acknowledged.serverValue, "first");
+  assert.equal(acknowledged.serverToken, "token-2");
+  assert.equal(acknowledged.status, SAVE_STATUS.UNSAVED);
 });
 
 test("navigation requires confirmation for every unresolved state", () => {

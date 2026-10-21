@@ -6,7 +6,8 @@ import {
   PRINT_MODE,
   reportsForMode,
 } from "../../utils/reportCardPresentation";
-import { acceptAuthoritativeValue, beginConfirmedOverwrite, beginSave, editSaveField, failSave, finishSave, hasUnresolvedSaves } from "../../utils/reliableSaveState";
+import { acceptAuthoritativeValue, acknowledgeTokenizedSave, beginConfirmedOverwrite, beginSave, editSaveField, failSave, hasUnresolvedSaves } from "../../utils/reliableSaveState";
+import { enqueueLatestSave } from "../../utils/latestSaveQueue";
 import useUnsavedChangesGuard from "../../utils/useUnsavedChangesGuard";
 
 export default function Reports() {
@@ -26,25 +27,43 @@ export default function Reports() {
 
   const [commentSaveStates, setCommentSaveStates] = useState({});
   const commentSaveStatesRef = useRef(commentSaveStates);
+  const commentSaveQueuesRef = useRef({});
+  const commentSaveEpochRef = useRef(0);
   useEffect(() => { commentSaveStatesRef.current = commentSaveStates; }, [commentSaveStates]);
   const confirmDiscardComments = useUnsavedChangesGuard(commentSaveStates, commentSaveStatesRef);
   const clearCommentSaveStates = () => {
+    commentSaveEpochRef.current += 1;
+    commentSaveQueuesRef.current = {};
     commentSaveStatesRef.current = {};
     setCommentSaveStates({});
   };
 
-  const saveComment = async (
+  const replaceCommentSaveState = (key, update) => {
+    const next = update(commentSaveStatesRef.current[key]);
+    if (!next) return next;
+    commentSaveStatesRef.current = { ...commentSaveStatesRef.current, [key]: next };
+    setCommentSaveStates(commentSaveStatesRef.current);
+    return next;
+  };
+
+  const persistComment = async (
     studentId,
     subject,
-    value
+    value,
+    key,
+    epoch,
   ) => {
-    const key = `${termId}-${studentId}-${subject.subjectId}`;
     const previous = commentSaveStatesRef.current[key];
-    const saving = { ...beginSave(previous, subject.comment), serverToken: previous?.serverToken ?? subject.commentUpdatedAt ?? null };
-    commentSaveStatesRef.current = { ...commentSaveStatesRef.current, [key]: saving };
-    setCommentSaveStates(commentSaveStatesRef.current);
+    if (previous?.status === "Conflict") return false;
+    if ((!previous || previous.status === "Saved") && String(value ?? "") === String(previous?.serverValue ?? subject.comment ?? "")) return true;
+    const saving = {
+      ...beginSave(previous, subject.comment),
+      draftValue: String(value ?? ""),
+      serverToken: previous?.serverToken ?? subject.commentUpdatedAt ?? null,
+    };
+    replaceCommentSaveState(key, () => saving);
     try {
-      if (!subject.teacherSubjectId) return;
+      if (!subject.teacherSubjectId) return false;
 
       const response = await apiClient.post(
         "/teacher/report/comment",
@@ -57,8 +76,14 @@ export default function Reports() {
         }
       );
 
-      if (commentSaveStatesRef.current[key]?.sequence !== saving.sequence) return;
-      setCommentSaveStates((current) => ({ ...current, [key]: { ...finishSave(current[key], saving.sequence, response.data.comment), serverToken: response.data.updatedAt } }));
+      if (commentSaveEpochRef.current !== epoch) return false;
+      replaceCommentSaveState(key, (current) => acknowledgeTokenizedSave(
+        current,
+        saving.sequence,
+        response.data.comment,
+        response.data.updatedAt,
+      ));
+      return true;
     } catch (err) {
       console.error(
         "SAVE COMMENT ERROR:",
@@ -69,17 +94,39 @@ export default function Reports() {
           const refreshed = (await apiClient.get(`/teacher/report/${classId}?termId=${termId}`)).data;
           const refreshedStudent = refreshed.find((item) => item.studentId === studentId);
           const refreshedSubject = refreshedStudent?.subjects?.find((item) => item.subjectId === subject.subjectId);
-          if (commentSaveStatesRef.current[key]?.sequence === saving.sequence && refreshedSubject?.comment === value) {
+          if (commentSaveEpochRef.current === epoch && refreshedSubject?.comment === value) {
             setReports(refreshed);
-            setCommentSaveStates((current) => ({ ...current, [key]: { ...finishSave(current[key], saving.sequence, value), serverToken: refreshedSubject.commentUpdatedAt } }));
-            return;
+            replaceCommentSaveState(key, (current) => acknowledgeTokenizedSave(
+              current,
+              saving.sequence,
+              value,
+              refreshedSubject.commentUpdatedAt,
+            ));
+            return true;
           }
         } catch (reconcileError) { console.error("Comment reconciliation failed", reconcileError); }
       }
+      if (commentSaveEpochRef.current !== epoch) return false;
       const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to save comment";
       const authoritative = err?.response?.data?.current;
-      setCommentSaveStates((current) => ({ ...current, [key]: { ...failSave(current[key], saving.sequence, message, err?.response?.status === 409, authoritative?.comment), ...(authoritative?.updatedAt ? { authoritativeToken: authoritative.updatedAt } : {}) } }));
+      replaceCommentSaveState(key, (current) => ({
+        ...failSave(current, current.sequence, message, err?.response?.status === 409, authoritative?.comment),
+        ...(authoritative?.updatedAt ? { authoritativeToken: authoritative.updatedAt } : {}),
+      }));
+      return false;
     }
+  };
+
+  const saveComment = (studentId, subject, value) => {
+    if (!subject.teacherSubjectId) return;
+    const key = `${termId}-${studentId}-${subject.subjectId}`;
+    const epoch = commentSaveEpochRef.current;
+    void enqueueLatestSave(
+      commentSaveQueuesRef.current,
+      key,
+      { studentId, subject, value, key, epoch },
+      (next) => persistComment(next.studentId, next.subject, next.value, next.key, next.epoch),
+    );
   };
 
   const acceptSavedComment = (studentId, subject) => {

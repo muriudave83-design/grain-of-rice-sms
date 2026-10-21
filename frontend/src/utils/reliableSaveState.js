@@ -40,6 +40,21 @@ export function finishSave(previous, sequence, serverValue) {
   return { ...previous, serverValue, draftValue: String(serverValue ?? ""), status: SAVE_STATUS.SAVED, error: null };
 }
 
+export function acknowledgeTokenizedSave(previous, sequence, serverValue, serverToken) {
+  if (!previous || previous.sequence < sequence) return previous;
+  if (previous.sequence === sequence) {
+    return {
+      ...finishSave(previous, sequence, serverValue),
+      serverToken,
+    };
+  }
+  return {
+    ...previous,
+    serverValue,
+    serverToken,
+  };
+}
+
 export function failSave(previous, sequence, error, conflict = false, serverValue) {
   if (!previous || previous.sequence !== sequence) return previous;
   return {
