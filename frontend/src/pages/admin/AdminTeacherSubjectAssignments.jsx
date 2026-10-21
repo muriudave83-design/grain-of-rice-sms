@@ -11,6 +11,10 @@ export default function AdminTeacherSubjectAssignments() {
   const [subjectsError, setSubjectsError] = useState("");
   const [loading, setLoading] = useState(true);
   const [showInactive, setShowInactive] = useState(false);
+  const [handoverAssignments, setHandoverAssignments] = useState([]);
+  const [handovers, setHandovers] = useState([]);
+  const [handoverTerms, setHandoverTerms] = useState([]);
+  const [handoverForm, setHandoverForm] = useState({ originalTeacherSubjectId: "", replacementTeacherSubjectId: "", termId: "", note: "" });
 
   const [form, setForm] = useState({
     teacherId: "",
@@ -55,22 +59,64 @@ export default function AdminTeacherSubjectAssignments() {
     setLoading(true);
 
     try {
-      const [teachersRes, classesRes, assignmentsRes] =
+      const [teachersRes, classesRes, assignmentsRes, allAssignmentsRes, handoversRes] =
         await Promise.all([
           apiClient.get("/admin/users?role=TEACHER"),
           apiClient.get("/admin/classes"),
           apiClient.get(`/admin/teacher-subjects${includeInactive ? "?includeInactive=true" : ""}`),
+          apiClient.get("/admin/teacher-subjects?includeInactive=true"),
+          apiClient.get("/admin/teacher-subject-handovers"),
         ]);
 
       setTeachers(teachersRes.data || []);
       setClasses(classesRes.data || []);
       setAssignments(assignmentsRes.data || []);
+      setHandoverAssignments(allAssignmentsRes.data || []);
+      setHandovers(handoversRes.data || []);
     } catch (err) {
       console.error("Failed to load data", err);
     } finally {
       setLoading(false);
     }
   }, [showInactive]);
+
+  const originalHandoverAssignment = handoverAssignments.find((item) => String(item.id) === handoverForm.originalTeacherSubjectId);
+  const replacementHandoverAssignments = originalHandoverAssignment
+    ? handoverAssignments.filter((item) => item.isActive && item.id !== originalHandoverAssignment.id && item.teacher?.id !== originalHandoverAssignment.teacher?.id && item.class?.id === originalHandoverAssignment.class?.id && item.subject?.id === originalHandoverAssignment.subject?.id)
+    : [];
+
+  useEffect(() => {
+    if (!originalHandoverAssignment?.class?.id) { setHandoverTerms([]); return; }
+    apiClient.get(`/admin/gradebook/classes/${originalHandoverAssignment.class.id}/options`)
+      .then((response) => setHandoverTerms(response.data?.terms || []))
+      .catch(() => setHandoverTerms([]));
+  }, [originalHandoverAssignment?.class?.id]);
+
+  async function createHandover(event) {
+    event.preventDefault();
+    const replacement = replacementHandoverAssignments.find((item) => String(item.id) === handoverForm.replacementTeacherSubjectId);
+    const term = handoverTerms.find((item) => String(item.id) === handoverForm.termId);
+    if (!originalHandoverAssignment || !replacement || !term) return;
+    const confirmed = confirm(`Create this exact handover?\n\nFrom: ${originalHandoverAssignment.teacher?.name}\nTo: ${replacement.teacher?.name}\nClass: ${originalHandoverAssignment.class?.name}\nSubject: ${originalHandoverAssignment.subject?.name}\nTerm: ${term.name} ${term.academicYear}\n\nNo other class, subject, or term will be authorized.`);
+    if (!confirmed) return;
+    try {
+      await apiClient.post("/admin/teacher-subject-handovers", handoverForm);
+      setHandoverForm({ originalTeacherSubjectId: "", replacementTeacherSubjectId: "", termId: "", note: "" });
+      await fetchData();
+    } catch (err) {
+      alert(err?.response?.data?.message || err?.message || "Failed to create handover");
+    }
+  }
+
+  async function revokeHandover(handover) {
+    if (!confirm(`Revoke ${handover.replacementTeacher?.name}'s handover access for ${handover.class?.name} ${handover.subject?.name}?`)) return;
+    try {
+      await apiClient.post(`/admin/teacher-subject-handovers/${handover.id}/revoke`);
+      await fetchData();
+    } catch (err) {
+      alert(err?.response?.data?.message || err?.message || "Failed to revoke handover");
+    }
+  }
 
   useEffect(() => {
     fetchData(showInactive);
@@ -253,6 +299,35 @@ export default function AdminTeacherSubjectAssignments() {
           </button>
         </div>
       </form>
+
+      <section className="bg-white border rounded p-4 space-y-4">
+        <div>
+          <h2 className="font-semibold">Gradebook handovers</h2>
+          <p className="text-sm text-gray-600">Grant term-specific access to an earlier teacher's assignments. Ownership and marks remain unchanged.</p>
+        </div>
+        <form onSubmit={createHandover} className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <select required className="p-2 border rounded" value={handoverForm.originalTeacherSubjectId} onChange={(event) => setHandoverForm({ ...handoverForm, originalTeacherSubjectId: event.target.value, replacementTeacherSubjectId: "", termId: "" })}>
+            <option value="">Original teacher assignment</option>
+            {handoverAssignments.map((item) => <option key={item.id} value={item.id}>{item.teacher?.name} — {item.class?.name} — {item.subject?.name}</option>)}
+          </select>
+          <select required className="p-2 border rounded" value={handoverForm.replacementTeacherSubjectId} disabled={!originalHandoverAssignment} onChange={(event) => setHandoverForm({ ...handoverForm, replacementTeacherSubjectId: event.target.value })}>
+            <option value="">Replacement teacher</option>
+            {replacementHandoverAssignments.map((item) => <option key={item.id} value={item.id}>{item.teacher?.name}</option>)}
+          </select>
+          <select required className="p-2 border rounded" value={handoverForm.termId} disabled={!originalHandoverAssignment} onChange={(event) => setHandoverForm({ ...handoverForm, termId: event.target.value })}>
+            <option value="">Permitted term</option>
+            {handoverTerms.map((item) => <option key={item.id} value={item.id}>{item.name} {item.academicYear}</option>)}
+          </select>
+          <button className="px-4 py-2 rounded bg-blue-600 text-white" type="submit">Create handover</button>
+        </form>
+        <input className="w-full p-2 border rounded" placeholder="Administrative note (optional)" value={handoverForm.note} onChange={(event) => setHandoverForm({ ...handoverForm, note: event.target.value })} />
+        <div className="space-y-2">
+          {handovers.map((item) => <div key={item.id} className="flex items-center justify-between border-t pt-2 text-sm">
+            <span>{item.originalTeacher?.name} → {item.replacementTeacher?.name} · {item.class?.name} · {item.subject?.name} · {item.term?.name} {item.term?.academicYear} · {item.isActive ? "Active" : "Revoked"}</span>
+            {item.isActive && <button className="text-red-600" onClick={() => revokeHandover(item)}>Revoke</button>}
+          </div>)}
+        </div>
+      </section>
 
       <div className="flex justify-end">
         <label className="flex items-center gap-2 text-sm text-gray-700">

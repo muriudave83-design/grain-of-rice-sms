@@ -94,6 +94,12 @@ router.get(
     try {
       const classId = Number(req.params.id);
 
+      const permitted = await prisma.teacherSubject.findFirst({
+        where: { teacherId: req.user!.id, classId, isActive: true, class: { isArchived: false } },
+        select: { id: true },
+      });
+      if (!permitted) return res.status(403).json({ message: "Unauthorized for this class" });
+
       const students = await prisma.student.findMany({
         where: {
           classId: classId,
@@ -121,9 +127,18 @@ router.get(
     try {
       const studentId = Number(req.params.id);
 
+      const student = await prisma.student.findFirst({ where: { id: studentId, isArchived: false }, select: { classId: true } });
+      if (!student?.classId) return res.status(404).json({ message: "Active student not found" });
+      const permittedSubjects = await prisma.teacherSubject.findMany({
+        where: { teacherId: req.user!.id, classId: student.classId, isActive: true, class: { isArchived: false } },
+        select: { subjectId: true },
+      });
+      if (!permittedSubjects.length) return res.status(403).json({ message: "Unauthorized for this student" });
+
       const scores = await prisma.assessmentScore.findMany({
         where: {
           studentId: studentId,
+          assessment: { classId: student.classId, subjectId: { in: permittedSubjects.map((item) => item.subjectId) } },
         },
         include: {
           assessment: true,
@@ -157,12 +172,13 @@ router.post(
     try {
       const teacherId = req.user?.id;
       const classId = Number(req.params.id);
-      const { title, type, maxScore } = req.body;
+      const { title, type, maxScore, subjectId, termId } = req.body;
 
       const teacherSubject = await prisma.teacherSubject.findFirst({
         where: {
           teacherId,
           classId,
+          subjectId: Number(subjectId),
           isActive: true,
           class: { isArchived: false },
         },
@@ -187,7 +203,7 @@ router.post(
         });
       }
 
-      const term = await prisma.term.findFirst();
+      const term = await prisma.term.findFirst({ where: { id: Number(termId), classId, isActive: true, isLocked: false } });
 
       if (!term) {
         return res.status(200).json({
@@ -241,7 +257,7 @@ router.post(
   async (req: any, res) => {
     try {
       const studentId = Number(req.params.id);
-      const { title, type, maxScore } = req.body;
+      const { title, type, maxScore, subjectId, termId } = req.body;
 
       const student = await prisma.student.findUnique({
         where: { id: studentId },
@@ -259,6 +275,7 @@ router.post(
         where: {
           classId,
           teacherId: req.user!.id,
+          subjectId: Number(subjectId),
           isActive: true,
           class: { isArchived: false },
         },
@@ -268,10 +285,7 @@ router.post(
         return res.status(200).json({ message: "No subject found" });
       }
 
-      const term = await prisma.term.findFirst({
-        where: { classId },
-        orderBy: [{ startDate: "desc" }, { id: "desc" }],
-      });
+      const term = await prisma.term.findFirst({ where: { id: Number(termId), classId, isActive: true, isLocked: false } });
 
       if (!term) {
         return res.status(200).json({ message: "No term found" });
@@ -317,7 +331,20 @@ router.put(
     try {
       const { studentId, assessmentId, score } = req.body;
 
-      await prisma.assessmentScore.updateMany({
+      const assessment = await prisma.assessment.findFirst({
+        where: { id: Number(assessmentId), status: "DRAFT", term: { isActive: true, isLocked: false } },
+        select: { id: true, classId: true, subjectId: true, maxScore: true },
+      });
+      if (!assessment) return res.status(409).json({ message: "Assessment is submitted, locked, inactive, or missing" });
+      const [permitted, student] = await Promise.all([
+        prisma.teacherSubject.findFirst({ where: { teacherId: req.user!.id, classId: assessment.classId, subjectId: assessment.subjectId, isActive: true }, select: { id: true } }),
+        prisma.student.findFirst({ where: { id: Number(studentId), classId: assessment.classId, isArchived: false }, select: { id: true } }),
+      ]);
+      if (!permitted) return res.status(403).json({ message: "Unauthorized for this assessment" });
+      if (!student) return res.status(400).json({ message: "Student is not active in this class" });
+      if (!Number.isFinite(Number(score)) || Number(score) < 0 || Number(score) > assessment.maxScore) return res.status(400).json({ message: "Invalid score" });
+
+      const changed = await prisma.assessmentScore.updateMany({
         where: {
           studentId: Number(studentId),
           assessmentId: Number(assessmentId),
@@ -326,6 +353,8 @@ router.put(
           score: Number(score),
         },
       });
+
+      if (changed.count !== 1) return res.status(404).json({ message: "Score record not found" });
 
       return res.status(200).json({ message: "Updated" });
     } catch (err) {

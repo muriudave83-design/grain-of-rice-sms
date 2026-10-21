@@ -4,6 +4,7 @@ import { requireRole } from "../middlewares/rolesMiddleware";
 import prisma from "../prisma";
 import { generateTranscripts } from "../controllers/teacher.controller";
 import { assertNotCombinedChild, CombinedTeachingGroupError } from "../services/combinedTeachingGroup.service";
+import { activeHandoverForAssignment, TeacherSubjectHandoverError } from "../services/teacherSubjectHandover.service";
 import { getGradeDescription, getLetterGrade } from "../utils/gradeDescriptions";
 import {
   addTeacherDiscipline,
@@ -186,20 +187,23 @@ router.put("/assignment/:id/lock", async (req, res) => {
     }
 
     const owned = await prisma.assignment.findFirst({
-      where: {
-        id: Number(id),
-        teacherSubject: { teacherId: req.user!.id, isActive: true },
-      },
+      where: { id: Number(id) },
       select: {
-        id: true,
+        id: true, isLocked: true,
         termId: true,
+        term: { select: { isLocked: true, isActive: true } },
         teacherSubject: { select: { subjectId: true, classId: true } },
       },
     });
     if (!owned) {
       return res.status(404).json({ message: "Assignment not found" });
     }
+    await activeHandoverForAssignment(prisma, req.user!.id, owned.id);
     await assertNotCombinedChild(prisma, [owned.id]);
+
+    if (owned.term.isLocked || !owned.term.isActive) {
+      return res.status(409).json({ message: "Assignment term is locked or inactive" });
+    }
 
     if (!isLocked) {
       const publishedGrade = await prisma.grade.findFirst({
@@ -224,6 +228,7 @@ router.put("/assignment/:id/lock", async (req, res) => {
 
     res.json({ isLocked: assignment.isLocked });
   } catch (err) {
+    if (err instanceof TeacherSubjectHandoverError) return res.status(err.status).json({ message: err.message });
     if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
     console.error("Lock toggle error:", err);
     res.status(500).json({ message: "Failed to toggle lock" });

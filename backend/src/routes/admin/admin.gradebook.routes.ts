@@ -4,10 +4,52 @@ import { prisma } from "../../prisma/client";
 import { authenticate } from "../../middlewares/authMiddleware";
 import { requireRole } from "../../middlewares/rolesMiddleware";
 import { activateContributionScope, getAdminGradebook, getAdminGradebookOptions, listAdminGradebookClasses, reviewAssignmentContribution } from "../../services/adminGradebook.service";
+import { createTeacherSubjectHandover, listTeacherSubjectHandovers, revokeTeacherSubjectHandover, TeacherSubjectHandoverError } from "../../services/teacherSubjectHandover.service";
 
 const router = Router();
 
 router.use(authenticate, requireRole([Role.ADMIN]));
+
+router.get("/teacher-subject-handovers", async (req, res) => {
+  const active = req.query.active === undefined ? undefined : req.query.active === "true";
+  try {
+    return res.json(await listTeacherSubjectHandovers(prisma, active));
+  } catch (error) {
+    console.error("LIST TEACHER HANDOVERS ERROR:", error);
+    return res.status(500).json({ message: "Failed to list teacher handovers" });
+  }
+});
+
+router.post("/teacher-subject-handovers", async (req, res) => {
+  const originalTeacherSubjectId = Number(req.body.originalTeacherSubjectId);
+  const replacementTeacherSubjectId = Number(req.body.replacementTeacherSubjectId);
+  const termId = Number(req.body.termId);
+  if (![originalTeacherSubjectId, replacementTeacherSubjectId, termId].every((id) => Number.isInteger(id) && id > 0)) {
+    return res.status(400).json({ message: "Valid originalTeacherSubjectId, replacementTeacherSubjectId and termId are required" });
+  }
+  try {
+    return res.status(201).json(await createTeacherSubjectHandover(prisma, {
+      originalTeacherSubjectId, replacementTeacherSubjectId, termId,
+      createdByAdminId: req.user!.id, note: req.body.note,
+    }));
+  } catch (error) {
+    if (error instanceof TeacherSubjectHandoverError) return res.status(error.status).json({ message: error.message });
+    console.error("CREATE TEACHER HANDOVER ERROR:", error);
+    return res.status(500).json({ message: "Failed to create teacher handover" });
+  }
+});
+
+router.post("/teacher-subject-handovers/:id/revoke", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Valid handover id is required" });
+  try {
+    return res.json(await revokeTeacherSubjectHandover(prisma, id, req.user!.id));
+  } catch (error) {
+    if (error instanceof TeacherSubjectHandoverError) return res.status(error.status).json({ message: error.message });
+    console.error("REVOKE TEACHER HANDOVER ERROR:", error);
+    return res.status(500).json({ message: "Failed to revoke teacher handover" });
+  }
+});
 
 router.get("/gradebook/classes", async (_req, res) => {
   try {

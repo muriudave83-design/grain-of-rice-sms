@@ -94,7 +94,7 @@ export function validateLockedScoreScope(
   if (input.teacherId !== undefined && row.teacherId !== input.teacherId) {
     throw new SavePreconditionError(403, "Not authorized for this assignment");
   }
-  if (!row.teacherSubjectActive) throw new SavePreconditionError(403, "This teacher assignment is inactive");
+  if (input.teacherId !== undefined && !row.teacherSubjectActive) throw new SavePreconditionError(403, "This teacher assignment is inactive");
   if (row.assignmentLocked || row.termLocked || !row.termActive) {
     throw new SavePreconditionError(409, "Assignment or term is locked or inactive");
   }
