@@ -7,6 +7,7 @@ function clientFixture() {
     classSubject: {
       findMany: async () => [
         {
+          id: 19,
           subjectId: 9,
           subject: { name: "Music", teacherSubjects: [
             { id: 145, teacherId: 10, isActive: true, assignments: [] },
@@ -16,6 +17,7 @@ function clientFixture() {
           ] },
         },
         {
+          id: 20,
           subjectId: 10,
           subject: { name: "Agriculture", teacherSubjects: [
             { id: 151, teacherId: 11, isActive: true, assignments: [
@@ -24,9 +26,12 @@ function clientFixture() {
             ] },
           ] },
         },
-        { subjectId: 11, subject: { name: "C.R.E", teacherSubjects: [] } },
+        { id: 21, subjectId: 11, subject: { name: "C.R.E", teacherSubjects: [] } },
       ],
     },
+    teachingGroupClass: { findMany: async () => [] },
+    assignment: { findMany: async () => [] },
+    assessment: { findMany: async () => [] },
     grade: { findMany: async () => [] },
     gradeContributionScope: { findMany: async () => [] },
     reportComment: { findMany: async () => [] },

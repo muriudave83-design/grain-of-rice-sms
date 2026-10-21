@@ -1,5 +1,8 @@
 import { getGradeDescription, getLetterGrade } from "../utils/gradeDescriptions";
 import { assembleClassSubjectResults, indexReportComments } from "./reportData.service";
+import {
+  loadExcludedCombinedLabelSubjectIds,
+} from "./officialReportSubjects.service";
 
 export async function loadAuthoritativeReportResults(
   client: any,
@@ -11,29 +14,31 @@ export async function loadAuthoritativeReportResults(
     includeComments?: boolean;
   },
 ) {
-  const classSubjects = await client.classSubject.findMany({
-    where: { classId: input.classId, subject: { isArchived: false } },
-    orderBy: { subject: { name: "asc" } },
-    include: {
-      subject: {
-        select: {
-          name: true,
-          teacherSubjects: {
-            where: { classId: input.classId },
-            select: {
-              id: true,
-              teacherId: true,
-              isActive: true,
-              assignments: {
-                where: { termId: input.termId },
-                select: {
-                  id: true,
-                  weight: true,
-                  maxPoints: true,
-                  gradeContributionStatus: true,
-                  scores: {
-                    where: { studentId: { in: input.studentIds } },
-                    select: { studentId: true, score: true },
+  const [allClassSubjects, excludedSubjectIds] = await Promise.all([
+    client.classSubject.findMany({
+      where: { classId: input.classId, subject: { isArchived: false } },
+      orderBy: { subject: { name: "asc" } },
+      include: {
+        subject: {
+          select: {
+            name: true,
+            teacherSubjects: {
+              where: { classId: input.classId },
+              select: {
+                id: true,
+                teacherId: true,
+                isActive: true,
+                assignments: {
+                  where: { termId: input.termId },
+                  select: {
+                    id: true,
+                    weight: true,
+                    maxPoints: true,
+                    gradeContributionStatus: true,
+                    scores: {
+                      where: { studentId: { in: input.studentIds } },
+                      select: { studentId: true, score: true },
+                    },
                   },
                 },
               },
@@ -41,8 +46,12 @@ export async function loadAuthoritativeReportResults(
           },
         },
       },
-    },
-  });
+    }),
+    loadExcludedCombinedLabelSubjectIds(client, { classId: input.classId, termId: input.termId }),
+  ]);
+  const classSubjects = allClassSubjects.filter(
+    (classSubject: any) => !excludedSubjectIds.has(classSubject.subjectId),
+  );
 
   const subjectIds = classSubjects.map((entry: any) => entry.subjectId);
   const teacherSubjectIds = classSubjects.flatMap((entry: any) =>

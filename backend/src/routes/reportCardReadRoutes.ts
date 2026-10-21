@@ -9,7 +9,7 @@ import {
   loadAuthoritativeReportResults,
   summarizeCompleteReport,
 } from "../services/authoritativeReport.service";
-import { presentReportCardSnapshot } from "../services/reportCardSnapshotPresentation.service";
+import { presentOfficialReportCardSnapshot } from "../services/reportCardSnapshotPresentation.service";
 
 const router = Router();
 
@@ -317,7 +317,7 @@ router.get(
       });
     }
 
-    res.json(presentReportCardSnapshot(reportCard));
+    res.json(await presentOfficialReportCardSnapshot(prisma, reportCard));
   }
 );
 
@@ -392,7 +392,9 @@ router.get(
       include: { term: true, class: true, subjects: true },
       orderBy: { generatedAt: "desc" },
     });
-    return res.json(reportCards.map(presentReportCardSnapshot));
+    return res.json(await Promise.all(reportCards.map((reportCard) =>
+      presentOfficialReportCardSnapshot(prisma, reportCard)
+    )));
   },
 );
 
@@ -432,7 +434,7 @@ router.get(
       },
     });
     if (!reportCard) return res.status(404).json({ message: "Report card not available" });
-    return res.json(presentReportCardSnapshot(reportCard));
+    return res.json(await presentOfficialReportCardSnapshot(prisma, reportCard));
   },
 );
 
@@ -506,7 +508,7 @@ router.get(
       }
     }
 
-    res.json(presentReportCardSnapshot(reportCard));
+    res.json(await presentOfficialReportCardSnapshot(prisma, reportCard));
   }
 );
 

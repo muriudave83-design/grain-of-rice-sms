@@ -3,6 +3,10 @@ import { prisma } from "../../prisma/client";
 import { ReportCardStatus } from "@prisma/client";
 import { formatGrade, getLetterGrade } from "../../utils/gradeDescriptions";
 import { loadReportAttendance } from "../attendance/reportAttendance.service";
+import {
+  filterExcludedReportSubjects,
+  loadExcludedCombinedLabelSubjectIds,
+} from "../officialReportSubjects.service";
 
 /**
  * Phase-8 v1.1 — Report Card PDF Generator
@@ -37,6 +41,12 @@ export async function generateReportCardPdf(
   if (reportCard.status !== ReportCardStatus.PUBLISHED) {
     throw new Error("Report card is not published");
   }
+
+  const excludedSubjectIds = await loadExcludedCombinedLabelSubjectIds(prisma, {
+    classId: reportCard.classId,
+    termId: reportCard.termId,
+  });
+  const officialSubjects = filterExcludedReportSubjects(reportCard.subjects, excludedSubjectIds);
 
   // 2️⃣ ATTENDANCE (REAL DB LOGIC FIX)
   const attendanceByStudent = await loadReportAttendance(prisma, {
@@ -141,7 +151,7 @@ export async function generateReportCardPdf(
 
   let rowY = tableTop + 25;
 
-  for (const entry of reportCard.subjects) {
+  for (const entry of officialSubjects) {
     if (rowY > 750) {
       doc.addPage();
       rowY = 50;
@@ -167,7 +177,7 @@ export async function generateReportCardPdf(
   doc.moveDown(0.5);
   doc.font("Helvetica");
 
-  const displayedPercentages = reportCard.subjects.map((entry) => Number(entry.total));
+  const displayedPercentages = officialSubjects.map((entry) => Number(entry.total));
   const displayedTotal = displayedPercentages.reduce((sum, percentage) => sum + percentage, 0);
   const displayedAverage = displayedPercentages.length > 0 ? displayedTotal / displayedPercentages.length : 0;
   doc.text(`Term Total Marks: ${displayedTotal.toFixed(1)}`);
