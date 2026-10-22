@@ -16,8 +16,7 @@ export type ResolvedSubjectGrade =
   | { status: "NO_INCLUDED_ASSIGNMENTS" };
 
 export function calculateCurrentAvailableGrade(studentId: number, assignments: ContributionAssignment[]) {
-  const available = [...new Map(assignments.map((assignment) => [assignment.id, assignment])).values()]
-    .filter((assignment) => assignment.gradeContributionStatus !== "EXCLUDED");
+  const available = [...new Map(assignments.map((assignment) => [assignment.id, assignment])).values()];
   if (!available.length) return null;
 
   let weightedTotal = 0;
@@ -32,6 +31,24 @@ export function calculateCurrentAvailableGrade(studentId: number, assignments: C
     totalWeight += weight;
   }
   return totalWeight > 0 ? weightedTotal / totalWeight : null;
+}
+
+export function calculateTeacherReportAssignments(studentId: number, assignments: ContributionAssignment[]): ResolvedSubjectGrade {
+  const unique = [...new Map(assignments.map((assignment) => [assignment.id, assignment])).values()];
+  if (!unique.length) return { status: "NO_INCLUDED_ASSIGNMENTS" };
+  const invalid = unique.filter((assignment) => {
+    const score = assignment.scores.find((entry) => entry.studentId === studentId)?.score;
+    const maxPoints = Number(assignment.maxPoints ?? 100);
+    const weight = Number(assignment.weight ?? 1);
+    return score === null || score === undefined || !Number.isFinite(Number(score)) ||
+      !Number.isFinite(maxPoints) || maxPoints <= 0 || !Number.isFinite(weight) || weight <= 0;
+  });
+  if (invalid.length) return { status: "INCOMPLETE", missingAssignmentIds: invalid.map((item) => item.id) };
+
+  const value = calculateCurrentAvailableGrade(studentId, unique);
+  return value === null
+    ? { status: "INCOMPLETE", missingAssignmentIds: unique.map((item) => item.id) }
+    : { status: "COMPLETE", value, assignmentIds: unique.map((item) => item.id) };
 }
 
 export function calculateIncludedAssignments(studentId: number, assignments: ContributionAssignment[]): ResolvedSubjectGrade {
@@ -83,13 +100,5 @@ export function resolveExplicitSubjectGrade(input: {
     };
   }
   if (!input.scope) return null;
-  if (input.scope.mode === "REVIEWING") {
-    return {
-      status: "REVIEW_REQUIRED",
-      unreviewedAssignmentIds: input.assignments
-        .filter((assignment) => assignment.gradeContributionStatus === "UNREVIEWED")
-        .map((assignment) => assignment.id),
-    };
-  }
-  return calculateIncludedAssignments(input.studentId, input.assignments);
+  return calculateTeacherReportAssignments(input.studentId, input.assignments);
 }

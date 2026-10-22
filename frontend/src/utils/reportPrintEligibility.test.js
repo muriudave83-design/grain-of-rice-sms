@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { reportPrintBlockReason } from "./reportPrintEligibility.js";
 
-const report = (studentId, completenessState, comment = "") => ({
+const report = (studentId, completenessState, comment = "", needsRevalidation = false) => ({
   studentId,
-  subjects: [{ completenessState, comment }],
+  subjects: [{ completenessState, comment, needsRevalidation }],
 });
 
-test("printing is blocked before assignment inclusion approval and allowed after activation", () => {
-  assert.match(reportPrintBlockReason([report(1, "REVIEW_REQUIRED")]), /administrator must review/i);
+test("administrator review status never blocks teacher printing", () => {
+  assert.equal(reportPrintBlockReason([report(1, "REVIEW_REQUIRED")]), null);
   assert.equal(reportPrintBlockReason([report(1, "COMPLETE")]), null);
 });
 
@@ -21,6 +21,10 @@ test("incomplete marks remain a printing blocker", () => {
 });
 
 test("selected-student printing evaluates only the selected report", () => {
-  assert.equal(reportPrintBlockReason([report(1, "COMPLETE"), report(2, "REVIEW_REQUIRED")], 1), null);
-  assert.match(reportPrintBlockReason([report(1, "COMPLETE"), report(2, "REVIEW_REQUIRED")], 2), /administrator must review/i);
+  assert.equal(reportPrintBlockReason([report(1, "COMPLETE"), report(2, "INCOMPLETE")], 1), null);
+  assert.match(reportPrintBlockReason([report(1, "COMPLETE"), report(2, "INCOMPLETE")], 2), /complete all required marks/i);
+});
+
+test("genuine revalidation remains a printing blocker", () => {
+  assert.match(reportPrintBlockReason([report(1, "PUBLISHED", "", true)]), /changed or inconsistent/i);
 });

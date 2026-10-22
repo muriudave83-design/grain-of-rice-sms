@@ -123,11 +123,12 @@ export async function loadAuthoritativeReportResults(
   return { classSubjects, resultsByStudent };
 }
 
-export function summarizeCompleteReport(subjects: Array<{ finalGrade: number | null; completenessState: string }>) {
+export function summarizeCompleteReport(subjects: Array<{ finalGrade: number | null; completenessState: string; needsRevalidation?: boolean }>) {
   if (
     subjects.length === 0 ||
     subjects.some((subject) =>
       subject.finalGrade === null ||
+      subject.needsRevalidation === true ||
       subject.completenessState === "REVIEW_REQUIRED" ||
       subject.completenessState === "NO_INCLUDED_ASSIGNMENTS"
     )

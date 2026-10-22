@@ -73,4 +73,7 @@ test("overall result is computed only when every official subject is complete", 
     { finalGrade: 95, completenessState: "COMPLETE" },
     { finalGrade: null, completenessState: "INCOMPLETE" },
   ]).average, null);
+  assert.equal(summarizeCompleteReport([
+    { finalGrade: 91, completenessState: "PUBLISHED", needsRevalidation: true },
+  ]).isComplete, false);
 });

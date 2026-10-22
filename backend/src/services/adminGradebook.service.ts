@@ -228,7 +228,10 @@ export async function getReportPrintingApprovalOverview(client: any) {
     const studentIds = students.filter((student: any) => student.classId === pair.classId).map((student: any) => student.id);
     const { resultsByStudent } = await loadAuthoritativeReportResults(client, { classId: pair.classId, termId: pair.termId, studentIds });
     const subjects = [...resultsByStudent.values()].flat();
-    const reviewPending = subjects.some((subject: any) => subject.completenessState === "REVIEW_REQUIRED");
+    const reviewPending = rows.some((row: any) =>
+      row.teacherSubject.classId === pair.classId && row.termId === pair.termId &&
+      row.gradeContributionStatus === "UNREVIEWED"
+    );
     const incompleteMarks = subjects.some((subject: any) => subject.completenessState === "INCOMPLETE" || subject.completenessState === "NO_INCLUDED_ASSIGNMENTS");
     return { ...pair, studentCount: studentIds.length, reviewPending, incompleteMarks, status: reviewPending ? "ASSIGNMENT_REVIEW_PENDING" : incompleteMarks ? "REQUIRED_MARKS_INCOMPLETE" : "READY_TO_PRINT" };
   }));

@@ -130,7 +130,7 @@ test("an active authoritative scope combines historical and current teacher assi
   assert.equal(result[0].completenessState, "COMPLETE");
 });
 
-test("ambiguous multi-owner history stays review-required instead of manufacturing a grade", () => {
+test("pending administrator review does not hide complete multi-owner teacher marks", () => {
   const result = assembleClassSubjectResults({
     studentId: 1,
     requestingTeacherId: 200,
@@ -145,8 +145,27 @@ test("ambiguous multi-owner history stays review-required instead of manufacturi
     comments: new Map(),
     contributionScopes: new Map([[5, { mode: "REVIEWING", revision: 1 }]]),
   });
-  assert.equal(result[0].finalGrade, null);
-  assert.equal(result[0].completenessState, "REVIEW_REQUIRED");
+  assert.equal(result[0].finalGrade, 70);
+  assert.equal(result[0].completenessState, "COMPLETE");
+});
+
+test("administrator rejection remains advisory and does not remove valid teacher marks", () => {
+  const result = assembleClassSubjectResults({
+    studentId: 1,
+    requestingTeacherId: 200,
+    classSubjects: [{
+      subjectId: 5,
+      subject: { name: "Mathematics", teacherSubjects: [{
+        id: 20, teacherId: 200, isActive: true,
+        assignments: [{ id: 41, gradeContributionStatus: "EXCLUDED", weight: 1, maxPoints: 100, scores: [{ studentId: 1, score: 80 }] }],
+      }] },
+    }],
+    grades: [],
+    comments: new Map(),
+    contributionScopes: new Map([[5, { mode: "ACTIVE", revision: 2 }]]),
+  });
+  assert.equal(result[0].finalGrade, 80);
+  assert.equal(result[0].completenessState, "COMPLETE");
 });
 
 test("combined-group display names cannot create report subjects", () => {

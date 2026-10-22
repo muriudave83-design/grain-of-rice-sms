@@ -1,13 +1,13 @@
-export const ASSIGNMENT_REVIEW_MESSAGE = "An administrator must review assignment inclusion before printing.";
 export const INCOMPLETE_MARKS_MESSAGE = "Complete all required marks before printing.";
+export const REVALIDATION_MESSAGE = "Resolve changed or inconsistent grade calculations before printing.";
 
 export function reportPrintBlockReason(reports, selectedStudentId = null) {
   const relevant = selectedStudentId
     ? reports.filter((report) => String(report.studentId) === String(selectedStudentId))
     : reports;
   if (relevant.some((report) =>
-    (report.subjects || []).some((subject) => subject.completenessState === "REVIEW_REQUIRED"),
-  )) return ASSIGNMENT_REVIEW_MESSAGE;
+    (report.subjects || []).some((subject) => subject.needsRevalidation === true),
+  )) return REVALIDATION_MESSAGE;
   if (relevant.some((report) =>
     (report.subjects || []).some((subject) => subject.completenessState === "INCOMPLETE"),
   )) return INCOMPLETE_MARKS_MESSAGE;

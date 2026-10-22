@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { calculateCurrentAvailableGrade, calculateIncludedAssignments, resolveExplicitSubjectGrade } from "./gradeContribution.service";
+import { calculateCurrentAvailableGrade, calculateIncludedAssignments, calculateTeacherReportAssignments, resolveExplicitSubjectGrade } from "./gradeContribution.service";
 
 const assignment = (id: number, status: any, score: number | null, studentId = 1) => ({
   id, weight: 1, maxPoints: 100, gradeContributionStatus: status,
@@ -27,12 +27,19 @@ test("historical and current included assignments combine without teacher-owner 
   assert.deepEqual(result, { status: "COMPLETE", value: 70, assignmentIds: [10, 11] });
 });
 
-test("legacy scopes retain existing behavior and published grades remain authoritative", () => {
+test("administrator review state is advisory for teacher reports while published grades remain authoritative", () => {
   assert.equal(resolveExplicitSubjectGrade({ studentId: 1, assignments: [], scope: null }), null);
-  assert.deepEqual(resolveExplicitSubjectGrade({ studentId: 1, assignments: [assignment(1, "INCLUDED", 88)], scope: { mode: "REVIEWING", revision: 2 } }), { status: "REVIEW_REQUIRED", unreviewedAssignmentIds: [] });
+  assert.deepEqual(resolveExplicitSubjectGrade({ studentId: 1, assignments: [assignment(1, "UNREVIEWED", 88)], scope: { mode: "REVIEWING", revision: 2 } }), { status: "COMPLETE", value: 88, assignmentIds: [1] });
+  assert.deepEqual(resolveExplicitSubjectGrade({ studentId: 1, assignments: [assignment(1, "EXCLUDED", 88)], scope: { mode: "ACTIVE", revision: 2 } }), { status: "COMPLETE", value: 88, assignmentIds: [1] });
   assert.deepEqual(resolveExplicitSubjectGrade({ studentId: 1, assignments: [assignment(1, "UNREVIEWED", 10)], scope: { mode: "ACTIVE", revision: 2 }, published: { total: 91, contributionRevision: 1 } }), { status: "PUBLISHED", value: 91, needsRevalidation: true });
   assert.deepEqual(resolveExplicitSubjectGrade({ studentId: 1, assignments: [], scope: { mode: "ACTIVE", revision: 1 }, published: { total: 88, contributionRevision: null } }), { status: "PUBLISHED", value: 88, needsRevalidation: true });
   assert.deepEqual(resolveExplicitSubjectGrade({ studentId: 1, assignments: [], scope: { mode: "REVIEWING", revision: 2 }, published: { total: 88, contributionRevision: 1 } }), { status: "PUBLISHED", value: 88, needsRevalidation: true });
+});
+
+test("teacher reports retain missing and invalid mark safeguards regardless of review status", () => {
+  assert.deepEqual(calculateTeacherReportAssignments(1, [assignment(1, "UNREVIEWED", null)]), { status: "INCOMPLETE", missingAssignmentIds: [1] });
+  assert.deepEqual(calculateTeacherReportAssignments(1, [{ ...assignment(1, "EXCLUDED", 80), maxPoints: 0 }]), { status: "INCOMPLETE", missingAssignmentIds: [1] });
+  assert.deepEqual(calculateTeacherReportAssignments(1, [{ ...assignment(1, "INCLUDED", 80), weight: Number.NaN }]), { status: "INCOMPLETE", missingAssignmentIds: [1] });
 });
 
 test("legacy published grades are display-valid when complete current marks reproduce the stored total", () => {
