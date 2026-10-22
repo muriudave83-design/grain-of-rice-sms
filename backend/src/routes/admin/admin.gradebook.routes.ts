@@ -3,7 +3,7 @@ import { Role } from "@prisma/client";
 import { prisma } from "../../prisma/client";
 import { authenticate } from "../../middlewares/authMiddleware";
 import { requireRole } from "../../middlewares/rolesMiddleware";
-import { activateContributionScope, getAdminGradebook, getAdminGradebookOptions, getContributionReview, listAdminGradebookClasses, reviewAssignmentContribution } from "../../services/adminGradebook.service";
+import { activateContributionScope, bulkIncludeAssignmentContributions, getAdminGradebook, getAdminGradebookOptions, getContributionReview, getReportPrintingApprovalOverview, listAdminGradebookClasses, reviewAssignmentContribution } from "../../services/adminGradebook.service";
 import { createTeacherSubjectHandover, listTeacherSubjectHandovers, revokeTeacherSubjectHandover, TeacherSubjectHandoverError } from "../../services/teacherSubjectHandover.service";
 
 const router = Router();
@@ -113,6 +113,23 @@ router.get("/gradebook/contribution-scopes/status", async (req, res) => {
   } catch (error) {
     console.error("GRADE CONTRIBUTION REVIEW STATUS ERROR:", error);
     return res.status(500).json({ message: "Failed to load assignment inclusion review" });
+  }
+});
+
+router.get("/gradebook/report-printing-approval", async (_req, res) => {
+  try {
+    return res.json(await getReportPrintingApprovalOverview(prisma));
+  } catch (error) {
+    console.error("REPORT PRINTING APPROVAL OVERVIEW ERROR:", error);
+    return res.status(500).json({ message: "Failed to load report printing approval" });
+  }
+});
+
+router.post("/gradebook/report-printing-approval/include", async (req, res) => {
+  try {
+    return res.json(await bulkIncludeAssignmentContributions(prisma, { assignmentIds: req.body.assignmentIds ?? [], actorUserId: req.user!.id }));
+  } catch (error: any) {
+    return res.status(error.status ?? 500).json({ message: error.message, details: error.details });
   }
 });
 
