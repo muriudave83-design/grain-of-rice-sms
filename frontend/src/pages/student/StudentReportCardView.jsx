@@ -71,7 +71,6 @@ export default function StudentReportCardView() {
                     <td className="p-3">{subject.grade ? formatGrade(subject.grade) : "—"}</td>
                     <td className="p-3 text-sm text-amber-200">
                       {subject.configurationWarnings?.includes("NO_TERM_ASSIGNMENTS") && "No assignments for this term — confirm that this is an official subject."}
-                      {subject.configurationWarnings?.includes("MULTIPLE_ACTIVE_TEACHER_ASSIGNMENTS") && " Multiple active teacher assignments — review ownership."}
                       {subject.configurationWarnings?.includes("PUBLISHED_GRADE_NEEDS_REVALIDATION") && " Published grade preserved — contribution changes require administrator revalidation."}
                     </td>
                   </tr>
