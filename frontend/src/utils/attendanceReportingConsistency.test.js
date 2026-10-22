@@ -3,14 +3,29 @@ import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
+/* global process */
+
 const read = (relative) => fs.readFileSync(path.resolve(process.cwd(), relative), "utf8");
 
-test("teacher printable report distinguishes missing attendance from zero percent", () => {
+test("teacher printable report shows only present, absent, and late", () => {
   const source = read("src/components/report-cards/TeacherReportCardSheet.jsx");
-  assert.match(source, /attendanceRate === null/);
-  assert.match(source, /Not available/);
-  assert.match(source, /Draft days excluded/);
-  assert.doesNotMatch(source, /attendanceRate \?\? 0/);
+  assert.match(source, /<strong>Present:<\/strong>/);
+  assert.match(source, /<strong>Absent:<\/strong>/);
+  assert.match(source, /<strong>Late:<\/strong>/);
+  assert.doesNotMatch(source, /Attendance Rate|Draft days excluded|Incomplete submitted days|attendanceState/);
+  assert.ok(source.indexOf("Present:") < source.indexOf("Absent:") && source.indexOf("Absent:") < source.indexOf("Late:"));
+});
+
+test("administrator and parent report cards expose only the three official attendance fields", () => {
+  const administrator = read("src/pages/student/StudentReportCardView.jsx");
+  const parent = read("src/pages/parent/report-cards/ParentReportCardView.jsx");
+  for (const source of [administrator, parent]) {
+    assert.match(source, />Present(?::)?</);
+    assert.match(source, />Absent(?::)?</);
+    assert.match(source, />Late(?::)?</);
+    assert.doesNotMatch(source, /Attendance Rate|draft attendance|incomplete submitted|Days Absent/);
+    assert.ok(source.indexOf("Present") < source.indexOf("Absent") && source.indexOf("Absent") < source.indexOf("Late"));
+  }
 });
 
 test("student and parent views expose official versus draft attendance state", () => {

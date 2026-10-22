@@ -9,14 +9,6 @@ const statusText = (subject) => {
   return `${Number(subject.average).toFixed(1)}%`;
 };
 
-const attendanceMessage = (attendance) => {
-  if (!attendance || attendance.state === "NO_DATA") return "No attendance has been recorded for this term.";
-  if (attendance.state === "DRAFT_ONLY") return "Attendance exists only in draft sessions and is not included in this report.";
-  if (attendance.state === "FINALIZED_INCOMPLETE") return "Submitted attendance is incomplete for this term.";
-  if (attendance.state === "PARTIALLY_FINALIZED") return "Submitted attendance is available, with some incomplete days.";
-  return "Submitted attendance is finalized for this term.";
-};
-
 const attendanceValue = (attendance, field) =>
   attendance?.hasCompleteFinalizedDays ? attendance[field] : "Not available";
 
@@ -93,15 +85,11 @@ export default function StudentReportCardView() {
           </section>
           <section className="mt-6 rounded border border-slate-700 p-4" aria-labelledby="attendance-summary-heading">
             <h2 id="attendance-summary-heading" className="text-lg font-semibold">Attendance summary</h2>
-            <p className="mt-1 text-sm text-slate-300">{attendanceMessage(studentData?.attendance)}</p>
-            <dl className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+            <dl className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
               <div><dt className="text-sm text-slate-400">Present</dt><dd className="text-xl font-semibold">{attendanceValue(studentData?.attendance, "present")}</dd></div>
               <div><dt className="text-sm text-slate-400">Absent</dt><dd className="text-xl font-semibold">{attendanceValue(studentData?.attendance, "absent")}</dd></div>
               <div><dt className="text-sm text-slate-400">Late</dt><dd className="text-xl font-semibold">{attendanceValue(studentData?.attendance, "late")}</dd></div>
-              <div><dt className="text-sm text-slate-400">Attendance Rate</dt><dd className="text-xl font-semibold">{studentData?.attendance?.attendanceRate === null || studentData?.attendance?.attendanceRate === undefined ? "Not available" : `${studentData.attendance.attendanceRate}%`}</dd></div>
             </dl>
-            {(studentData?.attendance?.draftDays ?? 0) > 0 && <p className="mt-3 text-sm text-amber-200">{studentData.attendance.draftDays} draft attendance day(s) excluded.</p>}
-            {(studentData?.attendance?.incomplete ?? 0) > 0 && <p className="mt-1 text-sm text-amber-200">{studentData.attendance.incomplete} submitted day(s) are incomplete.</p>}
           </section>
         </>
       )}

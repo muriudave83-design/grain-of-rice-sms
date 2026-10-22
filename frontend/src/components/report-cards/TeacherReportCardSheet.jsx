@@ -129,9 +129,6 @@ export default function TeacherReportCardSheet({
         <p><strong>Present:</strong>{" "}{Number(student.present || 0)}</p>
         <p><strong>Absent:</strong>{" "}{Number(student.absent || 0)}</p>
         <p><strong>Late:</strong>{" "}{Number(student.late || 0)}</p>
-        <p><strong>Attendance Rate:</strong>{" "}{student.attendanceRate === null || student.attendanceRate === undefined ? "Not available" : `${student.attendanceRate}%`}</p>
-        {student.attendanceDraftDays > 0 && <p><strong>Draft days excluded:</strong>{" "}{student.attendanceDraftDays}</p>}
-        {student.attendanceIncompleteDays > 0 && <p><strong>Incomplete submitted days:</strong>{" "}{student.attendanceIncompleteDays}</p>}
       </div>
     </article>
   );

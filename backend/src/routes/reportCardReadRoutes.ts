@@ -434,7 +434,19 @@ router.get(
       },
     });
     if (!reportCard) return res.status(404).json({ message: "Report card not available" });
-    return res.json(await presentOfficialReportCardSnapshot(prisma, reportCard));
+    const attendance = (await loadReportAttendance(prisma, {
+      classId: reportCard.classId,
+      termId: reportCard.termId,
+      startDate: reportCard.term.startDate,
+      endDate: reportCard.term.endDate,
+      studentIds: [reportCard.studentId],
+    })).get(reportCard.studentId)!;
+    return res.json({
+      ...await presentOfficialReportCardSnapshot(prisma, reportCard),
+      attendancePresent: attendance.present,
+      attendanceAbsent: attendance.absent,
+      attendanceLate: attendance.late,
+    });
   },
 );
 

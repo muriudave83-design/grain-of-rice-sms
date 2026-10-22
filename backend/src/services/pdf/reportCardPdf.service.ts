@@ -198,10 +198,7 @@ export async function generateReportCardPdf(
      .fontSize(10)
      .text(`Present: ${attendance.present}`, 50, 130)
      .text(`Absent: ${attendance.absent}`, 50, 145)
-     .text(`Late: ${attendance.late}`, 50, 160)
-     .text(`Attendance Rate: ${attendance.attendanceRate === null ? "Not available" : `${attendance.attendanceRate}%`}`, 50, 175)
-     .text(`Attendance Status: ${attendance.state}`, 50, 190)
-     .text(`Draft days excluded: ${attendance.draftDays}`, 50, 205);
+     .text(`Late: ${attendance.late}`, 50, 160);
 
   // =========================
   // 9️⃣ FOOTER (PROFESSIONAL)

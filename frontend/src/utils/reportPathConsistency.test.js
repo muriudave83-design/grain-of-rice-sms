@@ -11,9 +11,10 @@ test("administrator report renders authoritative incomplete and configuration st
   assert.match(source, /Incomplete/);
   assert.match(source, /NO_TERM_ASSIGNMENTS/);
   assert.match(source, /Attendance summary/);
-  assert.match(source, /DRAFT_ONLY/);
-  assert.match(source, /FINALIZED_INCOMPLETE/);
-  assert.match(source, /attendanceRate === null/);
+  assert.match(source, />Present</);
+  assert.match(source, />Absent</);
+  assert.match(source, />Late</);
+  assert.doesNotMatch(source, /Attendance Rate|DRAFT_ONLY|FINALIZED_INCOMPLETE|draft attendance|submitted day\(s\) are incomplete/);
   assert.doesNotMatch(source, /average \|\| 0/);
   assert.doesNotMatch(source, /getLetterGrade/);
 });

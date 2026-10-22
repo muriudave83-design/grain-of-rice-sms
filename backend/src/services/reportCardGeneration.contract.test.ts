@@ -31,7 +31,17 @@ test("PDF display derives percentages and summary from immutable subject snapsho
   assert.match(pdf, /Number\(entry\.total\)/);
   assert.match(pdf, /displayedPercentages/);
   assert.match(pdf, /loadReportAttendance/);
-  assert.match(pdf, /attendanceRate === null \? "Not available"/);
-  assert.match(pdf, /Draft days excluded/);
+  assert.match(pdf, /`Present: \$\{attendance\.present\}`/);
+  assert.match(pdf, /`Absent: \$\{attendance\.absent\}`/);
+  assert.match(pdf, /`Late: \$\{attendance\.late\}`/);
+  assert.match(pdf, /`Present: \$\{attendance\.present\}`[\s\S]*`Absent: \$\{attendance\.absent\}`[\s\S]*`Late: \$\{attendance\.late\}`/);
+  assert.doesNotMatch(pdf, /Attendance Rate|Attendance Status|Draft days excluded|attendance\.attendanceRate|attendance\.state|attendance\.draftDays/);
   assert.doesNotMatch(pdf, /SAMPLE ATTENDANCE STUDENT IDS/);
+});
+
+test("existing parent report snapshots are enriched read-only with the same three attendance counts", () => {
+  const routes = read("src/routes/reportCardReadRoutes.ts");
+  assert.match(routes, /attendancePresent: attendance\.present/);
+  assert.match(routes, /attendanceAbsent: attendance\.absent/);
+  assert.match(routes, /attendanceLate: attendance\.late/);
 });

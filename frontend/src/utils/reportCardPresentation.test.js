@@ -108,12 +108,15 @@ test("A4 print rules protect rows, attendance, and student boundaries", () => {
   assert.match(sheet, /report-attendance/);
 });
 
-test("teacher report preserves data loading, comment saving, attendance, and shared-sheet wiring", () => {
+test("teacher report preserves data loading, comment saving, simplified attendance, and shared-sheet wiring", () => {
   assert.match(component, /apiClient\.get\(/);
   assert.match(component, /apiClient\.post\([\s\S]*\/teacher\/report\/comment/);
   assert.match(component, /TeacherReportCardSheet/);
   assert.match(component, /commentSaveStates=\{commentSaveStates\}/);
   assert.match(component, /onCommentBlur=\{\(subject, value\) =>\s*flushCommentSave/);
-  assert.match(sheet, /student\.attendanceRate/);
+  assert.match(sheet, /student\.present/);
+  assert.match(sheet, /student\.absent/);
+  assert.match(sheet, /student\.late/);
+  assert.doesNotMatch(sheet, /attendanceRate|attendanceDraftDays|attendanceIncompleteDays/);
   assert.match(sheet, /className="[^"]*print-card/);
 });

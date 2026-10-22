@@ -133,10 +133,14 @@ export default function ParentReportCardView() {
           <p className="text-lg font-semibold">
             {reportCard.average ?? "-"}
           </p>
-          <div className="mt-1 text-sm text-gray-600">
-            Days Absent: {reportCard.attendanceAbsent ?? 0}
-          </div>
         </div>
+      </div>
+
+      <div className="mb-6 rounded border p-4">
+        <h3 className="mb-2 font-medium">Attendance</h3>
+        <p><strong>Present:</strong> {reportCard.attendancePresent ?? "Not available"}</p>
+        <p><strong>Absent:</strong> {reportCard.attendanceAbsent ?? "Not available"}</p>
+        <p><strong>Late:</strong> {reportCard.attendanceLate ?? "Not available"}</p>
       </div>
 
       {/* Teacher Comment */}
