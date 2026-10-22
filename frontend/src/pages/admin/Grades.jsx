@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import apiClient from "../../services/apiClient";
-import { eligibleApprovalAssignments as selectEligibleApprovalAssignments, filterApprovalAssignments } from "../../utils/reportPrintingApproval";
+import { academicPeriodKey, approvalAcademicPeriods, eligibleApprovalAssignments as selectEligibleApprovalAssignments, filterApprovalAssignments } from "../../utils/reportPrintingApproval";
 
 const emptyOptions = { subjects: [], terms: [], teacherSubjects: [] };
 
@@ -96,8 +96,8 @@ export default function Grades({
   );
   const approvalAssignments = useMemo(() => filterApprovalAssignments(printingApproval?.assignments || [], approvalClassFilter, approvalSubjectFilter, approvalTermFilter), [printingApproval, approvalClassFilter, approvalSubjectFilter, approvalTermFilter]);
   const approvalClasses = useMemo(() => [...new Map((printingApproval?.assignments || []).map((item) => [item.teacherSubject.classId, item.teacherSubject.class])).values()], [printingApproval]);
-  const approvalSubjects = useMemo(() => [...new Map(approvalAssignments.map((item) => [item.teacherSubject.subjectId, item.teacherSubject.subject])).values()], [approvalAssignments]);
-  const approvalTerms = useMemo(() => [...new Map((printingApproval?.assignments || []).map((item) => [item.termId, item.term])).values()], [printingApproval]);
+  const approvalSubjects = useMemo(() => [...new Map(filterApprovalAssignments(printingApproval?.assignments || [], approvalClassFilter, "", approvalTermFilter).map((item) => [item.teacherSubject.subjectId, item.teacherSubject.subject])).values()], [printingApproval, approvalClassFilter, approvalTermFilter]);
+  const approvalTerms = useMemo(() => approvalAcademicPeriods(printingApproval?.assignments || []), [printingApproval]);
   const eligibleApprovalAssignments = selectEligibleApprovalAssignments(approvalAssignments);
   const selectedApprovalSet = new Set(selectedApprovalIds);
 
@@ -255,9 +255,9 @@ export default function Grades({
               <option value="">All subjects</option>
               {approvalSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
-            <select className="rounded border p-2" value={approvalTermFilter} onChange={(event) => { setApprovalTermFilter(event.target.value); setSelectedApprovalIds([]); }}>
+            <select className="rounded border p-2" value={approvalTermFilter} onChange={(event) => { setApprovalTermFilter(event.target.value); setApprovalSubjectFilter(""); setSelectedApprovalIds([]); }}>
               <option value="">All terms</option>
-              {approvalTerms.map((item) => <option key={item.id} value={item.id}>{item.name} {item.academicYear}</option>)}
+              {approvalTerms.map((item) => <option key={item.key} value={item.key}>{item.name} {item.academicYear}</option>)}
             </select>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -275,7 +275,7 @@ export default function Grades({
             {printingApproval.groups.filter((group) =>
               (!approvalClassFilter || String(group.classId) === approvalClassFilter) &&
               (!approvalSubjectFilter || String(group.subjectId) === approvalSubjectFilter) &&
-              (!approvalTermFilter || String(group.termId) === approvalTermFilter) &&
+              (!approvalTermFilter || academicPeriodKey(group.term) === approvalTermFilter) &&
               (group.unreviewed > 0 || group.mode === "REVIEWING")
             ).map((group) => <div key={`${group.classId}:${group.subjectId}:${group.termId}`} className="flex flex-wrap items-center justify-between gap-2 rounded border bg-white p-2 text-sm">
               <span><strong>{group.className} · {group.subjectName}</strong> · {group.term.name} {group.term.academicYear} · {group.unreviewed} unreviewed · {group.included} included</span>
