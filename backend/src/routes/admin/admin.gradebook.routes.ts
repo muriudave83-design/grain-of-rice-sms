@@ -3,7 +3,7 @@ import { Role } from "@prisma/client";
 import { prisma } from "../../prisma/client";
 import { authenticate } from "../../middlewares/authMiddleware";
 import { requireRole } from "../../middlewares/rolesMiddleware";
-import { activateContributionScope, getAdminGradebook, getAdminGradebookOptions, listAdminGradebookClasses, reviewAssignmentContribution } from "../../services/adminGradebook.service";
+import { activateContributionScope, getAdminGradebook, getAdminGradebookOptions, getContributionReview, listAdminGradebookClasses, reviewAssignmentContribution } from "../../services/adminGradebook.service";
 import { createTeacherSubjectHandover, listTeacherSubjectHandovers, revokeTeacherSubjectHandover, TeacherSubjectHandoverError } from "../../services/teacherSubjectHandover.service";
 
 const router = Router();
@@ -98,6 +98,21 @@ router.patch("/gradebook/assignments/:assignmentId/contribution", async (req, re
     }));
   } catch (error: any) {
     return res.status(error.status ?? 500).json({ message: error.message, details: error.details });
+  }
+});
+
+router.get("/gradebook/contribution-scopes/status", async (req, res) => {
+  const classId = Number(req.query.classId);
+  const subjectId = Number(req.query.subjectId);
+  const termId = Number(req.query.termId);
+  if (![classId, subjectId, termId].every((id) => Number.isInteger(id) && id > 0)) {
+    return res.status(400).json({ message: "Valid classId, subjectId and termId are required" });
+  }
+  try {
+    return res.json(await getContributionReview(prisma, classId, subjectId, termId));
+  } catch (error) {
+    console.error("GRADE CONTRIBUTION REVIEW STATUS ERROR:", error);
+    return res.status(500).json({ message: "Failed to load assignment inclusion review" });
   }
 });
 

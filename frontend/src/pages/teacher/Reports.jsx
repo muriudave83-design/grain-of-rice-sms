@@ -12,6 +12,7 @@ import useUnsavedChangesGuard from "../../utils/useUnsavedChangesGuard";
 import { getCommentDraft, removeCommentDraft, saveCommentDraft } from "../../utils/commentDraftStore";
 import { isRetryableSaveError, withBoundedRetry } from "../../utils/boundedRetry";
 import { useAuth } from "../../context/AuthContext";
+import { reportPrintBlockReason } from "../../utils/reportPrintEligibility";
 
 export default function Reports() {
   const { user } = useAuth();
@@ -250,13 +251,15 @@ export default function Reports() {
 
   const handlePrintSelected = () => {
     if (hasUnresolvedSaves(commentSaveStates)) return setError("Resolve Unsaved, Saving, Failed, or Conflict comments before printing.");
-    if (reports.some((report) => report.subjects.some((subject) => subject.completenessState === "REVIEW_REQUIRED"))) return setError("An administrator must review assignment inclusion before printing.");
+    const blocked = reportPrintBlockReason(reports, selectedStudentId);
+    if (blocked) return setError(blocked);
     if (selectedStudentId) setPrintMode(PRINT_MODE.SELECTED);
   };
 
   const handlePrintAll = () => {
     if (hasUnresolvedSaves(commentSaveStates)) return setError("Resolve Unsaved, Saving, Failed, or Conflict comments before printing.");
-    if (reports.some((report) => report.subjects.some((subject) => subject.completenessState === "REVIEW_REQUIRED"))) return setError("An administrator must review assignment inclusion before printing.");
+    const blocked = reportPrintBlockReason(reports);
+    if (blocked) return setError(blocked);
     if (reports.length) setPrintMode(PRINT_MODE.ALL);
   };
 

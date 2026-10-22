@@ -14,6 +14,7 @@ export default function Grades({
   const [teacherSubjectId, setTeacherSubjectId] = useState("");
   const [termId, setTermId] = useState("");
   const [gradebook, setGradebook] = useState(null);
+  const [contributionReview, setContributionReview] = useState(null);
   const [classesLoading, setClassesLoading] = useState(true);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [gradebookLoading, setGradebookLoading] = useState(false);
@@ -106,21 +107,54 @@ export default function Grades({
     };
   }, [apiBase, teacherSubjectId, termId]);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    let current = true;
+    setContributionReview(null);
+    if (!classId || !subjectId || !termId || apiBase !== "/admin/gradebook") return () => controller.abort();
+    apiClient.get(`${apiBase}/contribution-scopes/status`, {
+      params: { classId, subjectId, termId },
+      signal: controller.signal,
+    }).then(({ data }) => {
+      if (current) setContributionReview(data);
+    }).catch((requestError) => {
+      if (current && requestError.code !== "ERR_CANCELED") {
+        setGradebookError(requestError?.response?.data?.message || "Unable to load assignment inclusion review");
+      }
+    });
+    return () => {
+      current = false;
+      controller.abort();
+    };
+  }, [apiBase, classId, subjectId, termId]);
+
   const scoreFor = (assignment, studentId) =>
     assignment.scores.find((score) => score.studentId === studentId)?.score;
   const hasScores = gradebook?.assignments.some((assignment) => assignment.scores.length > 0);
   const loading = classesLoading || optionsLoading || gradebookLoading;
   const error = gradebookError || optionsError || classesError;
+  const needsContributionReview = contributionReview?.scope?.mode === "REVIEWING";
 
   const reviewAssignment = async (assignment, status) => {
     const note = status === "EXCLUDED" ? globalThis.prompt("Reason for excluding this assignment:") : globalThis.prompt("Review note (optional):", assignment.gradeContributionNote || "");
     if (note === null || (status === "EXCLUDED" && !note.trim())) return;
-    if (status === "EXCLUDED" && assignment.scores.length && !globalThis.confirm("Exclude this scored assignment from future final-grade calculations? Scores will be preserved.")) return;
+    const scoreCount = assignment.scoreCount ?? assignment.scores?.length ?? 0;
+    if (status === "EXCLUDED" && scoreCount > 0 && !globalThis.confirm("Exclude this scored assignment from future final-grade calculations? Scores will be preserved.")) return;
     try {
       const { data } = await apiClient.patch(`${apiBase}/assignments/${assignment.id}/contribution`, {
         status, note, expectedReviewedAt: assignment.gradeContributionReviewedAt || null,
       });
-      setGradebook((current) => ({ ...current, assignments: current.assignments.map((item) => item.id === assignment.id ? { ...item, ...data, scores: item.scores } : item) }));
+      setGradebook((current) => current ? ({ ...current, assignments: current.assignments.map((item) => item.id === assignment.id ? { ...item, ...data, scores: item.scores } : item) }) : current);
+      setContributionReview((current) => current ? ({
+        ...current,
+        scope: data.scope,
+        assignments: current.assignments.map((item) => item.id === assignment.id ? {
+          ...item,
+          gradeContributionStatus: data.gradeContributionStatus,
+          gradeContributionNote: data.gradeContributionNote,
+          gradeContributionReviewedAt: data.gradeContributionReviewedAt,
+        } : item),
+      }) : current);
     } catch (requestError) {
       setGradebookError(requestError?.response?.data?.message || "Failed to review assignment");
     }
@@ -129,7 +163,8 @@ export default function Grades({
   const activateScope = async () => {
     if (!globalThis.confirm("Activate reviewed assignment inclusion for this class, subject and term?")) return;
     try {
-      await apiClient.post(`${apiBase}/contribution-scopes/activate`, { classId: Number(classId), subjectId: Number(subjectId), termId: Number(termId) });
+      const { data } = await apiClient.post(`${apiBase}/contribution-scopes/activate`, { classId: Number(classId), subjectId: Number(subjectId), termId: Number(termId) });
+      setContributionReview((current) => current ? ({ ...current, scope: data }) : current);
       globalThis.alert("Explicit grade calculation activated for this class, subject and term.");
     } catch (requestError) {
       setGradebookError(requestError?.response?.data?.message || "Unable to activate reviewed assignments");
@@ -141,7 +176,9 @@ export default function Grades({
       <div>
         <h1 className="text-xl font-semibold">{title}</h1>
         <p className="mt-1 text-sm text-gray-600">
-          Read-only view of legacy assignments and scores. Historical teacher ownership is preserved.
+          {apiBase === "/admin/gradebook"
+            ? "Review report-card assignment inclusion across current and historical teachers. Scores and ownership are preserved."
+            : "Read-only view of legacy assignments and scores. Historical teacher ownership is preserved."}
         </p>
       </div>
 
@@ -185,6 +222,43 @@ export default function Grades({
         </label>
       </div>
 
+      {apiBase === "/admin/gradebook" && classId && subjectId && termId && needsContributionReview && (
+        <section className="space-y-3 rounded-lg border border-amber-300 bg-amber-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold">Report-card assignment inclusion</h2>
+              <p className="text-sm text-gray-700">
+                Scope: <strong>REVIEWING</strong>. Review every assignment below, then activate the reviewed set.
+              </p>
+            </div>
+            <button type="button" className="rounded bg-blue-700 px-3 py-2 text-sm text-white" onClick={activateScope}>
+              Activate reviewed set
+            </button>
+          </div>
+          {contributionReview.assignments.length === 0 ? (
+            <p className="text-sm text-gray-600">No assignments exist for this class, subject and term.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white text-sm">
+                <thead><tr className="border-b"><th className="p-2 text-left">Assignment</th><th className="p-2 text-left">Owner</th><th className="p-2">Scores</th><th className="p-2">Status</th><th className="p-2">Review</th></tr></thead>
+                <tbody>{contributionReview.assignments.map((assignment) => (
+                  <tr className="border-b" key={assignment.id}>
+                    <td className="p-2">{assignment.title} <span className="text-gray-500">#{assignment.id}</span></td>
+                    <td className="p-2">{assignment.teacherSubject.teacher.name} <span className="text-gray-500">TS #{assignment.teacherSubjectId}</span></td>
+                    <td className="p-2 text-center">{assignment.scoreCount}</td>
+                    <td className="p-2 text-center font-medium">{assignment.gradeContributionStatus}</td>
+                    <td className="p-2 text-center space-x-2">
+                      <button type="button" className="underline" onClick={() => reviewAssignment(assignment, "INCLUDED")}>Include</button>
+                      <button type="button" className="underline text-red-700" onClick={() => reviewAssignment(assignment, "EXCLUDED")}>Exclude</button>
+                    </td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
       {error && <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       {loading && <p className="text-sm text-gray-500">Loading gradebook…</p>}
 
@@ -202,7 +276,6 @@ export default function Grades({
               {gradebook.teacherSubject.isActive ? "Active assignment" : "Historical assignment"}
             </span>
             <span className="text-gray-600">{gradebook.teacherSubject.teacher.name}</span>
-            <button type="button" className="rounded bg-blue-700 px-3 py-1 text-white" onClick={activateScope}>Activate reviewed set</button>
           </div>
 
           {!hasScores && (

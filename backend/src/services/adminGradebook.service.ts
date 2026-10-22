@@ -98,6 +98,35 @@ export async function getAdminGradebook(client: any, teacherSubjectId: number, t
   return { teacherSubject, term, students, assignments };
 }
 
+export async function getContributionReview(client: any, classId: number, subjectId: number, termId: number) {
+  const [scope, assignments] = await Promise.all([
+    client.gradeContributionScope.findUnique({
+      where: { classId_subjectId_termId: { classId, subjectId, termId } },
+    }),
+    client.assignment.findMany({
+      where: { termId, teacherSubject: { classId, subjectId } },
+      select: {
+        id: true,
+        title: true,
+        teacherSubjectId: true,
+        gradeContributionStatus: true,
+        gradeContributionNote: true,
+        gradeContributionReviewedAt: true,
+        teacherSubject: { select: { teacher: { select: { id: true, name: true } } } },
+        _count: { select: { scores: true } },
+      },
+      orderBy: [{ teacherSubjectId: "asc" }, { position: "asc" }, { id: "asc" }],
+    }),
+  ]);
+  return {
+    scope,
+    assignments: assignments.map(({ _count, ...assignment }: any) => ({
+      ...assignment,
+      scoreCount: _count.scores,
+    })),
+  };
+}
+
 export async function reviewAssignmentContribution(client: any, input: {
   assignmentId: number; status: "UNREVIEWED" | "INCLUDED" | "EXCLUDED";
   note?: string; expectedReviewedAt?: string | null; actorUserId: number;

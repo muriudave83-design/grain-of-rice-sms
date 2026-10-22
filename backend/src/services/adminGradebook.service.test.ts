@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getAdminGradebook, getAdminGradebookOptions, listAdminGradebookClasses, reviewAssignmentContribution } from "./adminGradebook.service";
+import { activateContributionScope, getAdminGradebook, getAdminGradebookOptions, getContributionReview, listAdminGradebookClasses, reviewAssignmentContribution } from "./adminGradebook.service";
 
 test("class and option queries exclude archived structure but retain historical teacher assignments", async () => {
   const calls: any = {};
@@ -79,4 +79,39 @@ test("exact TeacherSubject and Assignment IDs are used while archived students a
   assert.deepEqual(calls.students.where, { classId: 3, isArchived: false });
   assert.equal(calls.assignments.select.scores.where.student.isArchived, false);
   assert.equal(calls.assignments.select.scores.where.student.classId, 3);
+});
+
+test("subject-wide review exposes assignments from every teacher owner", async () => {
+  const calls: any = {};
+  const client = {
+    gradeContributionScope: { findUnique: async (args: any) => { calls.scope = args; return { id: 4, mode: "REVIEWING" }; } },
+    assignment: { findMany: async (args: any) => {
+      calls.assignments = args;
+      return [
+        { id: 10, teacherSubjectId: 20, gradeContributionStatus: "UNREVIEWED", teacherSubject: { teacher: { id: 7, name: "Former" } }, _count: { scores: 4 } },
+        { id: 11, teacherSubjectId: 21, gradeContributionStatus: "INCLUDED", teacherSubject: { teacher: { id: 8, name: "Current" } }, _count: { scores: 5 } },
+      ];
+    } },
+  };
+  const review = await getContributionReview(client, 3, 5, 12);
+  assert.equal(review.assignments.length, 2);
+  assert.equal(review.assignments[0].scoreCount, 4);
+  assert.deepEqual(calls.assignments.where, { termId: 12, teacherSubject: { classId: 3, subjectId: 5 } });
+});
+
+test("activation is blocked before review and succeeds after every assignment is decided", async () => {
+  let statuses = ["UNREVIEWED", "INCLUDED"];
+  const tx = {
+    assignment: { findMany: async () => statuses.map((gradeContributionStatus, id) => ({ id: id + 1, gradeContributionStatus })) },
+    gradeContributionScope: { upsert: async (args: any) => ({ id: 9, revision: 2, ...args.update }) },
+    auditLog: { create: async () => ({}) },
+  };
+  const client = { $transaction: async (fn: any) => fn(tx) };
+  await assert.rejects(
+    () => activateContributionScope(client, { classId: 3, subjectId: 5, termId: 12, actorUserId: 1 }),
+    (error: any) => error.status === 409 && error.details.unreviewed[0] === 1,
+  );
+  statuses = ["EXCLUDED", "INCLUDED"];
+  const activated = await activateContributionScope(client, { classId: 3, subjectId: 5, termId: 12, actorUserId: 1 });
+  assert.equal(activated.mode, "ACTIVE");
 });
