@@ -7,19 +7,20 @@ const OriginalClient = prismaModule.PrismaClient;
 prismaModule.PrismaClient = class { constructor() { return db; } };
 db = {};
 const { saveReportComment } = require("./teacher.controller");
+const { saveReportComment: saveLegacyReportComment } = require("./reports.controller");
 prismaModule.PrismaClient = OriginalClient;
 
 function response() {
   return { code: 200, body: null as any, status(code: number) { this.code = code; return this; }, json(body: any) { this.body = body; return this; } };
 }
 
-function fixture(teacherId = 7) {
+function fixture(teacherId = 7, teacherSubjectActive = true) {
   let row: any = null;
-  db.$transaction = async (callback: any) => callback(db);
+  db.$transaction = async () => { throw new Error("comment endpoint must not open an interactive transaction"); };
   db.$queryRaw = async () => [{
     teacherSubjectId: 2,
     teacherId,
-    teacherSubjectActive: true,
+    teacherSubjectActive,
     classId: 8,
     termId: 3,
     termLocked: false,
@@ -91,6 +92,56 @@ test("conflict resolution never bypasses teacher-subject ownership", async () =>
     teacherSubjectId: 2,
     termId: 3,
     comment: "unauthorized overwrite",
+    expectedUpdatedAt: null,
+  } }, denied);
+  assert.equal(denied.code, 403);
+});
+
+test("teacher cannot save after the TeacherSubject assignment is revoked", async () => {
+  const state = fixture(7, false);
+  const denied = response();
+  await saveReportComment({ user: { id: 7 }, body: {
+    studentId: 1,
+    teacherSubjectId: 2,
+    termId: 3,
+    comment: "must not be written",
+    expectedUpdatedAt: null,
+  } }, denied);
+  assert.equal(denied.code, 403);
+  assert.equal(state.current(), null);
+});
+
+test("blank values require explicit clearing semantics", async () => {
+  const state = fixture();
+  const created = response();
+  await saveReportComment({ user: { id: 7 }, body: { studentId: 1, teacherSubjectId: 2, termId: 3, comment: "keep this", expectedUpdatedAt: null } }, created);
+  const accidental = response();
+  await saveReportComment({ user: { id: 7 }, body: { studentId: 1, teacherSubjectId: 2, termId: 3, comment: "", expectedUpdatedAt: created.body.updatedAt } }, accidental);
+  assert.equal(accidental.code, 422);
+  assert.equal(state.current().comment, "keep this");
+  const intentional = response();
+  await saveReportComment({ user: { id: 7 }, body: { studentId: 1, teacherSubjectId: 2, termId: 3, comment: "", expectedUpdatedAt: created.body.updatedAt, allowEmpty: true } }, intentional);
+  assert.equal(intentional.code, 200);
+  assert.equal(state.current().comment, "");
+});
+
+test("pool acquisition failures are retryable and never reported as saved", async () => {
+  fixture();
+  db.$queryRaw = async () => { throw Object.assign(new Error("Timed out fetching a new connection from the connection pool"), { code: "P2024" }); };
+  const res = response();
+  await saveReportComment({ user: { id: 7 }, body: { studentId: 1, teacherSubjectId: 2, termId: 3, comment: "safe draft", expectedUpdatedAt: null } }, res);
+  assert.equal(res.code, 503);
+  assert.equal(res.body.retryable, true);
+});
+
+test("legacy report-comment route uses the same authorization and no-transaction save path", async () => {
+  fixture(99);
+  const denied = response();
+  await saveLegacyReportComment({ user: { id: 7 }, body: {
+    studentId: 1,
+    teacherSubjectId: 2,
+    termId: 3,
+    comment: "unauthorized",
     expectedUpdatedAt: null,
   } }, denied);
   assert.equal(denied.code, 403);

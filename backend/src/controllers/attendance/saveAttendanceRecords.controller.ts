@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
-import { AttendancePeriod, AttendanceStatus, PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { AttendancePeriod, AttendanceStatus } from "@prisma/client";
+import { prisma } from "../../prisma/client";
 
 export async function saveAttendanceRecords(req: Request, res: Response) {
   try {

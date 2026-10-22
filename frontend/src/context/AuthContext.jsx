@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { clearUserCommentDrafts } from "../utils/commentDraftStore";
 
 const AuthContext = createContext(null);
 
@@ -78,6 +79,7 @@ export function AuthProvider({ children }) {
   const logout = () => {
     console.log("🚪 Logging out...");
 
+    if (user?.id) clearUserCommentDrafts(user.id);
     localStorage.removeItem("token");
     localStorage.removeItem("role");
     localStorage.removeItem("user");

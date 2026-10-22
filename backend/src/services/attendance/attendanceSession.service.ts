@@ -1,12 +1,11 @@
 import {
-  PrismaClient,
   AttendanceSessionStatus,
 } from "@prisma/client";
+import { prisma } from "../../prisma/client";
 import { createAuditLog } from "../auditLog.service";
 import { AuditAction } from "@prisma/client";
 import { resolveAttendanceTermId, schoolDayRange } from "./reportAttendance.service";
 
-const prisma = new PrismaClient();
 
 /* ------------------------------------------------------------------ */
 /* TEMP stub — Phase 9 Notifications not implemented yet               */

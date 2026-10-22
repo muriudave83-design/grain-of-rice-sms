@@ -1,11 +1,11 @@
 import { Request, Response } from "express";
-import { PrismaClient, AuditAction } from "@prisma/client";
+import { AuditAction } from "@prisma/client";
+import { prisma } from "../prisma/client";
 import jwt from "jsonwebtoken";
 import { createAuditLog } from "../services/auditLog.service";
 import { hashPassword, normalizeEmail, verifyPassword } from "../utils/password";
 import { canViewSchoolGradebooks } from "../services/schoolGradebookViewerAccess";
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "dev_secret";
 
 // 🔥 DEFAULT PASSWORD (ADMIN-CONTROLLED)

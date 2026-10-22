@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { prisma } from "../prisma/client";
 import { getLetterGrade } from "../utils/gradeDescriptions";
 import { AssessmentType } from "@prisma/client";
 import { loadReportAttendance } from "../services/attendance/reportAttendance.service";
@@ -8,18 +9,16 @@ import { FinalGradePublicationError, publishFinalGradesAtomically } from "../ser
 import { deleteOwnedAssignment } from "../services/assignmentDeletion.service";
 import { assertNotCombinedChild, CombinedTeachingGroupError } from "../services/combinedTeachingGroup.service";
 import {
-  compareAndSetReportComment,
   compareAndSetScore,
   hasRequiredPrecondition,
-  lockCommentWriteScope,
+  isTransientCommentSaveError,
+  saveAuthorizedReportComment,
   lockScoreWriteScope,
   SavePreconditionError,
-  validateLockedCommentScope,
   validateLockedScoreScope,
 } from "../services/optimisticSave.service";
 import { accessibleTeacherSubjectIds, activeHandoverForAssignment, TeacherSubjectHandoverError } from "../services/teacherSubjectHandover.service";
 
-const prisma = new PrismaClient();
 
 // 🧠 HELPER — VALIDATE SCORE
 const isValidScore = (score: any) => {
@@ -848,7 +847,7 @@ export const getReportData = async (req: Request, res: Response) => {
 
 export const saveReportComment = async (req: Request, res: Response) => {
   try {
-    const { studentId, teacherSubjectId, termId, comment, expectedUpdatedAt } = req.body;
+    const { studentId, teacherSubjectId, termId, comment, expectedUpdatedAt, allowEmpty } = req.body;
 
     if (!studentId || !teacherSubjectId || !termId) {
       return res.status(400).json({ error: "studentId, teacherSubjectId, and termId are required" });
@@ -857,23 +856,20 @@ export const saveReportComment = async (req: Request, res: Response) => {
       return res.status(428).json({ error: "expectedUpdatedAt precondition is required" });
     }
 
-    const saved = await prisma.$transaction(async (tx) => {
-      validateLockedCommentScope(
-        await lockCommentWriteScope(tx, Number(teacherSubjectId), Number(termId), Number(studentId)),
-        (req as any).user.id,
-      );
-      return compareAndSetReportComment(tx, {
+    const saved = await saveAuthorizedReportComment(prisma, {
+        teacherId: (req as any).user.id,
         studentId: Number(studentId),
         teacherSubjectId: Number(teacherSubjectId),
         termId: Number(termId),
         comment: String(comment ?? ""),
         expectedUpdatedAt: expectedUpdatedAt === null ? null : String(expectedUpdatedAt),
-      });
+        allowEmpty: allowEmpty === true,
     });
 
     res.json(saved);
   } catch (err) {
     if (err instanceof SavePreconditionError) return res.status(err.status).json({ error: err.message, current: err.current });
+    if (isTransientCommentSaveError(err)) return res.status(503).json({ error: "Comment save temporarily unavailable; your draft is safe. Retry shortly.", retryable: true });
     console.error("Comment save failed:", err);
     res.status(500).json({ error: "Failed to save comment" });
   }

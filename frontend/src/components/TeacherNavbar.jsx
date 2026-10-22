@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { clearUserCommentDrafts } from "../utils/commentDraftStore";
 
 export default function TeacherNavbar() {
   const location = useLocation();
@@ -13,7 +14,12 @@ export default function TeacherNavbar() {
 
   // 🔐 Logout
   const handleLogout = () => {
+    try {
+      const currentUser = JSON.parse(localStorage.getItem("user") || "null");
+      if (currentUser?.id) clearUserCommentDrafts(currentUser.id);
+    } catch { /* malformed session is cleared below */ }
     localStorage.removeItem("token");
+    localStorage.removeItem("user");
     navigate("/login", { replace: true });
   };
 

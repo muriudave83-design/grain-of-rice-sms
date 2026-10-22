@@ -15,6 +15,7 @@ export default function TeacherReportCardSheet({
   onCommentRetry,
   onCommentUseSaved,
   onCommentOverwrite,
+  onCommentClear,
 }) {
   return (
     <article className="border p-6 rounded mb-6 print-card bg-white">
@@ -86,7 +87,7 @@ export default function TeacherReportCardSheet({
                     className="border w-full p-2 print-hidden"
                     value={displayedComment ?? ""}
                     placeholder="Add subject comment"
-                    onChange={(event) => onCommentChange(key, event.target.value, subject)}
+                    onChange={(event) => onCommentChange(student.studentId, key, event.target.value, subject)}
                     onBlur={(event) => onCommentBlur(subject, event.target.value)}
                   />
                 ) : (
@@ -95,7 +96,7 @@ export default function TeacherReportCardSheet({
                   </p>
                 )}
                 {saveState && (
-                  <div className={`print-hidden text-xs ${saveState.status === "Failed" || saveState.status === "Conflict" ? "text-red-700" : "text-gray-600"}`}>
+                  <div className={`print-hidden text-xs ${["Failed", "Conflict", "Login required"].includes(saveState.status) ? "text-red-700" : "text-gray-600"}`}>
                     {saveState.status}
                     {saveState.error && <span className="ml-1">— {saveState.error}</span>}
                     {saveState.status === "Failed" && (
@@ -106,6 +107,10 @@ export default function TeacherReportCardSheet({
                         <button type="button" className="underline" onClick={() => onCommentUseSaved(subject)}>Use saved value</button>
                         <button type="button" className="underline" onClick={() => onCommentOverwrite(subject)}>Overwrite with my value</button>
                       </span>
+                    )}
+                    {saveState.status === "Login required" && <a className="ml-2 underline" href="/login">Sign in again</a>}
+                    {saveState.status === "Unsaved" && !String(saveState.draftValue ?? "").trim() && String(saveState.serverValue ?? "").trim() && (
+                      <button type="button" className="ml-2 underline text-red-700" onClick={() => onCommentClear(subject)}>Clear saved comment</button>
                     )}
                   </div>
                 )}

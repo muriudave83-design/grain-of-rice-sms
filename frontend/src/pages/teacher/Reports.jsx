@@ -6,11 +6,15 @@ import {
   PRINT_MODE,
   reportsForMode,
 } from "../../utils/reportCardPresentation";
-import { acceptAuthoritativeValue, acknowledgeTokenizedSave, beginConfirmedOverwrite, beginSave, editSaveField, failSave, hasUnresolvedSaves } from "../../utils/reliableSaveState";
+import { acceptAuthoritativeValue, acknowledgeTokenizedSave, beginConfirmedOverwrite, beginSave, editSaveField, failSave, hasUnresolvedSaves, SAVE_STATUS } from "../../utils/reliableSaveState";
 import { enqueueLatestSave } from "../../utils/latestSaveQueue";
 import useUnsavedChangesGuard from "../../utils/useUnsavedChangesGuard";
+import { getCommentDraft, removeCommentDraft, saveCommentDraft } from "../../utils/commentDraftStore";
+import { isRetryableSaveError, withBoundedRetry } from "../../utils/boundedRetry";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Reports() {
+  const { user } = useAuth();
   const [classId, setClassId] = useState("");
   const [classes, setClasses] = useState([]);
 
@@ -29,11 +33,16 @@ export default function Reports() {
   const commentSaveStatesRef = useRef(commentSaveStates);
   const commentSaveQueuesRef = useRef({});
   const commentSaveEpochRef = useRef(0);
+  const commentSaveTimersRef = useRef({});
+  const commentDraftMetaRef = useRef({});
   useEffect(() => { commentSaveStatesRef.current = commentSaveStates; }, [commentSaveStates]);
   const confirmDiscardComments = useUnsavedChangesGuard(commentSaveStates, commentSaveStatesRef);
   const clearCommentSaveStates = () => {
     commentSaveEpochRef.current += 1;
+    Object.values(commentSaveTimersRef.current).forEach(clearTimeout);
+    commentSaveTimersRef.current = {};
     commentSaveQueuesRef.current = {};
+    commentDraftMetaRef.current = {};
     commentSaveStatesRef.current = {};
     setCommentSaveStates({});
   };
@@ -43,6 +52,14 @@ export default function Reports() {
     if (!next) return next;
     commentSaveStatesRef.current = { ...commentSaveStatesRef.current, [key]: next };
     setCommentSaveStates(commentSaveStatesRef.current);
+    const identity = commentDraftMetaRef.current[key];
+    if (identity && user?.id) {
+      if (next.status === SAVE_STATUS.SAVED && String(next.draftValue ?? "") === String(next.serverValue ?? "")) {
+        removeCommentDraft(user.id, identity);
+      } else {
+        saveCommentDraft(user.id, identity, { value: next.draftValue, serverValue: next.serverValue, serverToken: next.serverToken });
+      }
+    }
     return next;
   };
 
@@ -52,6 +69,7 @@ export default function Reports() {
     value,
     key,
     epoch,
+    allowEmpty = false,
   ) => {
     const previous = commentSaveStatesRef.current[key];
     if (previous?.status === "Conflict") return false;
@@ -65,16 +83,15 @@ export default function Reports() {
     try {
       if (!subject.teacherSubjectId) return false;
 
-      const response = await apiClient.post(
-        "/teacher/report/comment",
-        {
+      const response = await withBoundedRetry(() => apiClient.post(
+        "/teacher/report/comment", {
           studentId,
           teacherSubjectId: subject.teacherSubjectId,
           termId,
           comment: value,
           expectedUpdatedAt: saving.serverToken,
-        }
-      );
+          allowEmpty,
+        }), isRetryableSaveError);
 
       if (commentSaveEpochRef.current !== epoch) return false;
       replaceCommentSaveState(key, (current) => acknowledgeTokenizedSave(
@@ -110,23 +127,42 @@ export default function Reports() {
       const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to save comment";
       const authoritative = err?.response?.data?.current;
       replaceCommentSaveState(key, (current) => ({
-        ...failSave(current, current.sequence, message, err?.response?.status === 409, authoritative?.comment),
+        ...failSave(current, saving.sequence, message, err?.response?.status === 409, authoritative?.comment),
+        ...(err?.response?.status === 401 ? { status: SAVE_STATUS.LOGIN_REQUIRED, error: "Login required — draft retained in this browser tab" } : {}),
         ...(authoritative?.updatedAt ? { authoritativeToken: authoritative.updatedAt } : {}),
       }));
       return false;
     }
   };
 
-  const saveComment = (studentId, subject, value) => {
+  const saveComment = (studentId, subject, value, allowEmpty = false) => {
     if (!subject.teacherSubjectId) return;
     const key = `${termId}-${studentId}-${subject.subjectId}`;
+    const current = commentSaveStatesRef.current[key];
+    if (!allowEmpty && !String(value ?? "").trim() && String(current?.serverValue ?? subject.comment ?? "").trim()) return;
     const epoch = commentSaveEpochRef.current;
     void enqueueLatestSave(
       commentSaveQueuesRef.current,
       key,
-      { studentId, subject, value, key, epoch },
-      (next) => persistComment(next.studentId, next.subject, next.value, next.key, next.epoch),
+      { studentId, subject, value, key, epoch, allowEmpty },
+      (next) => persistComment(next.studentId, next.subject, next.value, next.key, next.epoch, next.allowEmpty),
     );
+  };
+
+  const scheduleCommentSave = (studentId, subject, value) => {
+    const key = `${termId}-${studentId}-${subject.subjectId}`;
+    clearTimeout(commentSaveTimersRef.current[key]);
+    commentSaveTimersRef.current[key] = setTimeout(() => {
+      delete commentSaveTimersRef.current[key];
+      saveComment(studentId, subject, value);
+    }, 900);
+  };
+
+  const flushCommentSave = (studentId, subject, value) => {
+    const key = `${termId}-${studentId}-${subject.subjectId}`;
+    clearTimeout(commentSaveTimersRef.current[key]);
+    delete commentSaveTimersRef.current[key];
+    saveComment(studentId, subject, value);
   };
 
   const acceptSavedComment = (studentId, subject) => {
@@ -136,6 +172,8 @@ export default function Reports() {
     const accepted = acceptAuthoritativeValue(current, current.authoritativeValue, current.authoritativeToken);
     commentSaveStatesRef.current = { ...commentSaveStatesRef.current, [key]: accepted };
     setCommentSaveStates(commentSaveStatesRef.current);
+    const identity = commentDraftMetaRef.current[key];
+    if (identity && user?.id) removeCommentDraft(user.id, identity);
   };
 
   const overwriteComment = (studentId, subject) => {
@@ -149,7 +187,8 @@ export default function Reports() {
     saveComment(studentId, subject, prepared.draftValue);
   };
 
-  const editComment = (key, value, subject) => {
+  const editComment = (studentId, key, value, subject) => {
+    commentDraftMetaRef.current[key] = { studentId, teacherSubjectId: subject.teacherSubjectId, subjectId: subject.subjectId, termId };
     const previous = commentSaveStatesRef.current[key];
     const edited = {
       ...editSaveField(previous, subject.comment, value),
@@ -157,7 +196,40 @@ export default function Reports() {
     };
     commentSaveStatesRef.current = { ...commentSaveStatesRef.current, [key]: edited };
     setCommentSaveStates(commentSaveStatesRef.current);
+    if (user?.id) saveCommentDraft(user.id, commentDraftMetaRef.current[key], { value, serverValue: edited.serverValue, serverToken: edited.serverToken });
+    scheduleCommentSave(studentId, subject, value);
   };
+
+  const clearComment = (studentId, subject) => {
+    if (!globalThis.confirm("Clear this saved comment? This intentionally replaces it with a blank value.")) return;
+    saveComment(studentId, subject, "", true);
+  };
+
+  const hydrateCommentDrafts = (loadedReports) => {
+    const restored = {};
+    if (!user?.id || !termId) return restored;
+    for (const student of loadedReports) for (const subject of student.subjects || []) {
+      if (!subject.canEditComment || !subject.teacherSubjectId) continue;
+      const key = `${termId}-${student.studentId}-${subject.subjectId}`;
+      const identity = { studentId: student.studentId, teacherSubjectId: subject.teacherSubjectId, subjectId: subject.subjectId, termId };
+      commentDraftMetaRef.current[key] = identity;
+      const draft = getCommentDraft(user.id, identity);
+      if (!draft) continue;
+      if (String(draft.value) === String(subject.comment ?? "")) {
+        removeCommentDraft(user.id, identity);
+        continue;
+      }
+      restored[key] = { ...editSaveField(null, subject.comment, draft.value), serverToken: subject.commentUpdatedAt ?? draft.serverToken ?? null };
+    }
+    commentSaveStatesRef.current = restored;
+    setCommentSaveStates(restored);
+    return restored;
+  };
+
+  useEffect(() => () => {
+    commentSaveEpochRef.current += 1;
+    Object.values(commentSaveTimersRef.current).forEach(clearTimeout);
+  }, []);
 
   useEffect(() => {
     if (!printMode) return undefined;
@@ -277,7 +349,7 @@ export default function Reports() {
 
       setReports(res.data);
       setSelectedStudentId("");
-      clearCommentSaveStates();
+      hydrateCommentDrafts(res.data);
     } catch (err) {
       console.error(
         "❌ GENERATE REPORT ERROR:",
@@ -481,7 +553,7 @@ export default function Reports() {
               termId={termId}
               commentSaveStates={commentSaveStates}
               onCommentChange={editComment}
-              onCommentBlur={(subject, value) => saveComment(
+              onCommentBlur={(subject, value) => flushCommentSave(
                 student.studentId,
                 subject,
                 value,
@@ -489,6 +561,7 @@ export default function Reports() {
               onCommentRetry={(subject, value) => saveComment(student.studentId, subject, value)}
               onCommentUseSaved={(subject) => acceptSavedComment(student.studentId, subject)}
               onCommentOverwrite={(subject) => overwriteComment(student.studentId, subject)}
+              onCommentClear={(subject) => clearComment(student.studentId, subject)}
             />
           ))}
         </div>

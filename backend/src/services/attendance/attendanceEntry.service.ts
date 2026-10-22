@@ -1,12 +1,10 @@
 // backend/src/services/attendance/attendanceEntry.service.ts
 
 import {
-  PrismaClient,
   AttendanceStatus,
   AttendanceSessionStatus,
 } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../prisma/client';
 
 export class AttendanceEntryService {
   static async updateEntry({

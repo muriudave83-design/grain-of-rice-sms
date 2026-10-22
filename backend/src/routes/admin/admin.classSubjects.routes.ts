@@ -1,10 +1,10 @@
 import { Router } from "express";
-import { Prisma, PrismaClient, Role } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
+import { prisma } from "../../prisma/client";
 import { authenticate } from "../../middlewares/authMiddleware";
 import { requireRole } from "../../middlewares/rolesMiddleware";
 import { removeClassSubjectConfiguration } from "../../services/classSubjectLifecycle.service";
 
-const prisma = new PrismaClient();
 const router = Router();
 
 

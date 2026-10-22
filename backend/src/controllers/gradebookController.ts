@@ -1,12 +1,11 @@
 // backend/src/controllers/gradebookController.ts
 import { Request, Response } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../prisma/client";
 import {
   computeFinalForStudent,
   computeFinalForStudentsBulk,
 } from "../utils/gradeHelpers";
 
-const prisma = new PrismaClient();
 
 /**
  * Teacher gradebook (NEVER FAIL VERSION)

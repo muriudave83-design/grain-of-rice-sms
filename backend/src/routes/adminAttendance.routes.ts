@@ -1,5 +1,5 @@
 import express from "express"
-import { PrismaClient } from "@prisma/client"
+import { prisma } from "../prisma/client"
 import { markAllPresent, markAttendance, startAfternoonAttendance } from "../controllers/attendance/markAttendance.controller"
 import { statusesByPeriod, summarizeCurrentAttendance } from "../services/attendance/attendanceDomain"
 import { getAttendanceReport } from "../controllers/attendance.controller"
@@ -10,7 +10,6 @@ import { requireRole } from "../middlewares/rolesMiddleware"
 import { Role } from "@prisma/client"
 
 const router = express.Router()
-const prisma = new PrismaClient()
 
 /*
 🔒 GLOBAL PROTECTION (APPLIES TO ALL ROUTES BELOW)
