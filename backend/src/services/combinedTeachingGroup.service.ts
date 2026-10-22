@@ -332,19 +332,21 @@ async function ownedLogical(tx: any, groupId: number, teacherId: number, logical
 }
 
 export async function updateCombinedAssignment(client: any, groupId: number, teacherId: number, logicalId: number, input: any) {
+  if (Object.prototype.hasOwnProperty.call(input ?? {}, "maxPoints")) {
+    throw new CombinedTeachingGroupError(400, "Maximum-point editing for combined assignments is not yet supported");
+  }
   return client.$transaction(async (tx: any) => {
     const logical = await ownedLogical(tx, groupId, teacherId, logicalId);
     if (logical.children.some((child: any) => child.assignment.term?.isLocked || child.assignment.isLocked)) throw new CombinedTeachingGroupError(409, "A child assignment or Term is locked");
     const data: any = {};
-    for (const key of ["title", "weight", "maxPoints", "dateAssigned", "dueDate"]) if (input[key] !== undefined) data[key] = input[key];
+    for (const key of ["title", "weight", "dateAssigned", "dueDate"]) if (input[key] !== undefined) data[key] = input[key];
     if (data.title !== undefined) data.title = String(data.title).trim();
     if (data.weight !== undefined) data.weight = Number(data.weight);
-    if (data.maxPoints !== undefined) data.maxPoints = Number(data.maxPoints);
     if (data.dateAssigned !== undefined) data.dateAssigned = data.dateAssigned ? new Date(data.dateAssigned) : null;
     if (data.dueDate !== undefined) data.dueDate = data.dueDate ? new Date(data.dueDate) : null;
     if (input.type !== undefined) data.type = normalizedType(input.type);
     if (!data.title && input.title !== undefined) throw new CombinedTeachingGroupError(400, "Title cannot be empty");
-    if (data.weight !== undefined && !(data.weight > 0) || data.maxPoints !== undefined && !(data.maxPoints > 0)) throw new CombinedTeachingGroupError(400, "Weight and maximum points must be greater than zero");
+    if (data.weight !== undefined && !(data.weight > 0)) throw new CombinedTeachingGroupError(400, "Weight must be greater than zero");
     await tx.combinedAssignment.update({ where: { id: logical.id }, data });
     await tx.assignment.updateMany({ where: { id: { in: logical.children.map((child: any) => child.assignmentId) } }, data });
     return tx.combinedAssignment.findUnique({ where: { id: logical.id }, include: { children: { include: { assignment: true } } } });

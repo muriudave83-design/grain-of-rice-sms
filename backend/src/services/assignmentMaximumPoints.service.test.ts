@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import { AssignmentMaximumPointsError, updateOwnedAssignmentMaximumPoints } from "./assignmentMaximumPoints.service";
 
@@ -101,4 +103,12 @@ test("detects simultaneous maximum-point changes", async () => {
   await assert.rejects(() => change(stale.client), (error: any) => error.status === 409 && error.current.maxPoints === 30);
   const race = fixture({ race: true });
   await assert.rejects(() => change(race.client), /changed or was locked/);
+});
+
+test("generic assignment update rejects maxPoints and only the dedicated route exposes regular editing", () => {
+  const controller = readFileSync(path.resolve(process.cwd(), "src/controllers/teacher.controller.ts"), "utf8");
+  const routes = readFileSync(path.resolve(process.cwd(), "src/routes/teacher.routes.ts"), "utf8");
+  assert.match(controller, /updateAssignment[\s\S]*hasOwnProperty\.call\(req\.body, "maxPoints"\)[\s\S]*Use the maximum-points endpoint/);
+  assert.match(routes, /router\.patch\("\/assignment\/:id\/max-points", updateAssignmentMaximumPoints\)/);
+  assert.doesNotMatch(routes, /router\.(?:put|post)\("\/assignment\/:id\/max-points"/);
 });
