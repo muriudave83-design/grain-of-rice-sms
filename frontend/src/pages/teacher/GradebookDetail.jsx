@@ -62,6 +62,7 @@ export default function GradebookDetail() {
   const [contextMenu, setContextMenu] = useState(null);
   const contextMenuRef = useRef(null);
   const [deleteDialog, setDeleteDialog] = useState(null);
+  const [maximumPointsDialog, setMaximumPointsDialog] = useState(null);
 
   // 🧱 TERMS
   const [terms, setTerms] = useState([]);
@@ -646,6 +647,34 @@ useEffect(() => {
         alert(err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to rename assignment");
       }
     };
+
+  const handleMaximumPointsUpdate = async (event) => {
+    event.preventDefault();
+    const next = Number(maximumPointsDialog.value);
+    if (!Number.isFinite(next) || next <= 0) {
+      setMaximumPointsDialog((current) => ({ ...current, error: "Maximum points must be a positive number." }));
+      return;
+    }
+    if (!Number.isInteger(next * 100)) {
+      setMaximumPointsDialog((current) => ({ ...current, error: "Maximum points supports at most two decimal places." }));
+      return;
+    }
+    setMaximumPointsDialog((current) => ({ ...current, saving: true, error: "" }));
+    try {
+      const { data: updated } = await apiClient.patch(
+        `/teacher/assignment/${maximumPointsDialog.assignment.id}/max-points`,
+        { maxPoints: next, expectedMaxPoints: maximumPointsDialog.assignment.maxPoints },
+      );
+      setData((current) => ({
+        ...current,
+        assignments: current.assignments.map((assignment) => assignment.id === updated.id ? { ...assignment, ...updated } : assignment),
+      }));
+      setMaximumPointsDialog(null);
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.response?.data?.error || err?.message || "Failed to update maximum points";
+      setMaximumPointsDialog((current) => ({ ...current, saving: false, error: message }));
+    }
+  };
 
   const handleWeightChange = async (id, weight) => {
     const weightNumber = Number(weight);
@@ -1358,6 +1387,23 @@ useEffect(() => {
         </div>
       )}
 
+      {maximumPointsDialog && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="maximum-points-title">
+          <form onSubmit={handleMaximumPointsUpdate} className="w-full max-w-sm rounded-lg bg-white p-5 shadow-xl">
+            <h2 id="maximum-points-title" className="text-lg font-bold text-gray-900">Edit Maximum Points</h2>
+            <p className="mt-1 text-sm text-gray-600">{maximumPointsDialog.assignment.title}</p>
+            <label htmlFor="maximum-points-value" className="mt-4 block text-sm font-medium text-gray-700">Maximum points</label>
+            <input id="maximum-points-value" type="number" min="0.01" step="0.01" required autoFocus value={maximumPointsDialog.value} onChange={(event) => setMaximumPointsDialog((current) => ({ ...current, value: event.target.value, error: "" }))} className="mt-1 w-full rounded border p-2" />
+            <p className="mt-2 text-xs text-gray-500">Existing student scores will be preserved.</p>
+            {maximumPointsDialog.error && <p role="alert" className="mt-2 text-sm text-red-700">{maximumPointsDialog.error}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setMaximumPointsDialog(null)} disabled={maximumPointsDialog.saving} className="rounded border px-4 py-2 text-sm">Cancel</button>
+              <button type="submit" disabled={maximumPointsDialog.saving} className="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">{maximumPointsDialog.saving ? "Saving…" : "Save"}</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* CONTEXT MENU */}
       {contextMenu && (
         <div
@@ -1385,6 +1431,19 @@ useEffect(() => {
               className="w-full px-3 py-2 text-left hover:bg-gray-100 cursor-pointer text-sm"
             >
               ✏️ Rename
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              disabled={termLocked || contextMenu.assignment.isLocked}
+              onClick={() => {
+                setMaximumPointsDialog({ assignment: contextMenu.assignment, value: String(contextMenu.assignment.maxPoints ?? 100), saving: false, error: "" });
+                setContextMenu(null);
+              }}
+              className="w-full px-3 py-2 text-left hover:bg-gray-100 cursor-pointer text-sm disabled:cursor-not-allowed disabled:text-gray-400"
+            >
+              Edit Maximum Points
             </button>
 
             <button

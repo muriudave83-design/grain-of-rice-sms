@@ -20,6 +20,7 @@ import {
   createAssignment,
   deleteAssignment,
   updateAssignment,
+  updateAssignmentMaximumPoints,
   getClassStudents,
   reorderAssignments,
   bulkUpdateScores,
@@ -170,6 +171,7 @@ router.post("/assignment", createAssignment);
 router.delete("/assignment/:id", deleteAssignment);
 router.put("/assignment/reorder", reorderAssignments);
 router.put("/assignment/:id", updateAssignment);
+router.patch("/assignment/:id/max-points", updateAssignmentMaximumPoints);
 
 router.post("/transcript/generate", generateTranscripts);
 

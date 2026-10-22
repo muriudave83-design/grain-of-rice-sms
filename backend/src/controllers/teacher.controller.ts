@@ -7,6 +7,7 @@ import { loadAuthoritativeReportResults } from "../services/authoritativeReport.
 import { FinalGradePublicationError, publishFinalGradesAtomically } from "../services/finalGradePublication.service";
 import { deleteOwnedAssignment } from "../services/assignmentDeletion.service";
 import { assertNotCombinedChild, CombinedTeachingGroupError } from "../services/combinedTeachingGroup.service";
+import { AssignmentMaximumPointsError, updateOwnedAssignmentMaximumPoints } from "../services/assignmentMaximumPoints.service";
 import {
   compareAndSetReportComment,
   compareAndSetScore,
@@ -437,6 +438,9 @@ export const deleteAssignment = async (req: Request, res: Response) => {
 };
 
 export const updateAssignment = async (req: Request, res: Response) => {
+  if (Object.prototype.hasOwnProperty.call(req.body, "maxPoints")) {
+    return res.status(400).json({ message: "Use the maximum-points endpoint to change maximum points" });
+  }
   try {
     const assignment = await prisma.assignment.findFirst({
       where: {
@@ -472,9 +476,6 @@ export const updateAssignment = async (req: Request, res: Response) => {
         ...(req.body.weight !== undefined && { weight: req.body.weight }),
 
         // 🔥 OPTIONAL: allow updating new fields too
-        ...(req.body.maxPoints !== undefined && {
-          maxPoints: Number(req.body.maxPoints),
-        }),
         ...(req.body.dateAssigned !== undefined && {
           dateAssigned: req.body.dateAssigned
             ? new Date(req.body.dateAssigned)
@@ -493,6 +494,30 @@ export const updateAssignment = async (req: Request, res: Response) => {
     if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
     console.error("UPDATE ASSIGNMENT ERROR:", err);
     res.status(500).json({ message: "Error updating assignment" });
+  }
+};
+
+export const updateAssignmentMaximumPoints = async (req: Request, res: Response) => {
+  if (!Object.prototype.hasOwnProperty.call(req.body, "expectedMaxPoints")) {
+    return res.status(428).json({ message: "expectedMaxPoints precondition is required" });
+  }
+  try {
+    const assignment = await updateOwnedAssignmentMaximumPoints(prisma, {
+      assignmentId: Number(req.params.id),
+      teacherId: (req as any).user.id,
+      maxPoints: req.body.maxPoints,
+      expectedMaxPoints: req.body.expectedMaxPoints,
+    });
+    return res.json(assignment);
+  } catch (err) {
+    if (err instanceof AssignmentMaximumPointsError) {
+      return res.status(err.status).json({ message: err.message, ...(err.current ? { current: err.current } : {}) });
+    }
+    if ((err as any)?.code === "P2034") {
+      return res.status(409).json({ message: "Assignment or scores changed concurrently; refresh and try again" });
+    }
+    console.error("UPDATE ASSIGNMENT MAXIMUM POINTS ERROR:", err);
+    return res.status(500).json({ message: "Failed to update maximum points" });
   }
 };
 
