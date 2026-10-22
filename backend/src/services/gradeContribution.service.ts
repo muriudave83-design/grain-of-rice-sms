@@ -15,6 +15,25 @@ export type ResolvedSubjectGrade =
   | { status: "REVIEW_REQUIRED"; unreviewedAssignmentIds: number[] }
   | { status: "NO_INCLUDED_ASSIGNMENTS" };
 
+export function calculateCurrentAvailableGrade(studentId: number, assignments: ContributionAssignment[]) {
+  const available = [...new Map(assignments.map((assignment) => [assignment.id, assignment])).values()]
+    .filter((assignment) => assignment.gradeContributionStatus !== "EXCLUDED");
+  if (!available.length) return null;
+
+  let weightedTotal = 0;
+  let totalWeight = 0;
+  for (const assignment of available) {
+    const score = assignment.scores.find((entry) => entry.studentId === studentId)?.score;
+    const maxPoints = Number(assignment.maxPoints ?? 100);
+    const weight = Number(assignment.weight ?? 1);
+    if (score === null || score === undefined || !Number.isFinite(Number(score)) ||
+        !Number.isFinite(maxPoints) || maxPoints <= 0 || !Number.isFinite(weight) || weight <= 0) return null;
+    weightedTotal += (Number(score) / maxPoints) * 100 * weight;
+    totalWeight += weight;
+  }
+  return totalWeight > 0 ? weightedTotal / totalWeight : null;
+}
+
 export function calculateIncludedAssignments(studentId: number, assignments: ContributionAssignment[]): ResolvedSubjectGrade {
   const unique = [...new Map(assignments.map((assignment) => [assignment.id, assignment])).values()];
   const unreviewed = unique.filter((assignment) => assignment.gradeContributionStatus === "UNREVIEWED");
@@ -48,13 +67,19 @@ export function resolveExplicitSubjectGrade(input: {
   published?: { total: number; contributionRevision?: number | null } | null;
 }): ResolvedSubjectGrade | null {
   if (input.published) {
+    const revisionMismatch = Boolean(
+      input.scope !== null &&
+      input.published.contributionRevision !== input.scope.revision
+    );
+    const currentAvailable = revisionMismatch
+      ? calculateCurrentAvailableGrade(input.studentId, input.assignments)
+      : null;
+    const verifiedCurrentValue = currentAvailable !== null &&
+      Number(currentAvailable.toFixed(1)) === Number(Number(input.published.total).toFixed(1));
     return {
       status: "PUBLISHED",
       value: input.published.total,
-      needsRevalidation: Boolean(
-        input.scope !== null &&
-        input.published.contributionRevision !== input.scope.revision
-      ),
+      needsRevalidation: revisionMismatch && !verifiedCurrentValue,
     };
   }
   if (!input.scope) return null;

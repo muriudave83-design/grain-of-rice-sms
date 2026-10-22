@@ -92,6 +92,9 @@ test("screen and print grids accommodate long subject and grade content", () => 
   assert.match(css, /@media print[\s\S]*grid-template-columns:\s*30%\s*10%\s*25%\s*minmax\(0,\s*1fr\)/);
   assert.match(css, /\.report-subject-name,[\s\S]*\.report-grade[\s\S]*overflow-wrap:\s*anywhere/);
   assert.match(css, /\.report-score[\s\S]*white-space:\s*nowrap/);
+  assert.match(sheet, /<small className="report-score-warning">Revalidation required<\/small>/);
+  assert.match(css, /\.report-score-warning\s*\{[\s\S]*display:\s*block;[\s\S]*white-space:\s*normal;[\s\S]*overflow-wrap:\s*anywhere/);
+  assert.doesNotMatch(sheet, /formatReportPercentage\(subject\.finalGrade\).*revalidation required/);
 });
 
 test("A4 print rules protect rows, attendance, and student boundaries", () => {
@@ -110,7 +113,7 @@ test("teacher report preserves data loading, comment saving, attendance, and sha
   assert.match(component, /apiClient\.post\([\s\S]*\/teacher\/report\/comment/);
   assert.match(component, /TeacherReportCardSheet/);
   assert.match(component, /commentSaveStates=\{commentSaveStates\}/);
-  assert.match(component, /onCommentBlur=\{\(subject, value\) => saveComment/);
+  assert.match(component, /onCommentBlur=\{\(subject, value\) =>\s*flushCommentSave/);
   assert.match(sheet, /student\.attendanceRate/);
   assert.match(sheet, /className="[^"]*print-card/);
 });

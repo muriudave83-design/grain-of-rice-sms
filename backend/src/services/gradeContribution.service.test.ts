@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { calculateIncludedAssignments, resolveExplicitSubjectGrade } from "./gradeContribution.service";
+import { calculateCurrentAvailableGrade, calculateIncludedAssignments, resolveExplicitSubjectGrade } from "./gradeContribution.service";
 
 const assignment = (id: number, status: any, score: number | null, studentId = 1) => ({
   id, weight: 1, maxPoints: 100, gradeContributionStatus: status,
@@ -33,6 +33,36 @@ test("legacy scopes retain existing behavior and published grades remain authori
   assert.deepEqual(resolveExplicitSubjectGrade({ studentId: 1, assignments: [assignment(1, "UNREVIEWED", 10)], scope: { mode: "ACTIVE", revision: 2 }, published: { total: 91, contributionRevision: 1 } }), { status: "PUBLISHED", value: 91, needsRevalidation: true });
   assert.deepEqual(resolveExplicitSubjectGrade({ studentId: 1, assignments: [], scope: { mode: "ACTIVE", revision: 1 }, published: { total: 88, contributionRevision: null } }), { status: "PUBLISHED", value: 88, needsRevalidation: true });
   assert.deepEqual(resolveExplicitSubjectGrade({ studentId: 1, assignments: [], scope: { mode: "REVIEWING", revision: 2 }, published: { total: 88, contributionRevision: 1 } }), { status: "PUBLISHED", value: 88, needsRevalidation: true });
+});
+
+test("legacy published grades are display-valid when complete current marks reproduce the stored total", () => {
+  const assignments = [
+    { ...assignment(1, "UNREVIEWED", 4), maxPoints: 5 },
+    { ...assignment(2, "INCLUDED", 55), maxPoints: 60 },
+    { ...assignment(3, "INCLUDED", 5), maxPoints: 5 },
+  ];
+  assert.equal(Number(calculateCurrentAvailableGrade(1, assignments)?.toFixed(1)), 90.6);
+  assert.deepEqual(resolveExplicitSubjectGrade({
+    studentId: 1, assignments, scope: { mode: "REVIEWING", revision: 1 },
+    published: { total: 90.6, contributionRevision: null },
+  }), { status: "PUBLISHED", value: 90.6, needsRevalidation: false });
+});
+
+test("genuinely changed or incomplete inputs retain published-grade revalidation", () => {
+  const changed = [{ ...assignment(1, "INCLUDED", 80), maxPoints: 100 }];
+  const changedResult = resolveExplicitSubjectGrade({
+    studentId: 1, assignments: changed, scope: { mode: "ACTIVE", revision: 2 },
+    published: { total: 91, contributionRevision: 1 },
+  });
+  assert.equal(changedResult?.status, "PUBLISHED");
+  assert.equal(changedResult?.status === "PUBLISHED" && changedResult.needsRevalidation, true);
+  const missing = [assignment(1, "INCLUDED", null)];
+  const missingResult = resolveExplicitSubjectGrade({
+    studentId: 1, assignments: missing, scope: { mode: "ACTIVE", revision: 2 },
+    published: { total: 91, contributionRevision: 1 },
+  });
+  assert.equal(missingResult?.status, "PUBLISHED");
+  assert.equal(missingResult?.status === "PUBLISHED" && missingResult.needsRevalidation, true);
 });
 
 test("migration auto-activates only authoritative active combined-assignment sets", () => {

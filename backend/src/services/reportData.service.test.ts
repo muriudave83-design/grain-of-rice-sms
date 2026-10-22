@@ -38,8 +38,8 @@ test("teacher report authorization and term-scoped comment query remain enforced
   assert.match(authoritative, /teacherSubjectId: \{ in: teacherSubjectIds \}/);
   assert.match(authoritative, /client\.grade\.findMany\(/);
   assert.match(authoritative, /termId: input\.termId/);
-  assert.match(controller, /lockCommentWriteScope\(tx, Number\(teacherSubjectId\), Number\(termId\), Number\(studentId\)\)/);
-  assert.match(controller, /validateLockedCommentScope/);
+  assert.match(controller, /saveAuthorizedReportComment\(prisma/);
+  assert.match(controller, /teacherId: \(req as any\)\.user\.id/);
 });
 
 test("class-wide assembly includes every configured subject and prefers published grades", () => {
@@ -274,6 +274,33 @@ test("a published grade remains authoritative even when current assignment input
     contributionScopes: new Map([[13, { mode: "ACTIVE", revision: 2 }]]),
   });
   assert.equal(subject.finalGrade, 83);
+  assert.equal(subject.completenessState, "PUBLISHED");
+  assert.equal(subject.needsRevalidation, false);
+});
+
+test("Grade 7 Kiswahili legacy publication is verified by complete current marks", () => {
+  const [subject] = assembleClassSubjectResults({
+    studentId: 181,
+    requestingTeacherId: 700,
+    classSubjects: [{
+      subjectId: 49,
+      subject: {
+        name: "GRADE 7 KISWAHILI",
+        teacherSubjects: [{
+          id: 149, teacherId: 700, isActive: true,
+          assignments: [
+            { id: 75, gradeContributionStatus: "UNREVIEWED", weight: 1, maxPoints: 5, scores: [{ studentId: 181, score: 4 }] },
+            { id: 425, gradeContributionStatus: "INCLUDED", weight: 1, maxPoints: 60, scores: [{ studentId: 181, score: 55 }] },
+            { id: 426, gradeContributionStatus: "INCLUDED", weight: 1, maxPoints: 5, scores: [{ studentId: 181, score: 5 }] },
+          ],
+        }],
+      },
+    }],
+    grades: [{ studentId: 181, subjectId: 49, total: 90.6, contributionRevision: null }],
+    comments: emptyComments(),
+    contributionScopes: new Map([[49, { mode: "REVIEWING", revision: 1 }]]),
+  });
+  assert.equal(subject.finalGrade, 90.6);
   assert.equal(subject.completenessState, "PUBLISHED");
   assert.equal(subject.needsRevalidation, false);
 });

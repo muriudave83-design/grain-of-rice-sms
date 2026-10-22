@@ -37,6 +37,16 @@
   white-space: nowrap;
 }
 
+.report-score-warning {
+  display: block;
+  margin-top: 0.2rem;
+  color: #b45309;
+  font-size: 0.75rem;
+  line-height: 1.1;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .print-only {
   display: none;
 }
