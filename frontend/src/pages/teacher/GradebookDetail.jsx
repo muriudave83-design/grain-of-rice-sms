@@ -24,6 +24,7 @@ import {
   hasUnresolvedSaves,
 } from "../../utils/reliableSaveState";
 import useUnsavedChangesGuard from "../../utils/useUnsavedChangesGuard";
+import { calculateAssignmentWeightedGrade } from "../../utils/assignmentWeightedGrade";
 
 const PUBLISHED_DELETE_CONFIRMATION = "DELETE PUBLISHED ASSIGNMENT";
 
@@ -330,112 +331,6 @@ useEffect(() => {
     return attendanceMap[studentId] || 0;
   };
 
-  // ✅ CATEGORY AVERAGES
-  const getCategoryAverages = (student) => {
-    const categories = {};
-
-    for (const a of assignments) {
-      const type = a.type || "HOMEWORK";
-
-      const scoreObj = a.scores?.find(
-        (s) => String(s.studentId) === String(student.id)
-      );
-
-      if (!scoreObj) continue;
-
-      if (!categories[type]) {
-        categories[type] = { total: 0, count: 0 };
-      }
-
-      const maxPoints = a.maxPoints || 100;
-      const percentage = (scoreObj.score / maxPoints) * 100;
-
-      categories[type].total += percentage;
-      categories[type].count += 1;
-    }
-
-    const result = {};
-
-    Object.keys(categories).forEach((type) => {
-      const c = categories[type];
-      result[type] = c.total / c.count;
-    });
-
-    return result;
-  };
-
-  // ✅ CATEGORY WEIGHTS
-  const getCategoryWeights = () => {
-    const weights = data?.categoryWeights;
-
-    if (!weights || weights.length === 0) {
-      const uniqueTypes = [
-        ...new Set(assignments.map((a) => a.type || "HOMEWORK")),
-      ];
-
-      const equal = uniqueTypes.length > 0 ? 1 / uniqueTypes.length : 1;
-
-      return uniqueTypes.map((type) => ({ type, weight: equal }));
-    }
-
-    const totalWeight = weights.reduce(
-      (sum, w) => sum + (Number(w.weight) || 0),
-      0
-    );
-
-    if (totalWeight <= 0) {
-      console.warn("⚠️ Invalid category weights. Falling back to equal weights.");
-
-      const uniqueTypes = [
-        ...new Set(assignments.map((a) => a.type || "HOMEWORK")),
-      ];
-
-      const equal = uniqueTypes.length > 0 ? 1 / uniqueTypes.length : 1;
-
-      return uniqueTypes.map((type) => ({ type, weight: equal }));
-    }
-
-    if (Math.abs(totalWeight - 1) > 0.01) {
-      console.warn("⚠️ Category weights do not sum to 1. Auto-normalizing...");
-
-      return weights.map((w) => ({
-        ...w,
-        weight: (Number(w.weight) || 0) / totalWeight,
-      }));
-    }
-
-    return weights.map((w) => ({
-      ...w,
-      weight: Number(w.weight) || 0,
-    }));
-  };
-    // ✅ FINAL GRADE
-  const calculateFinalGrade = (categoryAverages, weights) => {
-    if (!categoryAverages || !weights) return 0;
-
-    let total = 0;
-    let appliedWeight = 0;
-
-    for (const w of weights) {
-      const avg = categoryAverages[w.type];
-
-      if (avg !== undefined && !isNaN(avg)) {
-        total += avg * w.weight;
-        appliedWeight += w.weight;
-      }
-    }
-
-    if (appliedWeight === 0) return null;
-
-    return total / appliedWeight;
-  };
-
-  const getFinalGrade = (student) => {
-    const categoryAverages = getCategoryAverages(student);
-    const weights = getCategoryWeights();
-    return calculateFinalGrade(categoryAverages, weights);
-  };
-
     // 🔥 FIXED ADD ASSIGNMENT (MODAL VERSION)
     const handleAddAssignment = async () => {
       if (termLocked) {
@@ -477,42 +372,7 @@ useEffect(() => {
     };
 
   const getStudentAverage = (student) => {
-    if (!assignments || assignments.length === 0) {
-      return null;
-    }
-
-    let total = 0;
-    let totalWeight = 0;
-
-    for (const a of assignments) {
-      const scoreObj = a.scores?.find(
-        (s) => String(s.studentId) === String(student.id)
-      );
-
-      // Ignore blank/ungraded assignments
-      if (
-        !scoreObj ||
-        scoreObj.score === null ||
-        scoreObj.score === undefined ||
-        scoreObj.score === ""
-      ) {
-        return null;
-      }
-
-      const weight = a.weight ?? 1;
-      const maxPoints = a.maxPoints ?? 100;
-      if (maxPoints <= 0) return null;
-
-      total += (Number(scoreObj.score) / maxPoints) * 100 * weight;
-      totalWeight += weight;
-    }
-
-    // No graded assignments
-    if (totalWeight === 0) {
-      return null;
-    }
-
-    return total / totalWeight;
+    return calculateAssignmentWeightedGrade(student.id, assignments);
   };
 
   const getGrade = (avg) => {
@@ -1126,7 +986,7 @@ useEffect(() => {
 
                               <input
                                 type="number"
-                                value={a.weight || 1}
+                                value={a.weight ?? 1}
                                 disabled={termLocked}
                                 onChange={(e) =>
                                   handleWeightChange(
@@ -1156,7 +1016,7 @@ useEffect(() => {
 
           <tbody>
             {alphabeticalStudents.map((student) => {
-              const final = getFinalGrade(student);
+              const final = getStudentAverage(student);
               const avg = final;
               const grade = getGrade(final);
               const absent = getAbsentDays(student.id);

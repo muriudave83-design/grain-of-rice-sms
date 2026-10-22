@@ -27,6 +27,16 @@ test("historical and current included assignments combine without teacher-owner 
   assert.deepEqual(result, { status: "COMPLETE", value: 70, assignmentIds: [10, 11] });
 });
 
+test("final-grade publication calculation ignores missing zero-weight work", () => {
+  assert.deepEqual(calculateIncludedAssignments(1, [
+    assignment(1, "INCLUDED", 80),
+    { ...assignment(2, "INCLUDED", null), weight: 0, maxPoints: 0 },
+  ]), { status: "COMPLETE", value: 80, assignmentIds: [1] });
+  assert.deepEqual(calculateIncludedAssignments(1, [
+    { ...assignment(1, "INCLUDED", null), weight: 0 },
+  ]), { status: "INCOMPLETE", missingAssignmentIds: [1] });
+});
+
 test("administrator review state is advisory for teacher reports while published grades remain authoritative", () => {
   assert.equal(resolveExplicitSubjectGrade({ studentId: 1, assignments: [], scope: null }), null);
   assert.deepEqual(resolveExplicitSubjectGrade({ studentId: 1, assignments: [assignment(1, "UNREVIEWED", 88)], scope: { mode: "REVIEWING", revision: 2 } }), { status: "COMPLETE", value: 88, assignmentIds: [1] });
@@ -40,6 +50,32 @@ test("teacher reports retain missing and invalid mark safeguards regardless of r
   assert.deepEqual(calculateTeacherReportAssignments(1, [assignment(1, "UNREVIEWED", null)]), { status: "INCOMPLETE", missingAssignmentIds: [1] });
   assert.deepEqual(calculateTeacherReportAssignments(1, [{ ...assignment(1, "EXCLUDED", 80), maxPoints: 0 }]), { status: "INCOMPLETE", missingAssignmentIds: [1] });
   assert.deepEqual(calculateTeacherReportAssignments(1, [{ ...assignment(1, "INCLUDED", 80), weight: Number.NaN }]), { status: "INCOMPLETE", missingAssignmentIds: [1] });
+});
+
+test("teacher reports exclude zero weight, apply unequal positive weights, and reject all-zero or negative weights", () => {
+  assert.deepEqual(calculateTeacherReportAssignments(1, [
+    { ...assignment(1, "UNREVIEWED", 50), weight: 1 },
+    { ...assignment(2, "EXCLUDED", 100), weight: 3 },
+    { ...assignment(3, "INCLUDED", null), weight: 0, maxPoints: 0 },
+  ]), { status: "COMPLETE", value: 87.5, assignmentIds: [1, 2] });
+  assert.deepEqual(calculateTeacherReportAssignments(1, [
+    { ...assignment(1, "INCLUDED", null), weight: 0 },
+  ]), { status: "INCOMPLETE", missingAssignmentIds: [1] });
+  assert.deepEqual(calculateTeacherReportAssignments(1, [
+    { ...assignment(1, "INCLUDED", 80), weight: -1 },
+  ]), { status: "INCOMPLETE", missingAssignmentIds: [1] });
+});
+
+test("published grades remain authoritative while zero-weight work is ignored during revision verification", () => {
+  assert.deepEqual(resolveExplicitSubjectGrade({
+    studentId: 1,
+    assignments: [
+      { ...assignment(1, "INCLUDED", 77.3), weight: 1 },
+      { ...assignment(225, "UNREVIEWED", null), weight: 0 },
+    ],
+    scope: { mode: "REVIEWING", revision: 2 },
+    published: { total: 77.3, contributionRevision: 1 },
+  }), { status: "PUBLISHED", value: 77.3, needsRevalidation: false });
 });
 
 test("legacy published grades are display-valid when complete current marks reproduce the stored total", () => {

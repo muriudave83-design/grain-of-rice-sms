@@ -13,7 +13,7 @@ test("maximum-point save uses a concurrency precondition and refreshes assignmen
   assert.match(source, /patch\([\s\S]*\/max-points/);
   assert.match(source, /expectedMaxPoints: maximumPointsDialog\.assignment\.maxPoints/);
   assert.match(source, /assignments: current\.assignments\.map/);
-  assert.match(source, /Number\(scoreObj\.score\) \/ maxPoints/);
+  assert.match(source, /calculateAssignmentWeightedGrade\(student\.id, assignments\)/);
   assert.match(source, /getLetterGrade\(avg\)/);
 });
 

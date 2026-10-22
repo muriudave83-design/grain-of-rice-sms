@@ -17,16 +17,21 @@ export type ResolvedSubjectGrade =
 
 export function calculateCurrentAvailableGrade(studentId: number, assignments: ContributionAssignment[]) {
   const available = [...new Map(assignments.map((assignment) => [assignment.id, assignment])).values()];
-  if (!available.length) return null;
+  if (!available.length || available.some((assignment) => {
+    const weight = Number(assignment.weight ?? 1);
+    return !Number.isFinite(weight) || weight < 0;
+  })) return null;
+  const contributing = available.filter((assignment) => Number(assignment.weight ?? 1) > 0);
+  if (!contributing.length) return null;
 
   let weightedTotal = 0;
   let totalWeight = 0;
-  for (const assignment of available) {
+  for (const assignment of contributing) {
     const score = assignment.scores.find((entry) => entry.studentId === studentId)?.score;
     const maxPoints = Number(assignment.maxPoints ?? 100);
     const weight = Number(assignment.weight ?? 1);
     if (score === null || score === undefined || !Number.isFinite(Number(score)) ||
-        !Number.isFinite(maxPoints) || maxPoints <= 0 || !Number.isFinite(weight) || weight <= 0) return null;
+        !Number.isFinite(maxPoints) || maxPoints <= 0) return null;
     weightedTotal += (Number(score) / maxPoints) * 100 * weight;
     totalWeight += weight;
   }
@@ -36,19 +41,25 @@ export function calculateCurrentAvailableGrade(studentId: number, assignments: C
 export function calculateTeacherReportAssignments(studentId: number, assignments: ContributionAssignment[]): ResolvedSubjectGrade {
   const unique = [...new Map(assignments.map((assignment) => [assignment.id, assignment])).values()];
   if (!unique.length) return { status: "NO_INCLUDED_ASSIGNMENTS" };
-  const invalid = unique.filter((assignment) => {
+  const invalidWeights = unique.filter((assignment) => {
+    const weight = Number(assignment.weight ?? 1);
+    return !Number.isFinite(weight) || weight < 0;
+  });
+  if (invalidWeights.length) return { status: "INCOMPLETE", missingAssignmentIds: invalidWeights.map((item) => item.id) };
+  const contributing = unique.filter((assignment) => Number(assignment.weight ?? 1) > 0);
+  if (!contributing.length) return { status: "INCOMPLETE", missingAssignmentIds: unique.map((item) => item.id) };
+  const invalid = contributing.filter((assignment) => {
     const score = assignment.scores.find((entry) => entry.studentId === studentId)?.score;
     const maxPoints = Number(assignment.maxPoints ?? 100);
-    const weight = Number(assignment.weight ?? 1);
     return score === null || score === undefined || !Number.isFinite(Number(score)) ||
-      !Number.isFinite(maxPoints) || maxPoints <= 0 || !Number.isFinite(weight) || weight <= 0;
+      !Number.isFinite(maxPoints) || maxPoints <= 0;
   });
   if (invalid.length) return { status: "INCOMPLETE", missingAssignmentIds: invalid.map((item) => item.id) };
 
   const value = calculateCurrentAvailableGrade(studentId, unique);
   return value === null
     ? { status: "INCOMPLETE", missingAssignmentIds: unique.map((item) => item.id) }
-    : { status: "COMPLETE", value, assignmentIds: unique.map((item) => item.id) };
+    : { status: "COMPLETE", value, assignmentIds: contributing.map((item) => item.id) };
 }
 
 export function calculateIncludedAssignments(studentId: number, assignments: ContributionAssignment[]): ResolvedSubjectGrade {
@@ -58,23 +69,32 @@ export function calculateIncludedAssignments(studentId: number, assignments: Con
 
   const included = unique.filter((assignment) => assignment.gradeContributionStatus === "INCLUDED");
   if (!included.length) return { status: "NO_INCLUDED_ASSIGNMENTS" };
-  const missing = included.filter((assignment) => {
+  const invalidWeights = included.filter((assignment) => {
+    const weight = Number(assignment.weight ?? 1);
+    return !Number.isFinite(weight) || weight < 0;
+  });
+  if (invalidWeights.length) return { status: "INCOMPLETE", missingAssignmentIds: invalidWeights.map((item) => item.id) };
+  const contributing = included.filter((assignment) => Number(assignment.weight ?? 1) > 0);
+  if (!contributing.length) return { status: "INCOMPLETE", missingAssignmentIds: included.map((item) => item.id) };
+  const missing = contributing.filter((assignment) => {
     const score = assignment.scores.find((entry) => entry.studentId === studentId)?.score;
-    return score === null || score === undefined || (assignment.maxPoints ?? 100) <= 0;
+    const maxPoints = Number(assignment.maxPoints ?? 100);
+    return score === null || score === undefined || !Number.isFinite(Number(score)) ||
+      !Number.isFinite(maxPoints) || maxPoints <= 0;
   });
   if (missing.length) return { status: "INCOMPLETE", missingAssignmentIds: missing.map((item) => item.id) };
 
   let weightedTotal = 0;
   let totalWeight = 0;
-  for (const assignment of included) {
+  for (const assignment of contributing) {
     const score = assignment.scores.find((entry) => entry.studentId === studentId)!.score!;
     const maxPoints = assignment.maxPoints ?? 100;
     const weight = assignment.weight ?? 1;
     weightedTotal += (Number(score) / maxPoints) * 100 * weight;
     totalWeight += weight;
   }
-  if (totalWeight <= 0) return { status: "INCOMPLETE", missingAssignmentIds: included.map((item) => item.id) };
-  return { status: "COMPLETE", value: weightedTotal / totalWeight, assignmentIds: included.map((item) => item.id) };
+  if (totalWeight <= 0) return { status: "INCOMPLETE", missingAssignmentIds: contributing.map((item) => item.id) };
+  return { status: "COMPLETE", value: weightedTotal / totalWeight, assignmentIds: contributing.map((item) => item.id) };
 }
 
 export function resolveExplicitSubjectGrade(input: {
