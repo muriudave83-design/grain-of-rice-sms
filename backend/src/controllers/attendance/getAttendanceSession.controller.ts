@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
-import { PrismaClient, Role } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { Role } from "@prisma/client";
+import { prisma } from "../../prisma/client";
 
 export async function getAttendanceSession(req: Request, res: Response) {
   try {

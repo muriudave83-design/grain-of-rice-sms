@@ -3,11 +3,53 @@ import { Role } from "@prisma/client";
 import { prisma } from "../../prisma/client";
 import { authenticate } from "../../middlewares/authMiddleware";
 import { requireRole } from "../../middlewares/rolesMiddleware";
-import { activateContributionScope, getAdminGradebook, getAdminGradebookOptions, listAdminGradebookClasses, reviewAssignmentContribution } from "../../services/adminGradebook.service";
+import { activateContributionScope, bulkIncludeAssignmentContributions, getAdminGradebook, getAdminGradebookOptions, getContributionReview, getReportPrintingApprovalOverview, listAdminGradebookClasses, reviewAssignmentContribution } from "../../services/adminGradebook.service";
+import { createTeacherSubjectHandover, listTeacherSubjectHandovers, revokeTeacherSubjectHandover, TeacherSubjectHandoverError } from "../../services/teacherSubjectHandover.service";
 
 const router = Router();
 
 router.use(authenticate, requireRole([Role.ADMIN]));
+
+router.get("/teacher-subject-handovers", async (req, res) => {
+  const active = req.query.active === undefined ? undefined : req.query.active === "true";
+  try {
+    return res.json(await listTeacherSubjectHandovers(prisma, active));
+  } catch (error) {
+    console.error("LIST TEACHER HANDOVERS ERROR:", error);
+    return res.status(500).json({ message: "Failed to list teacher handovers" });
+  }
+});
+
+router.post("/teacher-subject-handovers", async (req, res) => {
+  const originalTeacherSubjectId = Number(req.body.originalTeacherSubjectId);
+  const replacementTeacherSubjectId = Number(req.body.replacementTeacherSubjectId);
+  const termId = Number(req.body.termId);
+  if (![originalTeacherSubjectId, replacementTeacherSubjectId, termId].every((id) => Number.isInteger(id) && id > 0)) {
+    return res.status(400).json({ message: "Valid originalTeacherSubjectId, replacementTeacherSubjectId and termId are required" });
+  }
+  try {
+    return res.status(201).json(await createTeacherSubjectHandover(prisma, {
+      originalTeacherSubjectId, replacementTeacherSubjectId, termId,
+      createdByAdminId: req.user!.id, note: req.body.note,
+    }));
+  } catch (error) {
+    if (error instanceof TeacherSubjectHandoverError) return res.status(error.status).json({ message: error.message });
+    console.error("CREATE TEACHER HANDOVER ERROR:", error);
+    return res.status(500).json({ message: "Failed to create teacher handover" });
+  }
+});
+
+router.post("/teacher-subject-handovers/:id/revoke", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "Valid handover id is required" });
+  try {
+    return res.json(await revokeTeacherSubjectHandover(prisma, id, req.user!.id));
+  } catch (error) {
+    if (error instanceof TeacherSubjectHandoverError) return res.status(error.status).json({ message: error.message });
+    console.error("REVOKE TEACHER HANDOVER ERROR:", error);
+    return res.status(500).json({ message: "Failed to revoke teacher handover" });
+  }
+});
 
 router.get("/gradebook/classes", async (_req, res) => {
   try {
@@ -54,6 +96,38 @@ router.patch("/gradebook/assignments/:assignmentId/contribution", async (req, re
       assignmentId, status: req.body.status, note: req.body.note,
       expectedReviewedAt: req.body.expectedReviewedAt ?? null, actorUserId: req.user!.id,
     }));
+  } catch (error: any) {
+    return res.status(error.status ?? 500).json({ message: error.message, details: error.details });
+  }
+});
+
+router.get("/gradebook/contribution-scopes/status", async (req, res) => {
+  const classId = Number(req.query.classId);
+  const subjectId = Number(req.query.subjectId);
+  const termId = Number(req.query.termId);
+  if (![classId, subjectId, termId].every((id) => Number.isInteger(id) && id > 0)) {
+    return res.status(400).json({ message: "Valid classId, subjectId and termId are required" });
+  }
+  try {
+    return res.json(await getContributionReview(prisma, classId, subjectId, termId));
+  } catch (error) {
+    console.error("GRADE CONTRIBUTION REVIEW STATUS ERROR:", error);
+    return res.status(500).json({ message: "Failed to load assignment inclusion review" });
+  }
+});
+
+router.get("/gradebook/report-printing-approval", async (_req, res) => {
+  try {
+    return res.json(await getReportPrintingApprovalOverview(prisma));
+  } catch (error) {
+    console.error("REPORT PRINTING APPROVAL OVERVIEW ERROR:", error);
+    return res.status(500).json({ message: "Failed to load report printing approval" });
+  }
+});
+
+router.post("/gradebook/report-printing-approval/include", async (req, res) => {
+  try {
+    return res.json(await bulkIncludeAssignmentContributions(prisma, { assignmentIds: req.body.assignmentIds ?? [], actorUserId: req.user!.id }));
   } catch (error: any) {
     return res.status(error.status ?? 500).json({ message: error.message, details: error.details });
   }

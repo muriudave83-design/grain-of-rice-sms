@@ -85,6 +85,37 @@ export async function lockCommentWriteScope(client: any, teacherSubjectId: numbe
   }];
 }
 
+export async function loadCommentWriteScope(client: any, teacherSubjectId: number, termId: number, studentId: number) {
+  return client.$queryRaw(Prisma.sql`
+    SELECT
+      ts.id AS "teacherSubjectId",
+      ts."teacherId" AS "teacherId",
+      ts."isActive" AS "teacherSubjectActive",
+      ts."classId" AS "classId",
+      t.id AS "termId",
+      t."isLocked" AS "termLocked",
+      t."isActive" AS "termActive",
+      s.id AS "studentId",
+      s."classId" AS "studentClassId",
+      s."isArchived" AS "studentArchived"
+    FROM "TeacherSubject" ts
+    JOIN "Term" t ON t.id = ${termId} AND t."classId" = ts."classId"
+    JOIN "Student" s ON s.id = ${studentId}
+    WHERE ts.id = ${teacherSubjectId}
+  `) as Promise<Array<{
+    teacherSubjectId: number;
+    teacherId: number;
+    teacherSubjectActive: boolean;
+    classId: number;
+    termId: number;
+    termLocked: boolean;
+    termActive: boolean;
+    studentId: number;
+    studentClassId: number | null;
+    studentArchived: boolean;
+  }>>;
+}
+
 export function validateLockedScoreScope(
   rows: Awaited<ReturnType<typeof lockScoreWriteScope>>,
   input: { teacherId?: number; score: number },
@@ -94,7 +125,7 @@ export function validateLockedScoreScope(
   if (input.teacherId !== undefined && row.teacherId !== input.teacherId) {
     throw new SavePreconditionError(403, "Not authorized for this assignment");
   }
-  if (!row.teacherSubjectActive) throw new SavePreconditionError(403, "This teacher assignment is inactive");
+  if (input.teacherId !== undefined && !row.teacherSubjectActive) throw new SavePreconditionError(403, "This teacher assignment is inactive");
   if (row.assignmentLocked || row.termLocked || !row.termActive) {
     throw new SavePreconditionError(409, "Assignment or term is locked or inactive");
   }
@@ -106,7 +137,7 @@ export function validateLockedScoreScope(
 }
 
 export function validateLockedCommentScope(
-  rows: Awaited<ReturnType<typeof lockCommentWriteScope>>,
+  rows: Awaited<ReturnType<typeof lockCommentWriteScope>> | Awaited<ReturnType<typeof loadCommentWriteScope>>,
   teacherId: number,
 ) {
   const row = rows[0];
@@ -120,6 +151,30 @@ export function validateLockedCommentScope(
     throw new SavePreconditionError(409, "Student is not active in this subject's class");
   }
   return row;
+}
+
+export async function saveAuthorizedReportComment(client: any, input: {
+  teacherId: number;
+  studentId: number;
+  teacherSubjectId: number;
+  termId: number;
+  comment: string;
+  expectedUpdatedAt: string | null;
+  allowEmpty?: boolean;
+}) {
+  const comment = String(input.comment ?? "");
+  if (!comment.trim() && !input.allowEmpty) {
+    throw new SavePreconditionError(422, "Clearing a saved comment requires explicit confirmation");
+  }
+  validateLockedCommentScope(
+    await loadCommentWriteScope(client, input.teacherSubjectId, input.termId, input.studentId),
+    input.teacherId,
+  );
+  return compareAndSetReportComment(client, { ...input, comment });
+}
+
+export function isTransientCommentSaveError(error: any) {
+  return error?.code === "P2024" || error?.code === "P2028" || /Unable to start a transaction|connection pool|timed out/i.test(String(error?.message ?? ""));
 }
 
 export function hasRequiredPrecondition(input: object, key: string) {
@@ -221,6 +276,10 @@ export async function compareAndSetReportComment(
   }
 
   if (input.expectedUpdatedAt === null) {
+    // A response may have been lost after a successful create. Repeating the
+    // same intended value is already satisfied and must not become a false
+    // conflict.
+    if (current.comment === input.comment) return current;
     throw new SavePreconditionError(409, "Comment already exists; reload before retrying", current);
   }
   const expected = new Date(input.expectedUpdatedAt);
@@ -239,6 +298,7 @@ export async function compareAndSetReportComment(
     const authoritative = await client.reportComment.findUnique({
       where: { studentId_teacherSubjectId_termId: key },
     });
+    if (authoritative?.comment === input.comment) return authoritative;
     throw new SavePreconditionError(409, "Comment changed in another session", authoritative);
   }
   return client.reportComment.findUnique({ where: { studentId_teacherSubjectId_termId: key } });

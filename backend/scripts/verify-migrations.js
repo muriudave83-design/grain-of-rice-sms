@@ -47,8 +47,9 @@ for (const name of migrationNames) {
     fail(`${name}/migration.sql contains a byte-order mark`);
   }
 
+  let text;
   try {
-    new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
     fail(`${name}/migration.sql is not valid UTF-8`);
   }
@@ -58,7 +59,9 @@ for (const name of migrationNames) {
     fail(`${name} is not present in migration-checksums.json`);
     continue;
   }
-  const actual = crypto.createHash("sha256").update(bytes).digest("hex");
+  // Git may check text files out with CRLF on Windows. Migration identity is
+  // based on canonical LF content so verification is stable across platforms.
+  const actual = crypto.createHash("sha256").update(text.replace(/\r\n/g, "\n"), "utf8").digest("hex");
   if (actual !== expected.toLowerCase()) {
     fail(`${name}/migration.sql checksum changed (expected ${expected}, got ${actual})`);
   }

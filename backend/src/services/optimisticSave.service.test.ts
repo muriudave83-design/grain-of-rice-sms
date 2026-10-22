@@ -83,3 +83,18 @@ test("stale comment cannot erase a newer comment", async () => {
     (error: any) => error instanceof SavePreconditionError && error.status === 409 && (error.current as any).comment === "New",
   );
 });
+
+test("a repeated request after a lost response is idempotently acknowledged", async () => {
+  const fixture = commentFixture();
+  const created = await compareAndSetReportComment(fixture.client, {
+    studentId: 1, teacherSubjectId: 2, termId: 3, comment: "Safe text", expectedUpdatedAt: null,
+  });
+  const retriedCreate = await compareAndSetReportComment(fixture.client, {
+    studentId: 1, teacherSubjectId: 2, termId: 3, comment: "Safe text", expectedUpdatedAt: null,
+  });
+  const retriedUpdate = await compareAndSetReportComment(fixture.client, {
+    studentId: 1, teacherSubjectId: 2, termId: 3, comment: "Safe text", expectedUpdatedAt: "2025-01-01T00:00:00.000Z",
+  });
+  assert.equal(retriedCreate.updatedAt.toISOString(), created.updatedAt.toISOString());
+  assert.equal(retriedUpdate.comment, "Safe text");
+});

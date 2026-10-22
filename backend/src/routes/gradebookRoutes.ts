@@ -49,7 +49,7 @@ router.post(
 
       const assessment = await prisma.assessment.findUnique({
         where: { id: Number(assessmentId) },
-        select: { id: true, classId: true, subjectId: true },
+        select: { id: true, classId: true, subjectId: true, maxScore: true, status: true, term: { select: { isActive: true, isLocked: true } } },
       });
       if (!assessment) return res.status(404).json({ message: "Assessment not found" });
       const [assigned, student] = await Promise.all([
@@ -64,6 +64,8 @@ router.post(
       ]);
       if (!assigned) return res.status(403).json({ message: "Active teacher assignment required" });
       if (!student) return res.status(400).json({ message: "Student is not active in this class" });
+      if (assessment.status !== "DRAFT" || assessment.term.isLocked || !assessment.term.isActive) return res.status(409).json({ message: "Assessment or term is locked, inactive, or submitted" });
+      if (!Number.isFinite(Number(score)) || Number(score) < 0 || Number(score) > assessment.maxScore) return res.status(400).json({ message: "Invalid score" });
 
       const saved = await prisma.assessmentScore.upsert({
         where: {

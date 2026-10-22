@@ -28,6 +28,10 @@ model User {
   taughtSubjects             Subject[]            @relation("TeacherSubjectsLegacy")
   teacherSubjects            TeacherSubject[]
   combinedAssignmentsCreated CombinedAssignment[] @relation("CombinedAssignmentCreator")
+  handoversAsOriginal        TeacherSubjectHandover[] @relation("HandoverOriginalTeacher")
+  handoversAsReplacement     TeacherSubjectHandover[] @relation("HandoverReplacementTeacher")
+  handoversCreated           TeacherSubjectHandover[] @relation("HandoverCreatedBy")
+  handoversRevoked           TeacherSubjectHandover[] @relation("HandoverRevokedBy")
 }
 
 model Parent {
@@ -90,6 +94,7 @@ model Class {
   students                Student[]
   studentClassEnrollments StudentClassEnrollment[]
   teacherSubjects         TeacherSubject[]
+  teacherSubjectHandovers TeacherSubjectHandover[]
   terms                   Term[]
 }
 
@@ -164,6 +169,7 @@ model Subject {
   reportEntries   ReportCardSubjectEntry[]
   teacher         User?                    @relation("TeacherSubjectsLegacy", fields: [teacherId], references: [id])
   teacherSubjects TeacherSubject[]
+  teacherSubjectHandovers TeacherSubjectHandover[]
 }
 
 model ClassSubject {
@@ -291,6 +297,7 @@ model Term {
   class              Class               @relation(fields: [classId], references: [id])
   transcripts        Transcript[]
   teachingGroupTerms TeachingGroupTerm[]
+  teacherSubjectHandovers TeacherSubjectHandover[]
 
   @@unique([name, classId, academicYear])
 }
@@ -388,10 +395,41 @@ model TeacherSubject {
   subject              Subject               @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   teacher              User                  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   teachingGroupMembers TeachingGroupMember[]
+  handoversAsOriginal  TeacherSubjectHandover[] @relation("HandoverOriginalTeacherSubject")
+  handoversAsReplacement TeacherSubjectHandover[] @relation("HandoverReplacementTeacherSubject")
 
   @@unique([teacherId, subjectId, classId], map: "TeacherSubject_unique_assignment")
   @@index([teacherId, isActive], map: "TeacherSubject_teacherId_isActive_idx")
   @@index([classId, subjectId, isActive], map: "TeacherSubject_classId_subjectId_isActive_idx")
+}
+
+model TeacherSubjectHandover {
+  id                          Int            @id @default(autoincrement())
+  originalTeacherSubjectId    Int
+  replacementTeacherSubjectId Int
+  originalTeacherId           Int
+  replacementTeacherId        Int
+  classId                     Int
+  subjectId                   Int
+  termId                      Int
+  isActive                    Boolean        @default(true)
+  note                        String?
+  createdByAdminId            Int
+  createdAt                   DateTime       @default(now()) @db.Timestamp(6)
+  revokedByAdminId            Int?
+  revokedAt                   DateTime?      @db.Timestamp(6)
+  originalTeacherSubject      TeacherSubject @relation("HandoverOriginalTeacherSubject", fields: [originalTeacherSubjectId], references: [id], onDelete: Restrict)
+  replacementTeacherSubject   TeacherSubject @relation("HandoverReplacementTeacherSubject", fields: [replacementTeacherSubjectId], references: [id], onDelete: Restrict)
+  originalTeacher             User           @relation("HandoverOriginalTeacher", fields: [originalTeacherId], references: [id], onDelete: Restrict)
+  replacementTeacher          User           @relation("HandoverReplacementTeacher", fields: [replacementTeacherId], references: [id], onDelete: Restrict)
+  class                       Class          @relation(fields: [classId], references: [id], onDelete: Restrict)
+  subject                     Subject        @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  term                        Term           @relation(fields: [termId], references: [id], onDelete: Restrict)
+  createdByAdmin              User           @relation("HandoverCreatedBy", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  revokedByAdmin              User?          @relation("HandoverRevokedBy", fields: [revokedByAdminId], references: [id], onDelete: Restrict)
+
+  @@index([replacementTeacherId, classId, subjectId, termId, isActive], map: "TeacherSubjectHandover_replacement_scope_active_idx")
+  @@index([originalTeacherSubjectId, termId, isActive], map: "TeacherSubjectHandover_original_term_active_idx")
 }
 
 model Assignment {

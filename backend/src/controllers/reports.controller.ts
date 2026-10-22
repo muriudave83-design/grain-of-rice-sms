@@ -1,40 +1,36 @@
 import { Request, Response } from "express";
 import { prisma } from "../prisma/client";
 import {
-  compareAndSetReportComment,
   hasRequiredPrecondition,
-  lockCommentWriteScope,
+  isTransientCommentSaveError,
+  saveAuthorizedReportComment,
   SavePreconditionError,
-  validateLockedCommentScope,
 } from "../services/optimisticSave.service";
 import { loadAuthoritativeReportResults, summarizeCompleteReport } from "../services/authoritativeReport.service";
 import { loadReportAttendance } from "../services/attendance/reportAttendance.service";
 
 export const saveReportComment = async (req: Request, res: Response) => {
   try {
-    const { studentId, teacherSubjectId, termId, comment, expectedUpdatedAt } = req.body;
+    const { studentId, teacherSubjectId, termId, comment, expectedUpdatedAt, allowEmpty } = req.body;
     if (!studentId || !teacherSubjectId || !termId) return res.status(400).json({ message: "Missing fields" });
     if (!hasRequiredPrecondition(req.body, "expectedUpdatedAt")) {
       return res.status(428).json({ message: "expectedUpdatedAt precondition is required" });
     }
-    const saved = await prisma.$transaction(async (tx) => {
-      validateLockedCommentScope(
-        await lockCommentWriteScope(tx, Number(teacherSubjectId), Number(termId), Number(studentId)),
-        req.user!.id,
-      );
-      return compareAndSetReportComment(tx, {
+    const saved = await saveAuthorizedReportComment(prisma, {
+        teacherId: (req as any).user.id,
         studentId: Number(studentId),
         teacherSubjectId: Number(teacherSubjectId),
         termId: Number(termId),
         comment: String(comment ?? ""),
         expectedUpdatedAt: expectedUpdatedAt === null ? null : String(expectedUpdatedAt),
-      });
+        allowEmpty: allowEmpty === true,
     });
     return res.json(saved);
   } catch (err) {
     if (err instanceof SavePreconditionError) {
       return res.status(err.status).json({ message: err.message, current: err.current });
     }
+    if (isTransientCommentSaveError(err)) return res.status(503).json({ message: "Comment save temporarily unavailable; your draft is safe. Retry shortly.", retryable: true });
     console.error("Save comment error:", err);
     return res.status(500).json({ message: "Something went wrong" });
   }
@@ -49,7 +45,7 @@ export const getStudentReport = async (req: Request, res: Response) => {
     if (!student) return res.status(404).json({ message: "Student not found" });
     if (student.classId === null || !student.class) return res.status(409).json({ message: "Student has no current class" });
     const classId = student.classId;
-    const user = req.user!;
+    const user = (req as any).user;
 
     if (user.role === "STUDENT" && student.userId !== user.id) return res.status(403).json({ message: "Not allowed to view this student" });
     if (user.role === "TEACHER") {

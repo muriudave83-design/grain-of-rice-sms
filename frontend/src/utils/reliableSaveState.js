@@ -5,6 +5,7 @@ export const SAVE_STATUS = Object.freeze({
   SAVED: "Saved",
   FAILED: "Failed",
   CONFLICT: "Conflict",
+  LOGIN_REQUIRED: "Login required",
 });
 
 export const unresolvedSaveStatuses = new Set([
@@ -12,6 +13,7 @@ export const unresolvedSaveStatuses = new Set([
   SAVE_STATUS.SAVING,
   SAVE_STATUS.FAILED,
   SAVE_STATUS.CONFLICT,
+  SAVE_STATUS.LOGIN_REQUIRED,
 ]);
 
 export function editSaveField(previous, serverValue, draftValue) {

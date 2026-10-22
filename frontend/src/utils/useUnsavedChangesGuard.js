@@ -2,7 +2,7 @@ import { useCallback, useEffect } from "react";
 import { useBlocker } from "react-router-dom";
 import { hasUnresolvedSaves } from "./reliableSaveState";
 
-const MESSAGE = "Some changes are not safely saved. Leave and discard those drafts?";
+const MESSAGE = "Some changes are not safely saved. Leave this page? Report-comment drafts will remain available in this browser tab.";
 
 export default function useUnsavedChangesGuard(fields, fieldsRef) {
   const blocker = useBlocker(hasUnresolvedSaves(fields));

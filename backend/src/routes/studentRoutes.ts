@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { AttendanceSessionStatus, PrismaClient } from "@prisma/client";
+import { AttendanceSessionStatus } from "@prisma/client";
+import { prisma } from "../prisma/client";
 import { authenticate } from "../middlewares/authMiddleware";
 import { requireRole } from "../middlewares/rolesMiddleware";
 import { authorizeStudentAccess } from "../middlewares/ownershipMiddleware";
@@ -8,7 +9,6 @@ import { summarizeAttendanceDays } from "../services/attendance/attendanceDomain
 import { loadReportAttendance } from "../services/attendance/reportAttendance.service";
 import { getOperationalStudentForUser } from "../services/studentOperational.service";
 
-const prisma = new PrismaClient();
 const router = Router();
 // ✅ TEST ROUTE (NO AUTH)
 router.get("/test", (_req, res) => {

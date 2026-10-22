@@ -13,13 +13,14 @@ const { saveCombinedScore } = require("../services/combinedTeachingGroup.service
 
 function fixture() {
   const rows: any[] = [];
-  const assignment = { id: 10, maxPoints: 50, isLocked: false, term: { isLocked: false }, teacherSubject: { teacherId: 7, classId: 8, isActive: true } };
+  const assignment = { id: 10, termId: 3, maxPoints: 50, isLocked: false, combinedAssignmentChild: null, term: { classId: 8, isLocked: false, isActive: true }, teacherSubject: { id: 4, teacherId: 7, classId: 8, subjectId: 9, isActive: true } };
   const student = { id: 1, classId: 8, isArchived: false };
   Object.assign(db, {
     assignment: {
       findUnique: async () => assignment,
-      findMany: async ({ where }: any) => where.teacherSubject.teacherId === 7 ? [assignment] : [],
+      findMany: async () => [assignment],
     },
+    teacherSubjectHandover: { findFirst: async () => null },
     combinedAssignmentChild: { findFirst: async () => null },
     student: { findFirst: async () => ({ id: student.id }), findMany: async () => [student] },
     score: { upsert: async ({ where, create, update }: any) => {

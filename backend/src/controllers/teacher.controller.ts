@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { prisma } from "../prisma/client";
 import { getLetterGrade } from "../utils/gradeDescriptions";
 import { AssessmentType } from "@prisma/client";
 import { loadReportAttendance } from "../services/attendance/reportAttendance.service";
@@ -9,17 +10,16 @@ import { deleteOwnedAssignment } from "../services/assignmentDeletion.service";
 import { assertNotCombinedChild, CombinedTeachingGroupError } from "../services/combinedTeachingGroup.service";
 import { AssignmentMaximumPointsError, updateOwnedAssignmentMaximumPoints } from "../services/assignmentMaximumPoints.service";
 import {
-  compareAndSetReportComment,
   compareAndSetScore,
   hasRequiredPrecondition,
-  lockCommentWriteScope,
+  isTransientCommentSaveError,
+  saveAuthorizedReportComment,
   lockScoreWriteScope,
   SavePreconditionError,
-  validateLockedCommentScope,
   validateLockedScoreScope,
 } from "../services/optimisticSave.service";
+import { accessibleTeacherSubjectIds, activeHandoverForAssignment, TeacherSubjectHandoverError } from "../services/teacherSubjectHandover.service";
 
-const prisma = new PrismaClient();
 
 // 🧠 HELPER — VALIDATE SCORE
 const isValidScore = (score: any) => {
@@ -136,13 +136,6 @@ export const getGradebook = async (req: Request, res: Response) => {
           include: { students: true },
         },
         subject: true,
-        assignments: termId
-          ? {
-              where: { termId },
-              orderBy: { position: "asc" },
-              include: { scores: true },
-            }
-          : false,
       },
     });
 
@@ -161,8 +154,17 @@ export const getGradebook = async (req: Request, res: Response) => {
         }))
       : false;
 
-    const assignments = ((gradebook.assignments || []) as any[]).map((assignment) => ({
+    const scope = termId ? await accessibleTeacherSubjectIds(prisma, {
+      replacementTeacherSubjectId: gradebook.id, teacherId: (req as any).user.id, termId,
+    }) : null;
+    const loadedAssignments: any[] = scope ? await prisma.assignment.findMany({
+      where: { termId: Number(termId), teacherSubjectId: { in: scope.teacherSubjectIds }, combinedAssignmentChild: null },
+      orderBy: [{ position: "asc" }, { id: "asc" }],
+      include: { scores: true, teacherSubject: { select: { id: true, teacherId: true } } },
+    }) : [];
+    const assignments = loadedAssignments.map((assignment) => ({
       ...assignment,
+      accessSource: assignment.teacherSubjectId === gradebook.id ? "OWNER" : "HANDOVER",
       scoreCount: assignment.scores.length,
       deletionStatus: hasPublishedGrades
         ? "PUBLISHED"
@@ -177,6 +179,7 @@ export const getGradebook = async (req: Request, res: Response) => {
     });
 
   } catch (err) {
+    if (err instanceof TeacherSubjectHandoverError) return res.status(err.status).json({ message: err.message });
     console.error("GET GRADEBOOK ERROR:", err);
     res.status(500).json({ message: "Error fetching gradebook" });
   }
@@ -231,9 +234,10 @@ export const upsertScore = async (req: Request, res: Response) => {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
+    const access = await activeHandoverForAssignment(tx, (req as any).user.id, Number(assignmentId));
     const locked = validateLockedScoreScope(
       await lockScoreWriteScope(tx, Number(assignmentId), Number(studentId)),
-      { teacherId: (req as any).user.id, score: scoreNumber },
+      { ...(access.access === "OWNER" ? { teacherId: (req as any).user.id } : {}), score: scoreNumber },
     );
     await assertNotCombinedChild(tx, [locked.assignmentId]);
 
@@ -248,6 +252,7 @@ export const upsertScore = async (req: Request, res: Response) => {
 
     res.json(result);
   } catch (err) {
+    if (err instanceof TeacherSubjectHandoverError) return res.status(err.status).json({ message: err.message });
     if (err instanceof SavePreconditionError) return res.status(err.status).json({ message: err.message, current: err.current });
     if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
     console.error("UPSERT SCORE ERROR:", err);
@@ -397,6 +402,10 @@ export const deleteAssignment = async (req: Request, res: Response) => {
   }
   try {
     await assertNotCombinedChild(prisma, [assignmentId]);
+    const deletionAccess = await activeHandoverForAssignment(prisma, (req as any).user.id, assignmentId);
+    if (deletionAccess.access === "HANDOVER") {
+      return res.status(403).json({ message: "Historical handover assignments cannot be deleted; an administrator must preserve their original record" });
+    }
     const result = await deleteOwnedAssignment(
       prisma,
       (req as any).user.id,
@@ -431,6 +440,7 @@ export const deleteAssignment = async (req: Request, res: Response) => {
       invalidatedGradeCount: result.invalidatedGradeCount,
     });
   } catch (err) {
+    if (err instanceof TeacherSubjectHandoverError) return res.status(err.status).json({ message: err.message });
     if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
     console.error("DELETE ASSIGNMENT ERROR:", err);
     res.status(500).json({ message: "Error deleting assignment" });
@@ -443,18 +453,17 @@ export const updateAssignment = async (req: Request, res: Response) => {
   }
   try {
     const assignment = await prisma.assignment.findFirst({
-      where: {
-        id: Number(req.params.id),
-        teacherSubject: { teacherId: (req as any).user.id, isActive: true },
-      },
+      where: { id: Number(req.params.id) },
       select: {
         id: true,
         isLocked: true,
         termId: true,
+        term: { select: { isLocked: true, isActive: true } },
         teacherSubject: { select: { subjectId: true, classId: true } },
       },
     });
     if (!assignment) return res.status(404).json({ message: "Assignment not found" });
+    await activeHandoverForAssignment(prisma, (req as any).user.id, assignment.id);
     await assertNotCombinedChild(prisma, [assignment.id]);
     const publishedGrade = await prisma.grade.findFirst({
       where: {
@@ -467,7 +476,7 @@ export const updateAssignment = async (req: Request, res: Response) => {
     if (publishedGrade) {
       return res.status(409).json({ message: "Published final-grade assignments cannot be edited" });
     }
-    if (assignment.isLocked) return res.status(409).json({ message: "Assignment is locked" });
+    if (assignment.isLocked || assignment.term.isLocked || !assignment.term.isActive) return res.status(409).json({ message: "Assignment or term is locked or inactive" });
 
     const updated = await prisma.assignment.update({
       where: { id: assignment.id },
@@ -491,6 +500,7 @@ export const updateAssignment = async (req: Request, res: Response) => {
 
     res.json(updated);
   } catch (err) {
+    if (err instanceof TeacherSubjectHandoverError) return res.status(err.status).json({ message: err.message });
     if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
     console.error("UPDATE ASSIGNMENT ERROR:", err);
     res.status(500).json({ message: "Error updating assignment" });
@@ -534,16 +544,23 @@ export const reorderAssignments = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid assignment id" });
     }
 
-    const ownedCount = await prisma.assignment.count({
-      where: {
-        id: { in: ids },
-        teacherSubject: { teacherId: (req as any).user.id, isActive: true },
-      },
-    });
-    if (ownedCount !== ids.length) {
-      return res.status(403).json({ error: "Cannot reorder another teacher's assignments" });
-    }
+    await Promise.all(ids.map((id) => activeHandoverForAssignment(prisma, (req as any).user.id, id)));
     await assertNotCombinedChild(prisma, ids);
+
+    const mutableAssignments = await prisma.assignment.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, isLocked: true, termId: true, term: { select: { isLocked: true, isActive: true } }, teacherSubject: { select: { classId: true, subjectId: true } } },
+    });
+    if (mutableAssignments.some((item) => item.isLocked || item.term.isLocked || !item.term.isActive)) {
+      return res.status(409).json({ error: "Cannot reorder locked or inactive assignments" });
+    }
+    for (const item of mutableAssignments) {
+      const published = await prisma.grade.findFirst({ where: {
+        termId: item.termId, subjectId: item.teacherSubject.subjectId,
+        student: { classId: item.teacherSubject.classId },
+      }, select: { id: true } });
+      if (published) return res.status(409).json({ error: "Published final-grade assignments cannot be reordered" });
+    }
 
     await prisma.$transaction(
       assignments.map((a: { id: number; position: number }) =>
@@ -556,6 +573,7 @@ export const reorderAssignments = async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (err) {
+    if (err instanceof TeacherSubjectHandoverError) return res.status(err.status).json({ message: err.message });
     if (err instanceof CombinedTeachingGroupError) return res.status(err.status).json({ message: err.message });
     console.error("REORDER ASSIGNMENTS ERROR:", err);
     res.status(500).json({ error: "Failed to reorder" });
@@ -603,16 +621,20 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
     const assignments = await prisma.assignment.findMany({
       where: {
         id: { in: assignmentIds },
-        teacherSubject: { teacherId: (req as any).user.id, isActive: true },
       },
       select: {
         id: true,
         isLocked: true,
-        term: { select: { isLocked: true } },
+        term: { select: { isLocked: true, isActive: true } },
         maxPoints: true,
         teacherSubject: { select: { classId: true } },
       },
     });
+    const accessByAssignment = new Map<number, any>();
+    for (const assignmentId of assignmentIds) {
+      try { accessByAssignment.set(assignmentId, await activeHandoverForAssignment(prisma, (req as any).user.id, assignmentId)); }
+      catch (error) { if (!(error instanceof TeacherSubjectHandoverError)) throw error; }
+    }
     await assertNotCombinedChild(prisma, assignmentIds);
 
     const studentIds = [
@@ -646,7 +668,10 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
       if (!assignment) {
         status = "invalid-assignment";
         invalid++;
-      } else if (assignment.isLocked || assignment.term?.isLocked) {
+      } else if (!accessByAssignment.has(Number(u.assignmentId))) {
+        status = "invalid-assignment";
+        invalid++;
+      } else if (assignment.isLocked || assignment.term?.isLocked || !assignment.term?.isActive) {
         status = "locked";
         skippedLocked++;
       } else if (!student || student.classId !== assignment.teacherSubject.classId) {
@@ -686,17 +711,23 @@ export const bulkUpdateScores = async (req: Request, res: Response) => {
     for (const update of validUpdates) {
       try {
         await prisma.$transaction(async (tx) => {
+          const access = await activeHandoverForAssignment(tx, (req as any).user.id, update.assignmentId);
           const locked = validateLockedScoreScope(
             await lockScoreWriteScope(tx, update.assignmentId, update.studentId),
-            { teacherId: (req as any).user.id, score: update.score },
+            { ...(access.access === "OWNER" ? { teacherId: (req as any).user.id } : {}), score: update.score },
           );
           await assertNotCombinedChild(tx, [locked.assignmentId]);
           return compareAndSetScore(tx, { ...update, maxPoints: locked.maxPoints });
         });
         updated++;
       } catch (error) {
-        if (!(error instanceof SavePreconditionError)) throw error;
         const item = preview.find((entry) => Number(entry.studentId) === update.studentId && Number(entry.assignmentId) === update.assignmentId);
+        if (error instanceof TeacherSubjectHandoverError) {
+          invalid++;
+          if (item) item.status = "invalid-assignment";
+          continue;
+        }
+        if (!(error instanceof SavePreconditionError)) throw error;
         if (error.status === 409 && error.current !== undefined) {
           conflicted++;
           if (item) {
@@ -841,7 +872,7 @@ export const getReportData = async (req: Request, res: Response) => {
 
 export const saveReportComment = async (req: Request, res: Response) => {
   try {
-    const { studentId, teacherSubjectId, termId, comment, expectedUpdatedAt } = req.body;
+    const { studentId, teacherSubjectId, termId, comment, expectedUpdatedAt, allowEmpty } = req.body;
 
     if (!studentId || !teacherSubjectId || !termId) {
       return res.status(400).json({ error: "studentId, teacherSubjectId, and termId are required" });
@@ -850,23 +881,20 @@ export const saveReportComment = async (req: Request, res: Response) => {
       return res.status(428).json({ error: "expectedUpdatedAt precondition is required" });
     }
 
-    const saved = await prisma.$transaction(async (tx) => {
-      validateLockedCommentScope(
-        await lockCommentWriteScope(tx, Number(teacherSubjectId), Number(termId), Number(studentId)),
-        (req as any).user.id,
-      );
-      return compareAndSetReportComment(tx, {
+    const saved = await saveAuthorizedReportComment(prisma, {
+        teacherId: (req as any).user.id,
         studentId: Number(studentId),
         teacherSubjectId: Number(teacherSubjectId),
         termId: Number(termId),
         comment: String(comment ?? ""),
         expectedUpdatedAt: expectedUpdatedAt === null ? null : String(expectedUpdatedAt),
-      });
+        allowEmpty: allowEmpty === true,
     });
 
     res.json(saved);
   } catch (err) {
     if (err instanceof SavePreconditionError) return res.status(err.status).json({ error: err.message, current: err.current });
+    if (isTransientCommentSaveError(err)) return res.status(503).json({ error: "Comment save temporarily unavailable; your draft is safe. Retry shortly.", retryable: true });
     console.error("Comment save failed:", err);
     res.status(500).json({ error: "Failed to save comment" });
   }

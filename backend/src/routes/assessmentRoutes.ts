@@ -249,8 +249,8 @@ router.post(
   async (req, res) => {
     const id = Number(req.params.id);
 
-    const assessment = await prisma.assessment.findUnique({
-      where: { id }
+    const assessment = await prisma.assessment.findFirst({
+      where: { id, status: "DRAFT", term: { isActive: true, isLocked: false } }
     });
 
     if (!assessment) {
@@ -273,6 +273,10 @@ router.post(
     }
 
     const { scores } = req.body;
+    if (!Array.isArray(scores) || scores.length === 0) return res.status(400).json({ message: "Scores are required" });
+    const studentIds = [...new Set(scores.map((item: any) => Number(item.studentId)))];
+    const activeStudentCount = await prisma.student.count({ where: { id: { in: studentIds }, classId: assessment.classId, isArchived: false } });
+    if (activeStudentCount !== studentIds.length) return res.status(400).json({ message: "Every student must be active in the assessment class" });
 
     await prisma.$transaction(
       scores.map((s: any) => {
@@ -327,6 +331,13 @@ router.patch(
       return res.status(404).json({ message: "Assessment not found" });
     }
 
+    const [assigned, term] = await Promise.all([
+      prisma.teacherSubject.findFirst({ where: { teacherId: req.user!.id, classId: assessment.classId, subjectId: assessment.subjectId, isActive: true }, select: { id: true } }),
+      prisma.term.findFirst({ where: { id: assessment.termId, classId: assessment.classId, isActive: true, isLocked: false }, select: { id: true } }),
+    ]);
+    if (!assigned) return res.status(403).json({ message: "You are not allowed to submit this assessment" });
+    if (!term || assessment.status !== "DRAFT") return res.status(409).json({ message: "Assessment or term is locked, inactive, or already submitted" });
+
     const scores = await prisma.assessmentScore.count({
       where: { assessmentId: id }
     });
@@ -374,6 +385,13 @@ router.post(
     if (!assessment) {
       return res.status(404).json({ message: "Assessment not found" });
     }
+
+    const [assigned, term] = await Promise.all([
+      prisma.teacherSubject.findFirst({ where: { teacherId: req.user!.id, classId: assessment.classId, subjectId: assessment.subjectId, isActive: true }, select: { id: true } }),
+      prisma.term.findFirst({ where: { id: assessment.termId, classId: assessment.classId, isActive: true, isLocked: false }, select: { id: true } }),
+    ]);
+    if (!assigned) return res.status(403).json({ message: "You are not allowed to submit this assessment" });
+    if (!term || assessment.status !== "DRAFT") return res.status(409).json({ message: "Assessment or term is locked, inactive, or already submitted" });
 
     const scores = await prisma.assessmentScore.count({
       where: { assessmentId: id }
@@ -438,6 +456,8 @@ router.delete(
           message: "You cannot delete another teacher's assessment"
         });
       }
+      const mutableTerm = await prisma.term.findFirst({ where: { id: assessment.termId, classId: assessment.classId, isActive: true, isLocked: false }, select: { id: true } });
+      if (!mutableTerm || assessment.status !== "DRAFT") return res.status(409).json({ message: "Submitted assessments or locked terms cannot be deleted" });
     }
 
     await prisma.assessment.delete({ where: { id } });
