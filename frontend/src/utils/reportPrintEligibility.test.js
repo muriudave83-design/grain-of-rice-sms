@@ -4,7 +4,12 @@ import { reportPrintBlockReason } from "./reportPrintEligibility.js";
 
 const report = (studentId, completenessState, comment = "", needsRevalidation = false) => ({
   studentId,
-  subjects: [{ completenessState, comment, needsRevalidation }],
+  subjects: [{
+    completenessState,
+    comment,
+    needsRevalidation,
+    finalGrade: completenessState === "INCOMPLETE" ? null : 85,
+  }],
 });
 
 test("administrator review status never blocks teacher printing", () => {
@@ -18,6 +23,7 @@ test("blank comments do not block printing", () => {
 
 test("incomplete marks remain a printing blocker", () => {
   assert.match(reportPrintBlockReason([report(1, "INCOMPLETE")]), /complete all required marks/i);
+  assert.match(reportPrintBlockReason([{ studentId: 1, subjects: [{ completenessState: "NO_INCLUDED_ASSIGNMENTS", finalGrade: null }] }]), /complete all required marks/i);
 });
 
 test("selected-student printing evaluates only the selected report", () => {

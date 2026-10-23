@@ -3,8 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma/client";
 import { getLetterGrade } from "../utils/gradeDescriptions";
 import { AssessmentType } from "@prisma/client";
-import { loadReportAttendance } from "../services/attendance/reportAttendance.service";
-import { loadAuthoritativeReportResults } from "../services/authoritativeReport.service";
+import { loadClassReports } from "../services/classReport.service";
 import { FinalGradePublicationError, publishFinalGradesAtomically } from "../services/finalGradePublication.service";
 import { deleteOwnedAssignment } from "../services/assignmentDeletion.service";
 import { assertNotCombinedChild, CombinedTeachingGroupError } from "../services/combinedTeachingGroup.service";
@@ -804,56 +803,13 @@ export const getReportData = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Term not found for this class" });
     }
 
-    const students = await prisma.student.findMany({
-      where: { classId, isArchived: false },
-      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+    const result = await loadClassReports(prisma, {
+      classId,
+      termId,
+      termStartDate: term.startDate,
+      termEndDate: term.endDate,
+      requestingTeacherId: teacherId,
     });
-    const studentIds = students.map((student) => student.id);
-    const [{ resultsByStudent }, attendanceByStudent] = await Promise.all([
-      loadAuthoritativeReportResults(prisma, {
-        classId,
-        termId,
-        studentIds,
-        requestingTeacherId: teacherId,
-        includeComments: true,
-      }),
-      loadReportAttendance(prisma, {
-        classId,
-        termId,
-        startDate: term.startDate,
-        endDate: term.endDate,
-        studentIds,
-      }),
-    ]);
-
-    /**
-     * BUILD REPORTS
-     */
-    const result = students.map((student) => {
-        const subjectResults = (resultsByStudent.get(student.id) ?? []).map((subject) => ({
-          ...subject,
-          letter: subject.grade,
-          status: subject.finalGrade === null ? "incomplete" : "complete",
-        }));
-
-        const attendance = attendanceByStudent.get(student.id)!;
-        const { present, absent, late, attendanceRate } = attendance;
-
-        return {
-          studentId: student.id,
-          name: `${student.firstName} ${student.lastName}`,
-          admissionNo: student.admissionNo,
-          subjects: subjectResults,
-
-          present,
-          absent,
-          late,
-          attendanceRate,
-          attendanceState: attendance.state,
-          attendanceDraftDays: attendance.draftDays,
-          attendanceIncompleteDays: attendance.incomplete,
-        };
-      });
 
     res.json(result);
 

@@ -28,12 +28,15 @@ test("subject comments match both student and teacher-subject assignment", () =>
 test("teacher report authorization and term-scoped comment query remain enforced", () => {
   const routes = fs.readFileSync(path.resolve(process.cwd(), "src/routes/teacher.routes.ts"), "utf8");
   const controller = fs.readFileSync(path.resolve(process.cwd(), "src/controllers/teacher.controller.ts"), "utf8");
+  const classReports = fs.readFileSync(path.resolve(process.cwd(), "src/services/classReport.service.ts"), "utf8");
   const authoritative = fs.readFileSync(path.resolve(process.cwd(), "src/services/authoritativeReport.service.ts"), "utf8");
 
   assert.match(routes, /router\.use\(authenticate, requireRole\(\["TEACHER"\]\)\)/);
   assert.match(controller, /where: \{ classId, teacherId, isActive: true, class: \{ isArchived: false \} \}/);
-  assert.match(controller, /loadAuthoritativeReportResults\(prisma/);
-  assert.match(controller, /includeComments: true/);
+  assert.match(controller, /loadClassReports\(prisma/);
+  assert.match(controller, /requestingTeacherId: teacherId/);
+  assert.match(classReports, /loadAuthoritativeReportResults\(client/);
+  assert.match(classReports, /includeComments: true/);
   assert.match(authoritative, /client\.classSubject\.findMany\(/);
   assert.match(authoritative, /teacherSubjectId: \{ in: teacherSubjectIds \}/);
   assert.match(authoritative, /client\.grade\.findMany\(/);

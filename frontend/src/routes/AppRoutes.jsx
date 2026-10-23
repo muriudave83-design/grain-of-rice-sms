@@ -286,10 +286,16 @@ function RoutedApp() {
           />
 
           {/* ✅ REPORTS */}
-          <Route
-            path="/dashboard/admin/reports"
-            element={<AdminReportsPage />}
-          />
+          <Route element={<ProtectedRoute allowedRoles={["ADMIN"]} />}>
+            <Route
+              path="/dashboard/admin/reports"
+              element={<AdminReportsPage />}
+            />
+            <Route
+              path="/dashboard/admin/reports/:studentId"
+              element={<StudentReportCardView />}
+            />
+          </Route>
 
           <Route
             path="/dashboard/admin/terms"
@@ -301,11 +307,6 @@ function RoutedApp() {
           <Route
             path="/dashboard/admin/attendance-reports"
             element={<AttendanceReport />}
-          />
-
-          <Route
-            path="/dashboard/admin/reports/:studentId"
-            element={<StudentReportCardView />}
           />
 
         </Route>

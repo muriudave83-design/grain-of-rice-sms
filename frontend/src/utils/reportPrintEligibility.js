@@ -9,7 +9,11 @@ export function reportPrintBlockReason(reports, selectedStudentId = null) {
     (report.subjects || []).some((subject) => subject.needsRevalidation === true),
   )) return REVALIDATION_MESSAGE;
   if (relevant.some((report) =>
-    (report.subjects || []).some((subject) => subject.completenessState === "INCOMPLETE"),
+    (report.subjects || []).some((subject) =>
+      subject.finalGrade === null ||
+      subject.finalGrade === undefined ||
+      subject.completenessState === "INCOMPLETE",
+    ),
   )) return INCOMPLETE_MARKS_MESSAGE;
   return null;
 }
