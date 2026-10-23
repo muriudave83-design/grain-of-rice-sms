@@ -1,3 +1,5 @@
+import { calculatePointsPercentage } from "./assignmentPointsPercentage.service";
+
 export type ContributionAssignment = {
   id: number;
   weight?: number | null;
@@ -24,18 +26,7 @@ export function calculateCurrentAvailableGrade(studentId: number, assignments: C
   const contributing = available.filter((assignment) => Number(assignment.weight ?? 1) > 0);
   if (!contributing.length) return null;
 
-  let weightedTotal = 0;
-  let totalWeight = 0;
-  for (const assignment of contributing) {
-    const score = assignment.scores.find((entry) => entry.studentId === studentId)?.score;
-    const maxPoints = Number(assignment.maxPoints ?? 100);
-    const weight = Number(assignment.weight ?? 1);
-    if (score === null || score === undefined || !Number.isFinite(Number(score)) ||
-        !Number.isFinite(maxPoints) || maxPoints <= 0) return null;
-    weightedTotal += (Number(score) / maxPoints) * 100 * weight;
-    totalWeight += weight;
-  }
-  return totalWeight > 0 ? weightedTotal / totalWeight : null;
+  return calculatePointsPercentage(studentId, contributing);
 }
 
 export function calculateTeacherReportAssignments(studentId: number, assignments: ContributionAssignment[]): ResolvedSubjectGrade {
@@ -84,39 +75,25 @@ export function calculateIncludedAssignments(studentId: number, assignments: Con
   });
   if (missing.length) return { status: "INCOMPLETE", missingAssignmentIds: missing.map((item) => item.id) };
 
-  let weightedTotal = 0;
-  let totalWeight = 0;
-  for (const assignment of contributing) {
-    const score = assignment.scores.find((entry) => entry.studentId === studentId)!.score!;
-    const maxPoints = assignment.maxPoints ?? 100;
-    const weight = assignment.weight ?? 1;
-    weightedTotal += (Number(score) / maxPoints) * 100 * weight;
-    totalWeight += weight;
-  }
-  if (totalWeight <= 0) return { status: "INCOMPLETE", missingAssignmentIds: contributing.map((item) => item.id) };
-  return { status: "COMPLETE", value: weightedTotal / totalWeight, assignmentIds: contributing.map((item) => item.id) };
+  const value = calculatePointsPercentage(studentId, contributing);
+  if (value === null) return { status: "INCOMPLETE", missingAssignmentIds: contributing.map((item) => item.id) };
+  return { status: "COMPLETE", value, assignmentIds: contributing.map((item) => item.id) };
 }
 
 export function resolveExplicitSubjectGrade(input: {
   studentId: number;
   assignments: ContributionAssignment[];
   scope: ContributionScope;
-  published?: { total: number; contributionRevision?: number | null } | null;
+  published?: { total: number; contributionRevision?: number | null; approvedCorrection?: boolean } | null;
 }): ResolvedSubjectGrade | null {
   if (input.published) {
-    const revisionMismatch = Boolean(
-      input.scope !== null &&
-      input.published.contributionRevision !== input.scope.revision
-    );
-    const currentAvailable = revisionMismatch
-      ? calculateCurrentAvailableGrade(input.studentId, input.assignments)
-      : null;
+    const currentAvailable = calculateCurrentAvailableGrade(input.studentId, input.assignments);
     const verifiedCurrentValue = currentAvailable !== null &&
       Number(currentAvailable.toFixed(1)) === Number(Number(input.published.total).toFixed(1));
     return {
       status: "PUBLISHED",
       value: input.published.total,
-      needsRevalidation: revisionMismatch && !verifiedCurrentValue,
+      needsRevalidation: input.published.approvedCorrection !== true && !verifiedCurrentValue,
     };
   }
   if (!input.scope) return null;

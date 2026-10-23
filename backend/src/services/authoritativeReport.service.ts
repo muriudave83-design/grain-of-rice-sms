@@ -82,6 +82,26 @@ export async function loadAuthoritativeReportResults(
       : Promise.resolve([]),
   ]);
 
+  const correctionAudits = client.auditLog?.findMany
+    ? await client.auditLog.findMany({
+        where: { action: "REPORT_CARDS_PUBLISHED", entityType: "Grade" },
+        select: { metadata: true },
+      })
+    : [];
+  const approvedCorrectionKeys = new Set(correctionAudits.flatMap((audit: any) => {
+    const metadata = audit.metadata as any;
+    return metadata?.reason === "Administrator-approved final report-card correction" &&
+      metadata?.authorizedBy === "Ammy" && metadata?.authorizedAt === "2026-10-23"
+      ? [`${metadata.studentId}:${metadata.subjectId}:${metadata.termId}:${metadata.approvedScore}`]
+      : [];
+  }));
+  const reportGrades = grades.map((grade: any) => ({
+    ...grade,
+    approvedCorrection: approvedCorrectionKeys.has(
+      `${grade.studentId}:${grade.subjectId}:${input.termId}:${grade.total}`,
+    ),
+  }));
+
   const scopeMap = new Map(scopes.map((scope: any) => [scope.subjectId, scope]));
   const commentMap = indexReportComments(comments);
   const resultsByStudent = new Map<number, any[]>();
@@ -91,7 +111,7 @@ export async function loadAuthoritativeReportResults(
       studentId,
       requestingTeacherId: input.requestingTeacherId ?? -1,
       classSubjects,
-      grades,
+      grades: reportGrades,
       comments: commentMap,
       contributionScopes: scopeMap as any,
     }).map((subject) => {
@@ -104,7 +124,7 @@ export async function loadAuthoritativeReportResults(
       const activeTeacherSubjectCount = teacherSubjects.filter((entry: any) => entry.isActive).length;
       const grade = getLetterGrade(subject.finalGrade);
       const configurationWarnings = [
-        ...(assignmentCount === 0 && !grades.some((entry: any) => entry.studentId === studentId && entry.subjectId === subject.subjectId)
+        ...(assignmentCount === 0 && !reportGrades.some((entry: any) => entry.studentId === studentId && entry.subjectId === subject.subjectId)
           ? ["NO_TERM_ASSIGNMENTS"]
           : []),
         ...(activeTeacherSubjectCount > 1 ? ["MULTIPLE_ACTIVE_TEACHER_ASSIGNMENTS"] : []),

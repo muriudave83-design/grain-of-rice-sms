@@ -40,7 +40,7 @@ test("partially graded student is incomplete", () => {
   assert.equal(calculateFinalGradeForStudent(1, [assignment(100), assignment(undefined)]), null);
 });
 test("complete weighted assignments calculate correctly", () => {
-  assert.equal(calculateFinalGradeForStudent(1, [assignment(80, 1), assignment(50, 3, 50)]), 95);
+  assert.equal(calculateFinalGradeForStudent(1, [assignment(18, 1, 20), assignment(30, 1, 50), assignment(8, 1, 10)]), 70);
 });
 test("incomplete class cannot publish and complete class can publish", () => {
   const canPublish = (studentIds: number[], assignments: any[]) =>

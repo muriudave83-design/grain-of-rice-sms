@@ -52,12 +52,17 @@ test("teacher reports retain missing and invalid mark safeguards regardless of r
   assert.deepEqual(calculateTeacherReportAssignments(1, [{ ...assignment(1, "INCLUDED", 80), weight: Number.NaN }]), { status: "INCOMPLETE", missingAssignmentIds: [1] });
 });
 
-test("teacher reports exclude zero weight, apply unequal positive weights, and reject all-zero or negative weights", () => {
+test("teacher reports use total earned over total possible, excluding zero weight", () => {
+  assert.deepEqual(calculateTeacherReportAssignments(1, [
+    { ...assignment(1, "INCLUDED", 18), maxPoints: 20 },
+    { ...assignment(2, "INCLUDED", 30), maxPoints: 50 },
+    { ...assignment(3, "INCLUDED", 8), maxPoints: 10 },
+  ]), { status: "COMPLETE", value: 70, assignmentIds: [1, 2, 3] });
   assert.deepEqual(calculateTeacherReportAssignments(1, [
     { ...assignment(1, "UNREVIEWED", 50), weight: 1 },
     { ...assignment(2, "EXCLUDED", 100), weight: 3 },
     { ...assignment(3, "INCLUDED", null), weight: 0, maxPoints: 0 },
-  ]), { status: "COMPLETE", value: 87.5, assignmentIds: [1, 2] });
+  ]), { status: "COMPLETE", value: 75, assignmentIds: [1, 2] });
   assert.deepEqual(calculateTeacherReportAssignments(1, [
     { ...assignment(1, "INCLUDED", null), weight: 0 },
   ]), { status: "INCOMPLETE", missingAssignmentIds: [1] });
@@ -84,11 +89,11 @@ test("legacy published grades are display-valid when complete current marks repr
     { ...assignment(2, "INCLUDED", 55), maxPoints: 60 },
     { ...assignment(3, "INCLUDED", 5), maxPoints: 5 },
   ];
-  assert.equal(Number(calculateCurrentAvailableGrade(1, assignments)?.toFixed(1)), 90.6);
+  assert.equal(Number(calculateCurrentAvailableGrade(1, assignments)?.toFixed(1)), 91.4);
   assert.deepEqual(resolveExplicitSubjectGrade({
     studentId: 1, assignments, scope: { mode: "REVIEWING", revision: 1 },
     published: { total: 90.6, contributionRevision: null },
-  }), { status: "PUBLISHED", value: 90.6, needsRevalidation: false });
+  }), { status: "PUBLISHED", value: 90.6, needsRevalidation: true });
 });
 
 test("genuinely changed or incomplete inputs retain published-grade revalidation", () => {

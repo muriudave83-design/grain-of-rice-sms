@@ -33,6 +33,23 @@ test("publication performs authoritative reads and writes in one Serializable tr
   assert.deepEqual(calls.locked.data, { isLocked: true });
 });
 
+test("publication stores total earned over total possible rather than averaging percentages", async () => {
+  const { tx, calls } = legacyTransaction();
+  tx.teacherSubject.findMany = async () => [{
+    id: 9, teacherId: 2, classId: 3, subjectId: 5,
+    subject: { id: 5, name: "Mathematics" },
+    assignments: [
+      { id: 10, title: "A", weight: 1, maxPoints: 20, scores: [{ studentId: 20, score: 18 }] },
+      { id: 11, title: "B", weight: 1, maxPoints: 50, scores: [{ studentId: 20, score: 30 }] },
+      { id: 12, title: "C", weight: 1, maxPoints: 10, scores: [{ studentId: 20, score: 8 }] },
+    ],
+  }];
+  const client = { $transaction: async (fn: any) => fn(tx) };
+  await publishFinalGradesAtomically(client, { classId: 3, termId: 4, teacherId: 2 });
+  assert.equal(calls.grades[0].create.total, 70);
+  assert.equal(calls.grades[0].create.average, 0.7);
+});
+
 test("publication retries bounded PostgreSQL serialization conflicts", async () => {
   const { tx } = legacyTransaction();
   let attempts = 0;

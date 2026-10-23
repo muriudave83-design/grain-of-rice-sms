@@ -18,6 +18,7 @@ import {
   validateLockedScoreScope,
 } from "../services/optimisticSave.service";
 import { accessibleTeacherSubjectIds, activeHandoverForAssignment, TeacherSubjectHandoverError } from "../services/teacherSubjectHandover.service";
+import { calculatePointsPercentage } from "../services/assignmentPointsPercentage.service";
 
 
 // 🧠 HELPER — VALIDATE SCORE
@@ -43,37 +44,7 @@ const dedupeUpdates = (updates: any[]) => {
 export const calculateFinalGradeForStudent = (
   studentId: number,
   assignments: any[]
-) => {
-  let total = 0;
-  let totalWeight = 0;
-
-  if (assignments.length === 0) return null;
-
-  for (const assignment of assignments) {
-    const scoreObj = assignment.scores.find(
-      (s: any) => s.studentId === studentId
-    );
-
-    if (!scoreObj || scoreObj.score === null || scoreObj.score === undefined || scoreObj.score === "") return null;
-
-    const score = Number(scoreObj.score);
-    if (isNaN(score)) return null;
-
-    // 🔥 UPDATED: use maxPoints instead of maxScore
-    const maxPoints = assignment.maxPoints ?? 100;
-    if (maxPoints <= 0) return null;
-    const weight = assignment.weight ?? 1;
-
-    const percentage = (score / maxPoints) * 100;
-
-    total += percentage * weight;
-    totalWeight += weight;
-  }
-
-  if (totalWeight <= 0) return null;
-
-  return total / totalWeight;
-};
+) => calculatePointsPercentage(studentId, assignments);
 
 //
 // 📚 TEACHER CORE

@@ -41,11 +41,16 @@ test("zero-weight assignments are excluded, including when their score is missin
   ]), 80);
 });
 
-test("unequal positive weights apply normally and invalid or all-zero weights are incomplete", () => {
+test("approved formula pools earned and possible points while zero weight still excludes", () => {
+  assert.equal(calculateAssignmentWeightedGrade(1, [
+    { id: 1, maxPoints: 20, weight: 1, scores: [{ studentId: 1, score: 18 }] },
+    { id: 2, maxPoints: 50, weight: 1, scores: [{ studentId: 1, score: 30 }] },
+    { id: 3, maxPoints: 10, weight: 1, scores: [{ studentId: 1, score: 8 }] },
+  ]), 70);
   assert.equal(calculateAssignmentWeightedGrade(1, [
     { id: 1, maxPoints: 100, weight: 1, scores: [{ studentId: 1, score: 50 }] },
     { id: 2, maxPoints: 100, weight: 3, scores: [{ studentId: 1, score: 100 }] },
-  ]), 87.5);
+  ]), 75);
   assert.equal(calculateAssignmentWeightedGrade(1, [{ id: 1, maxPoints: 100, weight: 0, scores: [] }]), null);
   assert.equal(calculateAssignmentWeightedGrade(1, [{ id: 1, maxPoints: 100, weight: -1, scores: [{ studentId: 1, score: 80 }] }]), null);
   assert.equal(calculateAssignmentWeightedGrade(1, [{ id: 1, maxPoints: 100, weight: Number.NaN, scores: [{ studentId: 1, score: 80 }] }]), null);

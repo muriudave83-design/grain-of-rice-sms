@@ -249,7 +249,7 @@ test("grade selection does not transfer comment ownership to a historical teache
   assert.equal(music.canEditComment, true);
 });
 
-test("complete weighted subjects use maximum points, preserve zero, and round once for reporting", () => {
+test("complete subjects use total earned over total possible and round once for reporting", () => {
   const [subject] = assembleClassSubjectResults({
     studentId: 1,
     requestingTeacherId: 100,
@@ -271,7 +271,7 @@ test("complete weighted subjects use maximum points, preserve zero, and round on
     grades: [],
     comments: emptyComments(),
   });
-  assert.equal(subject.finalGrade, 55.6);
+  assert.equal(subject.finalGrade, 50);
   assert.equal(subject.resultSource, "assignment-draft");
 });
 
@@ -297,10 +297,10 @@ test("a published grade remains authoritative even when current assignment input
   });
   assert.equal(subject.finalGrade, 83);
   assert.equal(subject.completenessState, "PUBLISHED");
-  assert.equal(subject.needsRevalidation, false);
+  assert.equal(subject.needsRevalidation, true);
 });
 
-test("Grade 7 Kiswahili legacy publication is verified by complete current marks", () => {
+test("legacy publication is flagged when the approved points formula changes its result", () => {
   const [subject] = assembleClassSubjectResults({
     studentId: 181,
     requestingTeacherId: 700,
@@ -324,5 +324,5 @@ test("Grade 7 Kiswahili legacy publication is verified by complete current marks
   });
   assert.equal(subject.finalGrade, 90.6);
   assert.equal(subject.completenessState, "PUBLISHED");
-  assert.equal(subject.needsRevalidation, false);
+  assert.equal(subject.needsRevalidation, true);
 });

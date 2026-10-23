@@ -14,10 +14,7 @@ export function calculateAssignmentWeightedGrade(studentId, assignments) {
     weighted.push({ score: Number(score), maxPoints, weight });
   }
 
-  const totalWeight = weighted.reduce((sum, assignment) => sum + assignment.weight, 0);
-  if (totalWeight <= 0) return null;
-  return weighted.reduce(
-    (sum, assignment) => sum + (assignment.score / assignment.maxPoints) * 100 * assignment.weight,
-    0,
-  ) / totalWeight;
+  const earned = weighted.reduce((sum, assignment) => sum + assignment.score, 0);
+  const possible = weighted.reduce((sum, assignment) => sum + assignment.maxPoints, 0);
+  return possible > 0 ? (earned / possible) * 100 : null;
 }

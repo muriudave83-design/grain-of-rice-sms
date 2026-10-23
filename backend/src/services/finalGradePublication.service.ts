@@ -120,8 +120,10 @@ export async function publishFinalGradesAtomically(
             throw new FinalGradePublicationError(409, `Cannot publish ${teacherSubject.subject.name}: total assignment weight must be greater than zero.`);
           }
           for (const student of students) {
-            let weightedTotal = 0;
+            let earnedPoints = 0;
+            let possiblePoints = 0;
             for (const assignment of assignments) {
+              if (Number(assignment.weight ?? 1) === 0) continue;
               const score = assignment.scores.find((entry: any) => entry.studentId === student.id)?.score;
               if (score === null || score === undefined) {
                 missing.push({
@@ -132,13 +134,14 @@ export async function publishFinalGradesAtomically(
                 });
                 continue;
               }
-              weightedTotal += (Number(score) / assignment.maxPoints) * 100 * (assignment.weight ?? 1);
+              earnedPoints += Number(score);
+              possiblePoints += Number(assignment.maxPoints);
             }
             if (!missing.some((entry) => entry.studentId === student.id && entry.subject === teacherSubject.subject.name)) {
               publications.push({
                 studentId: student.id,
                 subjectId: teacherSubject.subjectId,
-                total: Number((weightedTotal / totalWeight).toFixed(1)),
+                total: Number(((earnedPoints / possiblePoints) * 100).toFixed(1)),
                 revision: null,
               });
             }

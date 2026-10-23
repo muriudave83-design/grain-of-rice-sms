@@ -6,6 +6,7 @@ type ReportCommentRecord = {
 };
 
 import { resolveExplicitSubjectGrade } from "./gradeContribution.service";
+import { calculatePointsPercentage } from "./assignmentPointsPercentage.service";
 
 type AssignmentRecord = {
   id?: number;
@@ -27,26 +28,13 @@ type ClassSubjectRecord = {
   subject: { name: string; teacherSubjects: TeacherSubjectRecord[] };
 };
 
-type GradeRecord = { studentId: number; subjectId: number; total: number; contributionRevision?: number | null };
+type GradeRecord = { studentId: number; subjectId: number; total: number; contributionRevision?: number | null; approvedCorrection?: boolean };
 
 export function calculateCompleteAssignmentResult(
   studentId: number,
   assignments: AssignmentRecord[],
 ) {
-  if (assignments.length === 0) return null;
-
-  let weightedTotal = 0;
-  let totalWeight = 0;
-  for (const assignment of assignments) {
-    const score = assignment.scores.find((entry) => entry.studentId === studentId)?.score;
-    const maxPoints = assignment.maxPoints ?? 100;
-    const weight = assignment.weight ?? 1;
-    if (score === null || score === undefined || maxPoints <= 0) return null;
-    weightedTotal += (Number(score) / maxPoints) * 100 * weight;
-    totalWeight += weight;
-  }
-
-  return totalWeight > 0 ? weightedTotal / totalWeight : null;
+  return calculatePointsPercentage(studentId, assignments);
 }
 
 export function selectReportingTeacherSubject(
